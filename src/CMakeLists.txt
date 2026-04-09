@@ -42,6 +42,14 @@ add_executable(oniWorldApp
     "App/AppRuntime.cpp"
     "App/WasmResultSink.cpp"
     "App/BatchCaptureSink.cpp"
+    "Batch/FilterConfig.hpp"
+    "Batch/FilterConfig.cpp"
+    "Batch/BatchMatcher.hpp"
+    "Batch/BatchMatcher.cpp"
+    "Batch/SearchRequest.hpp"
+    "Batch/SearchEvents.hpp"
+    "Batch/BatchSearchService.hpp"
+    "Batch/BatchSearchService.cpp"
     "Setting/ComposableDictionary.hpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
@@ -111,5 +119,44 @@ target_include_directories(oniWorldApp
     PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
 )
 target_link_libraries(oniWorldApp PUBLIC clipper jsoncpp miniz)
+
+if(NOT EMSCRIPTEN)
+add_executable(test_filter_config
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_filter_config.cpp"
+    "Batch/FilterConfig.cpp"
+)
+target_include_directories(test_filter_config
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(test_filter_config PRIVATE jsoncpp)
+add_test(NAME test_filter_config COMMAND test_filter_config)
+
+add_executable(test_batch_matcher
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_batch_matcher.cpp"
+    "Batch/BatchMatcher.cpp"
+    "Batch/FilterConfig.cpp"
+)
+target_include_directories(test_batch_matcher
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(test_batch_matcher PRIVATE jsoncpp)
+add_test(NAME test_batch_matcher COMMAND test_batch_matcher)
+
+add_executable(test_batch_search_smoke
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_batch_search_smoke.cpp"
+    "Batch/BatchSearchService.cpp"
+    "BatchCpu/CpuOptimization.cpp"
+)
+target_include_directories(test_batch_search_smoke
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+if(TARGET Threads::Threads)
+target_link_libraries(test_batch_search_smoke PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_batch_search_smoke COMMAND test_batch_search_smoke)
+endif()
 
 configure_file("config.h.in" "config.h")
