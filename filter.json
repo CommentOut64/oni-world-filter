@@ -3,7 +3,6 @@
     "seedStart": 100000,
     "seedEnd": 200000,
     "mixing": 12187500,
-    "threads": 16,
 
     "required": ["big_volcano"],
 
@@ -18,5 +17,23 @@
         {"geyser": "liquid_sulfur",   "minDist": 0, "maxDist": 100},
         {"geyser": "molten_gold",     "minDist": 0, "maxDist": 100},
         {"geyser": "molten_iron",     "minDist": 0, "maxDist": 100}
-    ]
+    ],
+
+    "cpu": {
+        "mode": "custom",
+        "workers": 24,
+        "allowSmt": true,
+        "allowLowPerf": true,
+        "placement": "preferred",
+        "enableWarmup": true,
+        "warmupMinSampledSeeds": 512,
+        "warmupMaxRetry": 2,
+        "enableAdaptiveDown": true,
+        "chunkSize": 64,
+        "progressInterval": 1000,
+        "printMatches": true,
+        "printProgress": true,
+        "benchmarkSilent": false,
+        "printDiagnostics": true
+    }
 }

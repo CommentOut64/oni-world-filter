@@ -8,21 +8,21 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <chrono>
 #include <json/json.h>
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOGDI
-#include <windows.h>
-#endif
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
 #include <stack>
 #include <ranges>
 #include <algorithm>
+#include <cmath>
+#include <optional>
+#include <numeric>
 
 #include <clipper.hpp>
 
+#include "BatchCpu/CpuOptimization.hpp"
 #include "config.h"
 #include "Setting/SettingsCache.hpp"
 #include "WorldGen.hpp"
@@ -76,6 +76,42 @@ void WriteToBinary(const std::vector<Site> &sites)
     jsExchangeData(index++, (uint32_t)data.size(), (size_t)data.data());
 }
 
+#ifndef EMSCRIPTEN
+static const std::vector<char> *GetSharedResourceBlob()
+{
+    static std::once_flag once;
+    static std::vector<char> blob;
+    static bool loaded = false;
+
+    std::call_once(once, [] {
+        std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+        if (!file.is_open()) {
+            LogE("failed to open shared asset blob: %s", SETTING_ASSET_FILEPATH);
+            return;
+        }
+        file.seekg(0, std::ios::end);
+        const std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        if (size <= 0) {
+            LogE("asset blob size is invalid");
+            return;
+        }
+        blob.resize((size_t)size);
+        if (!file.read(blob.data(), size)) {
+            blob.clear();
+            LogE("failed to read shared asset blob");
+            return;
+        }
+        loaded = true;
+    });
+
+    if (!loaded) {
+        return nullptr;
+    }
+    return &blob;
+}
+#endif
+
 class App
 {
 private:
@@ -99,11 +135,23 @@ public:
 
     void Initialize(int seed)
     {
+#ifndef EMSCRIPTEN
+        if (const auto *blob = GetSharedResourceBlob(); blob != nullptr && !blob->empty()) {
+            std::string_view content(blob->data(), blob->size());
+            if (!m_settings.LoadSettingsCache(content)) {
+                LogE("load shared settings cache failed");
+            }
+            m_random = KRandom(seed);
+            return;
+        }
+#endif
         uint32_t count = SETTING_ASSET_FILESIZE;
         auto data = std::make_unique<char[]>(count);
         jsExchangeData(RT_Resource, count, (size_t)data.get());
         std::string_view content(data.get(), count);
-        m_settings.LoadSettingsCache(content);
+        if (!m_settings.LoadSettingsCache(content)) {
+            LogE("load settings cache failed");
+        }
         m_random = KRandom(seed);
     }
 
@@ -434,11 +482,40 @@ static thread_local BatchCapture g_batch;
 //  筛选规则
 // ============================================================
 struct FilterConfig {
+    struct CpuConfig {
+        std::string mode = "balanced"; // balanced/turbo/custom/conservative
+        int workers = 0;
+        bool allowSmt = true;
+        bool allowLowPerf = false;
+        std::string placement = "preferred"; // none/preferred/strict
+        bool enableWarmup = true;
+        int warmupTotalMs = 10000;
+        int warmupPerCandidateMs = 2500;
+        int warmupSeedCount = 4000;
+        double warmupTieTolerance = 0.03;
+        int warmupMinSampledSeeds = 512;
+        int warmupMaxRetry = 2;
+        bool enableAdaptiveDown = true;
+        int adaptiveMinWorkers = 1;
+        double adaptiveDropThreshold = 0.12;
+        int adaptiveDropWindows = 3;
+        int adaptiveCooldownMs = 8000;
+        int sampleWindowMs = 2000;
+        int chunkSize = 64;
+        int progressInterval = 1000;
+        bool printMatches = true;
+        bool printProgress = true;
+        bool benchmarkSilent = false;
+        bool printDiagnostics = true;
+    };
+
     int worldType = 0;
     int seedStart = 1;
     int seedEnd = 100000;
     int mixing = 0;
     int threads = 0; // 0 = 自动 (hardware_concurrency)
+    bool hasCpuSection = false;
+    CpuConfig cpu;
     std::vector<int> required;
     std::vector<int> forbidden;
     struct DistRule {
@@ -448,6 +525,18 @@ struct FilterConfig {
     };
     std::vector<DistRule> distanceRules;
 };
+
+template<typename T>
+static T ClampValue(T value, T minValue, T maxValue)
+{
+    if (value < minValue) {
+        return minValue;
+    }
+    if (value > maxValue) {
+        return maxValue;
+    }
+    return value;
+}
 
 static bool LoadFilter(const std::string &path, FilterConfig &cfg)
 {
@@ -469,6 +558,53 @@ static bool LoadFilter(const std::string &path, FilterConfig &cfg)
     cfg.seedEnd = root.get("seedEnd", 100000).asInt();
     cfg.mixing = root.get("mixing", 0).asInt();
     cfg.threads = root.get("threads", 0).asInt();
+    if (cfg.seedEnd < cfg.seedStart) {
+        std::swap(cfg.seedStart, cfg.seedEnd);
+    }
+    cfg.threads = std::max(0, cfg.threads);
+
+    const Json::Value cpu = root["cpu"];
+    if (cpu.isObject()) {
+        cfg.hasCpuSection = true;
+        cfg.cpu.mode = cpu.get("mode", cfg.cpu.mode).asString();
+        cfg.cpu.workers = std::max(0, cpu.get("workers", cfg.cpu.workers).asInt());
+        cfg.cpu.allowSmt = cpu.get("allowSmt", cfg.cpu.allowSmt).asBool();
+        cfg.cpu.allowLowPerf = cpu.get("allowLowPerf", cfg.cpu.allowLowPerf).asBool();
+        cfg.cpu.placement = cpu.get("placement", cfg.cpu.placement).asString();
+        cfg.cpu.enableWarmup = cpu.get("enableWarmup", cfg.cpu.enableWarmup).asBool();
+        cfg.cpu.warmupTotalMs = cpu.get("warmupTotalMs", cfg.cpu.warmupTotalMs).asInt();
+        cfg.cpu.warmupPerCandidateMs = cpu.get("warmupPerCandidateMs", cfg.cpu.warmupPerCandidateMs).asInt();
+        cfg.cpu.warmupSeedCount = cpu.get("warmupSeedCount", cfg.cpu.warmupSeedCount).asInt();
+        cfg.cpu.warmupTieTolerance = cpu.get("warmupTieTolerance", cfg.cpu.warmupTieTolerance).asDouble();
+        cfg.cpu.warmupMinSampledSeeds = cpu.get("warmupMinSampledSeeds", cfg.cpu.warmupMinSampledSeeds).asInt();
+        cfg.cpu.warmupMaxRetry = cpu.get("warmupMaxRetry", cfg.cpu.warmupMaxRetry).asInt();
+        cfg.cpu.enableAdaptiveDown = cpu.get("enableAdaptiveDown", cfg.cpu.enableAdaptiveDown).asBool();
+        cfg.cpu.adaptiveMinWorkers = cpu.get("adaptiveMinWorkers", cfg.cpu.adaptiveMinWorkers).asInt();
+        cfg.cpu.adaptiveDropThreshold = cpu.get("adaptiveDropThreshold", cfg.cpu.adaptiveDropThreshold).asDouble();
+        cfg.cpu.adaptiveDropWindows = cpu.get("adaptiveDropWindows", cfg.cpu.adaptiveDropWindows).asInt();
+        cfg.cpu.adaptiveCooldownMs = cpu.get("adaptiveCooldownMs", cfg.cpu.adaptiveCooldownMs).asInt();
+        cfg.cpu.sampleWindowMs = cpu.get("sampleWindowMs", cfg.cpu.sampleWindowMs).asInt();
+        cfg.cpu.chunkSize = cpu.get("chunkSize", cfg.cpu.chunkSize).asInt();
+        cfg.cpu.progressInterval = cpu.get("progressInterval", cfg.cpu.progressInterval).asInt();
+        cfg.cpu.printMatches = cpu.get("printMatches", cfg.cpu.printMatches).asBool();
+        cfg.cpu.printProgress = cpu.get("printProgress", cfg.cpu.printProgress).asBool();
+        cfg.cpu.benchmarkSilent = cpu.get("benchmarkSilent", cfg.cpu.benchmarkSilent).asBool();
+        cfg.cpu.printDiagnostics = cpu.get("printDiagnostics", cfg.cpu.printDiagnostics).asBool();
+    }
+
+    cfg.cpu.warmupTotalMs = ClampValue(cfg.cpu.warmupTotalMs, 1000, 30000);
+    cfg.cpu.warmupPerCandidateMs = ClampValue(cfg.cpu.warmupPerCandidateMs, 500, 8000);
+    cfg.cpu.warmupSeedCount = ClampValue(cfg.cpu.warmupSeedCount, 256, 200000);
+    cfg.cpu.warmupTieTolerance = ClampValue(cfg.cpu.warmupTieTolerance, 0.0, 0.2);
+    cfg.cpu.warmupMinSampledSeeds = ClampValue(cfg.cpu.warmupMinSampledSeeds, 32, 200000);
+    cfg.cpu.warmupMaxRetry = ClampValue(cfg.cpu.warmupMaxRetry, 0, 5);
+    cfg.cpu.adaptiveMinWorkers = ClampValue(cfg.cpu.adaptiveMinWorkers, 1, 1024);
+    cfg.cpu.adaptiveDropThreshold = ClampValue(cfg.cpu.adaptiveDropThreshold, 0.0, 0.5);
+    cfg.cpu.adaptiveDropWindows = ClampValue(cfg.cpu.adaptiveDropWindows, 1, 10);
+    cfg.cpu.adaptiveCooldownMs = ClampValue(cfg.cpu.adaptiveCooldownMs, 1000, 60000);
+    cfg.cpu.sampleWindowMs = ClampValue(cfg.cpu.sampleWindowMs, 200, 10000);
+    cfg.cpu.chunkSize = ClampValue(cfg.cpu.chunkSize, 1, 2048);
+    cfg.cpu.progressInterval = ClampValue(cfg.cpu.progressInterval, 1, 1000000);
 
     for (const auto &v : root["required"]) {
         int i = GeyserIdToIndex(v.asString());
@@ -590,6 +726,7 @@ static void PrintUsage()
     printf("Usage:\n");
     printf("  oniWorldApp                       Interactive mode\n");
     printf("  oniWorldApp --filter filter.json   Batch search mode\n");
+    printf("    filter.json supports optional cpu{} for topology-aware scheduling and benchmarkSilent\n");
     printf("  oniWorldApp --list-geysers         Show all geyser IDs\n");
     printf("  oniWorldApp --list-worlds          Show all world type IDs\n");
 }
@@ -624,6 +761,272 @@ static void PrintWorldList()
     printf("  ... (13~37 for Spaced Out cluster variants)\n");
 }
 
+struct BatchRunOptions {
+    bool printMatches = true;
+    bool printProgress = true;
+    bool printDiagnostics = true;
+    bool enableAdaptive = false;
+    int chunkSize = 64;
+    int progressInterval = 1000;
+    std::chrono::milliseconds sampleWindow{2000};
+    std::chrono::milliseconds maxRunDuration{0}; // 0 表示不限制
+    BatchCpu::AdaptiveConfig adaptiveConfig{};
+};
+
+struct BatchRunResult {
+    int totalSeeds = 0;
+    int processedSeeds = 0;
+    int totalMatches = 0;
+    int finalActiveWorkers = 0;
+    uint32_t autoFallbackCount = 0;
+    bool stoppedByBudget = false;
+    BatchCpu::ThroughputStats throughput{};
+};
+
+static double ComputeStdDev(const std::vector<double> &samples, double avg)
+{
+    if (samples.size() <= 1) {
+        return 0.0;
+    }
+    double sumSquares = 0.0;
+    for (double sample : samples) {
+        const double diff = sample - avg;
+        sumSquares += diff * diff;
+    }
+    return std::sqrt(sumSquares / (double)samples.size());
+}
+
+static BatchCpu::PlannerInput BuildPlannerInput(const FilterConfig &cfg,
+                                                const BatchCpu::CpuTopology &topology)
+{
+    BatchCpu::PlannerInput input;
+    input.topology = &topology;
+
+    const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
+    if (legacyThreadsOnly) {
+        input.mode = BatchCpu::CpuMode::Custom;
+        input.customWorkers = (uint32_t)cfg.threads;
+        input.customAllowSmt = true;
+        input.customAllowLowPerf = true;
+        input.customPlacement = BatchCpu::PlacementMode::Preferred;
+        return input;
+    }
+
+    input.mode = BatchCpu::ParseCpuMode(cfg.cpu.mode);
+    input.legacyThreadOverride = 0;
+    input.customWorkers = (uint32_t)std::max(0, cfg.cpu.workers);
+    input.customAllowSmt = cfg.cpu.allowSmt;
+    input.customAllowLowPerf = cfg.cpu.allowLowPerf;
+    input.customPlacement = BatchCpu::ParsePlacementMode(cfg.cpu.placement);
+    return input;
+}
+
+static void PrintThreadPolicy(const BatchCpu::ThreadPolicy &policy, const char *prefix)
+{
+    printf("%sname=%s workers=%u placement=%s smt=%s low_perf=%s logical=[%s]\n",
+           prefix,
+           policy.name.c_str(),
+           policy.workerCount,
+           BatchCpu::ToString(policy.placement),
+           policy.allowSmt ? "on" : "off",
+           policy.allowLowPerf ? "on" : "off",
+           BatchCpu::JoinLogicalList(policy.targetLogicalProcessors).c_str());
+}
+
+static BatchRunResult RunBatchWithPolicy(const FilterConfig &cfg,
+                                         int seedStart,
+                                         int seedEnd,
+                                         const BatchCpu::ThreadPolicy &policy,
+                                         const BatchRunOptions &options)
+{
+    BatchRunResult result;
+    if (seedEnd < seedStart) {
+        return result;
+    }
+    result.totalSeeds = seedEnd - seedStart + 1;
+
+    const int workerCount = std::max<int>(1, (int)policy.workerCount);
+    std::atomic<int> nextSeed{seedStart};
+    std::atomic<int> processed{0};
+    std::atomic<int> totalMatches{0};
+    std::atomic<int> activeWorkers{workerCount};
+    std::atomic<bool> stopRequested{false};
+    std::atomic<bool> hitBudget{false};
+    std::mutex outputMutex;
+    std::vector<double> sampledThroughput;
+    sampledThroughput.reserve(64);
+
+    BatchCpu::AdaptiveConfig adaptive = options.adaptiveConfig;
+    adaptive.enabled = options.enableAdaptive && adaptive.enabled;
+    adaptive.minWorkers = (uint32_t)std::min<int>(adaptive.minWorkers, workerCount);
+    BatchCpu::AdaptiveConcurrencyController controller(adaptive, (uint32_t)workerCount);
+
+    const auto startedAt = std::chrono::steady_clock::now();
+    auto deadline = startedAt;
+    if (options.maxRunDuration.count() > 0) {
+        deadline = startedAt + options.maxRunDuration;
+    }
+
+    auto worker = [&](int workerIndex) {
+        app_init(0);
+        App::Instance()->skipPolygons = true;
+        g_batch.active = true;
+
+        std::string placementError;
+        if (!BatchCpu::ApplyThreadPlacement(policy, (uint32_t)workerIndex, &placementError) &&
+            options.printDiagnostics && !placementError.empty()) {
+            std::lock_guard<std::mutex> lock(outputMutex);
+            printf("  [cpu] worker %d placement fallback: %s\n",
+                   workerIndex, placementError.c_str());
+        }
+
+        while (true) {
+            if (stopRequested.load(std::memory_order_relaxed)) {
+                break;
+            }
+            if (nextSeed.load(std::memory_order_relaxed) > seedEnd) {
+                break;
+            }
+            if (workerIndex >= activeWorkers.load(std::memory_order_relaxed)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+
+            const int chunkStart = nextSeed.fetch_add(options.chunkSize);
+            if (chunkStart > seedEnd) {
+                break;
+            }
+            const int chunkEnd = std::min(seedEnd, chunkStart + options.chunkSize - 1);
+            for (int seed = chunkStart; seed <= chunkEnd; ++seed) {
+                if (stopRequested.load(std::memory_order_relaxed)) {
+                    break;
+                }
+
+                g_batch.Reset();
+                const bool generated = app_generate(cfg.worldType, seed, cfg.mixing);
+                const bool matched = generated && MatchFilter(cfg, g_batch);
+                if (matched) {
+                    totalMatches.fetch_add(1);
+                    if (options.printMatches) {
+                        std::lock_guard<std::mutex> lock(outputMutex);
+                        PrintMatch(seed, g_batch, cfg);
+                    }
+                }
+
+                const int done = processed.fetch_add(1) + 1;
+                if (options.printProgress && done % options.progressInterval == 0) {
+                    std::lock_guard<std::mutex> lock(outputMutex);
+                    printf("[%d/%d] found %d matches (active workers=%d)\n",
+                           done,
+                           result.totalSeeds,
+                           totalMatches.load(),
+                           activeWorkers.load());
+                }
+
+                if (options.maxRunDuration.count() > 0 &&
+                    std::chrono::steady_clock::now() >= deadline) {
+                    stopRequested.store(true);
+                    hitBudget.store(true);
+                    break;
+                }
+            }
+        }
+    };
+
+    std::thread monitor([&] {
+        int lastProcessed = 0;
+        auto lastTs = std::chrono::steady_clock::now();
+        while (!stopRequested.load(std::memory_order_relaxed)) {
+            if (processed.load(std::memory_order_relaxed) >= result.totalSeeds) {
+                break;
+            }
+            std::this_thread::sleep_for(options.sampleWindow);
+            const auto now = std::chrono::steady_clock::now();
+            if (options.maxRunDuration.count() > 0 && now >= deadline) {
+                stopRequested.store(true);
+                hitBudget.store(true);
+            }
+
+            const int current = processed.load(std::memory_order_relaxed);
+            const int delta = current - lastProcessed;
+            const double seconds =
+                std::chrono::duration<double>(now - lastTs).count();
+            if (seconds <= 0.0 || delta <= 0) {
+                continue;
+            }
+            const double seedsPerSecond = (double)delta / seconds;
+            sampledThroughput.push_back(seedsPerSecond);
+
+            if (options.printProgress) {
+                std::lock_guard<std::mutex> lock(outputMutex);
+                printf("  [cpu] window throughput: %.1f seeds/s, active workers=%d\n",
+                       seedsPerSecond,
+                       activeWorkers.load(std::memory_order_relaxed));
+            }
+
+            if (adaptive.enabled) {
+                const auto nextWorkers = controller.Observe(
+                    seedsPerSecond,
+                    (uint32_t)activeWorkers.load(std::memory_order_relaxed),
+                    now);
+                if (nextWorkers.has_value() &&
+                    (int)nextWorkers.value() < activeWorkers.load(std::memory_order_relaxed)) {
+                    activeWorkers.store((int)nextWorkers.value(), std::memory_order_relaxed);
+                    if (options.printDiagnostics || options.printProgress) {
+                        std::lock_guard<std::mutex> lock(outputMutex);
+                        printf("  [cpu] adaptive fallback -> active workers %u (peak=%.1f)\n",
+                               nextWorkers.value(),
+                               controller.PeakSeedsPerSecond());
+                    }
+                }
+            }
+
+            lastProcessed = current;
+            lastTs = now;
+        }
+    });
+
+    std::vector<std::thread> workers;
+    workers.reserve((size_t)workerCount);
+    for (int i = 0; i < workerCount; ++i) {
+        workers.emplace_back(worker, i);
+    }
+    for (auto &th : workers) {
+        th.join();
+    }
+
+    stopRequested.store(true);
+    if (monitor.joinable()) {
+        monitor.join();
+    }
+
+    result.processedSeeds = processed.load();
+    result.totalMatches = totalMatches.load();
+    result.finalActiveWorkers = activeWorkers.load();
+    result.autoFallbackCount = controller.ReductionCount();
+    result.stoppedByBudget = hitBudget.load();
+
+    const auto finishedAt = std::chrono::steady_clock::now();
+    const double elapsedSeconds =
+        std::chrono::duration<double>(finishedAt - startedAt).count();
+    if (elapsedSeconds > 0.0 && result.processedSeeds > 0) {
+        result.throughput.averageSeedsPerSecond =
+            (double)result.processedSeeds / elapsedSeconds;
+        result.throughput.processedSeeds = (uint64_t)result.processedSeeds;
+        result.throughput.valid = true;
+    }
+    if (!sampledThroughput.empty()) {
+        const double sampleAvg = std::accumulate(sampledThroughput.begin(),
+                                                 sampledThroughput.end(),
+                                                 0.0) /
+                                 (double)sampledThroughput.size();
+        result.throughput.stddevSeedsPerSecond =
+            ComputeStdDev(sampledThroughput, sampleAvg);
+    }
+
+    return result;
+}
+
 // ============================================================
 //  main
 // ============================================================
@@ -656,85 +1059,162 @@ int main(int argc, char *argv[])
             return 1;
 
         g_batchMode = true;
-        int total = cfg.seedEnd - cfg.seedStart + 1;
-        int numThreads = cfg.threads;
-        if (numThreads <= 0) {
-            numThreads = (int)std::thread::hardware_concurrency();
-            if (numThreads <= 0)
-                numThreads = 4;
+        const int totalSeeds = cfg.seedEnd - cfg.seedStart + 1;
+        const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
+        const bool benchmarkSilent = cfg.cpu.benchmarkSilent;
+
+        auto topology = BatchCpu::CpuTopologyDetector::Detect();
+        auto plannerInput = BuildPlannerInput(cfg, topology);
+        auto candidates = BatchCpu::ThreadPolicyPlanner::BuildCandidates(plannerInput);
+        if (candidates.empty()) {
+            candidates.push_back(BatchCpu::ThreadPolicyPlanner::BuildConservativePolicy(topology));
         }
 
-        printf("Scanning seeds %d ~ %d (worldType=%d, mixing=%d) with %d threads\n",
-               cfg.seedStart, cfg.seedEnd, cfg.worldType, cfg.mixing, numThreads);
+        printf("Scanning seeds %d ~ %d (worldType=%d, mixing=%d)\n",
+               cfg.seedStart, cfg.seedEnd, cfg.worldType, cfg.mixing);
         printf("  required: %zu, forbidden: %zu, distance rules: %zu\n",
                cfg.required.size(), cfg.forbidden.size(), cfg.distanceRules.size());
+        printf("  cpu mode: %s%s\n",
+               BatchCpu::ToString(plannerInput.mode),
+               legacyThreadsOnly ? " (legacy threads override)" : "");
+        if (cfg.cpu.printDiagnostics && !benchmarkSilent) {
+            printf("  %s\n", topology.diagnostics.c_str());
+            for (size_t i = 0; i < candidates.size(); ++i) {
+                printf("  candidate[%zu] ", i);
+                PrintThreadPolicy(candidates[i], "");
+            }
+        }
 
-        std::mutex outputMutex;
-        std::atomic<int> totalMatches{0};
-        std::atomic<int> seedsProcessed{0};
+        auto selectedPolicy = candidates.front();
+        bool enableWarmup = cfg.cpu.enableWarmup && !legacyThreadsOnly &&
+                            plannerInput.mode != BatchCpu::CpuMode::Custom &&
+                            plannerInput.mode != BatchCpu::CpuMode::Conservative &&
+                            candidates.size() > 1;
+        if (cfg.seedStart >= cfg.seedEnd) {
+            enableWarmup = false;
+        }
 
-        auto worker = [&](int rangeStart, int rangeEnd) {
-            // 每个线程独立初始化 App (thread_local 实例)
-            app_init(0);
-            App::Instance()->skipPolygons = true;
-            g_batch.active = true;
+        if (enableWarmup) {
+            const int warmupEnd = std::min(
+                cfg.seedEnd,
+                cfg.seedStart + std::max(1, cfg.cpu.warmupSeedCount) - 1);
+            const int warmupTotalSeeds = warmupEnd - cfg.seedStart + 1;
+            const int warmupMinSampledSeeds = std::min(
+                warmupTotalSeeds,
+                std::max(1, cfg.cpu.warmupMinSampledSeeds));
+            BatchCpu::WarmupConfig warmupConfig;
+            warmupConfig.enabled = true;
+            warmupConfig.totalBudget = std::chrono::milliseconds(cfg.cpu.warmupTotalMs);
+            warmupConfig.perCandidateBudget = std::chrono::milliseconds(cfg.cpu.warmupPerCandidateMs);
+            warmupConfig.tieToleranceRatio = cfg.cpu.warmupTieTolerance;
 
-            for (int seed = rangeStart; seed <= rangeEnd; ++seed) {
-                g_batch.Reset();
-                if (!app_generate(cfg.worldType, seed, cfg.mixing))
+            BatchRunOptions warmupOptions;
+            warmupOptions.printMatches = false;
+            warmupOptions.printProgress = false;
+            warmupOptions.printDiagnostics = false;
+            warmupOptions.enableAdaptive = false;
+            warmupOptions.chunkSize = cfg.cpu.chunkSize;
+            warmupOptions.sampleWindow = std::chrono::milliseconds(cfg.cpu.sampleWindowMs);
+
+            if (!benchmarkSilent) {
+                printf("  [warmup] calibrating policies on seeds %d ~ %d ...\n",
+                       cfg.seedStart, warmupEnd);
+            }
+            auto warmupResults = BatchCpu::ThroughputCalibrator::Evaluate(
+                candidates,
+                warmupConfig,
+                [&](const BatchCpu::ThreadPolicy &policy, std::chrono::milliseconds budget) {
+                    auto currentBudget = budget;
+                    BatchRunResult bestRun;
+                    for (int attempt = 0; attempt <= cfg.cpu.warmupMaxRetry; ++attempt) {
+                        warmupOptions.maxRunDuration = currentBudget;
+                        auto attemptRun = RunBatchWithPolicy(
+                            cfg, cfg.seedStart, warmupEnd, policy, warmupOptions);
+                        if (attemptRun.processedSeeds > bestRun.processedSeeds) {
+                            bestRun = attemptRun;
+                        }
+                        const bool sampledEnough = attemptRun.processedSeeds >= warmupMinSampledSeeds;
+                        if (attemptRun.throughput.valid && sampledEnough) {
+                            return attemptRun.throughput;
+                        }
+                        if (!attemptRun.stoppedByBudget) {
+                            break;
+                        }
+                        currentBudget = std::max(currentBudget * 2, std::chrono::milliseconds(5000));
+                    }
+                    return bestRun.throughput;
+                });
+
+            if (!benchmarkSilent) {
+                for (size_t i = 0; i < warmupResults.size(); ++i) {
+                    const auto &item = warmupResults[i];
+                    const bool sampledEnough =
+                        (int)item.stats.processedSeeds >= warmupMinSampledSeeds;
+                    printf("  [warmup] candidate[%zu] %s -> avg %.1f seeds/s, stdev %.1f, sampled=%llu/%d%s\n",
+                           i,
+                           item.policy.name.c_str(),
+                           item.stats.averageSeedsPerSecond,
+                           item.stats.stddevSeedsPerSecond,
+                           (unsigned long long)item.stats.processedSeeds,
+                           warmupMinSampledSeeds,
+                           sampledEnough ? "" : " [under-sampled]");
+                }
+            }
+
+            auto selectableResults = warmupResults;
+            bool hasQualifiedResult = false;
+            for (auto &item : selectableResults) {
+                if ((int)item.stats.processedSeeds < warmupMinSampledSeeds) {
+                    item.stats.valid = false;
                     continue;
-
-                if (MatchFilter(cfg, g_batch)) {
-                    totalMatches.fetch_add(1);
-                    std::lock_guard<std::mutex> lock(outputMutex);
-                    PrintMatch(seed, g_batch, cfg);
                 }
-
-                int done = seedsProcessed.fetch_add(1) + 1;
-                if (done % 1000 == 0) {
-                    std::lock_guard<std::mutex> lock(outputMutex);
-                    printf("[%d/%d] found %d matches\n",
-                           done, total, totalMatches.load());
+                if (item.stats.valid) {
+                    hasQualifiedResult = true;
                 }
             }
-        };
-
-        // 将种子范围均匀分配到各线程
-        std::vector<std::thread> threads;
-        int seedsPerThread = total / numThreads;
-        int remainder = total % numThreads;
-        int currentStart = cfg.seedStart;
-
-        for (int t = 0; t < numThreads; ++t) {
-            int count = seedsPerThread + (t < remainder ? 1 : 0);
-            int rangeEnd = currentStart + count - 1;
-            threads.emplace_back(worker, currentStart, rangeEnd);
-            currentStart = rangeEnd + 1;
-        }
-
-#ifdef _WIN32
-        // Intel 大小核: 将线程绑定到前 numThreads 个逻辑处理器 (通常是 P 核)
-        // 每个线程绑定一个核心，避免 E 核调度和 P 核降频
-        {
-            int hwThreads = (int)std::thread::hardware_concurrency();
-            // 仅当用户指定的线程数 < 总逻辑核心数时才绑定
-            // (说明用户有意只用部分核心)
-            if (numThreads < hwThreads) {
-                for (int t = 0; t < numThreads; ++t) {
-                    DWORD_PTR mask = (DWORD_PTR)1 << t;
-                    SetThreadAffinityMask(threads[t].native_handle(), mask);
-                }
-                printf("  affinity: pinned %d threads to logical processors 0-%d\n",
-                       numThreads, numThreads - 1);
+            if (!hasQualifiedResult && cfg.cpu.printDiagnostics && !benchmarkSilent) {
+                printf("  [warmup] warning: no candidate reached min sampled seeds, fallback to raw comparison\n");
+            }
+            const auto &resultsForSelection =
+                hasQualifiedResult ? selectableResults : warmupResults;
+            const size_t bestIndex = BatchCpu::ThroughputCalibrator::PickBestIndex(
+                resultsForSelection, cfg.cpu.warmupTieTolerance);
+            if (!warmupResults.empty() && bestIndex < warmupResults.size()) {
+                selectedPolicy = warmupResults[bestIndex].policy;
             }
         }
-#endif
 
-        for (auto &th : threads)
-            th.join();
+        if (!benchmarkSilent) {
+            printf("  selected policy: ");
+            PrintThreadPolicy(selectedPolicy, "");
+        }
 
-        printf("\nDone. Scanned %d seeds, found %d matches.\n",
-               total, totalMatches.load());
+        BatchRunOptions runOptions;
+        runOptions.printMatches = !benchmarkSilent && cfg.cpu.printMatches;
+        runOptions.printProgress = !benchmarkSilent && cfg.cpu.printProgress;
+        runOptions.printDiagnostics = !benchmarkSilent && cfg.cpu.printDiagnostics;
+        runOptions.enableAdaptive = cfg.cpu.enableAdaptiveDown && !legacyThreadsOnly;
+        runOptions.chunkSize = cfg.cpu.chunkSize;
+        runOptions.progressInterval = cfg.cpu.progressInterval;
+        runOptions.sampleWindow = std::chrono::milliseconds(cfg.cpu.sampleWindowMs);
+        runOptions.maxRunDuration = std::chrono::milliseconds(0);
+        runOptions.adaptiveConfig.enabled = cfg.cpu.enableAdaptiveDown && !legacyThreadsOnly;
+        runOptions.adaptiveConfig.minWorkers = (uint32_t)std::max(1, cfg.cpu.adaptiveMinWorkers);
+        runOptions.adaptiveConfig.dropThreshold = cfg.cpu.adaptiveDropThreshold;
+        runOptions.adaptiveConfig.consecutiveDropWindows = cfg.cpu.adaptiveDropWindows;
+        runOptions.adaptiveConfig.cooldown = std::chrono::milliseconds(cfg.cpu.adaptiveCooldownMs);
+
+        auto finalRun = RunBatchWithPolicy(cfg, cfg.seedStart, cfg.seedEnd, selectedPolicy, runOptions);
+        printf("\nDone. Scanned %d/%d seeds, found %d matches.\n",
+               finalRun.processedSeeds, totalSeeds, finalRun.totalMatches);
+        printf("Throughput summary: avg=%.1f seeds/s, stdev=%.1f, active_workers=%d, fallback_count=%u\n",
+               finalRun.throughput.averageSeedsPerSecond,
+               finalRun.throughput.stddevSeedsPerSecond,
+               finalRun.finalActiveWorkers,
+               finalRun.autoFallbackCount);
+        if (finalRun.stoppedByBudget) {
+            printf("  [warn] run stopped by time budget\n");
+        }
     } else {
         // ---- 交互模式 (原有行为) ----
         int type, seed, mixing;
