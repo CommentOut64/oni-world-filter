@@ -13,32 +13,21 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
-#include <stack>
 #include <ranges>
 #include <algorithm>
 #include <cmath>
 #include <optional>
 #include <numeric>
 
-#include <clipper.hpp>
-
+#include "App/AppRuntime.hpp"
+#include "App/ResultSink.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
 #include "config.h"
 #include "Setting/SettingsCache.hpp"
-#include "WorldGen.hpp"
 
 // I defined only one function for exchanging data between c++ and js,
 // it get resource from js and set result to js.
 extern "C" void jsExchangeData(uint32_t type, uint32_t count, size_t data);
-
-enum ResultType {
-    RT_Starting,
-    RT_Trait,
-    RT_Geyser,
-    RT_Polygon,
-    RT_WorldSize,
-    RT_Resource
-};
 
 // for debug
 void WriteToBinary(const std::vector<Site> &sites)
@@ -76,305 +65,20 @@ void WriteToBinary(const std::vector<Site> &sites)
     jsExchangeData(index++, (uint32_t)data.size(), (size_t)data.data());
 }
 
-#ifndef EMSCRIPTEN
-static const std::vector<char> *GetSharedResourceBlob()
+static WasmResultSink g_wasmSink;
+
+static AppRuntime *GetRuntime()
 {
-    static std::once_flag once;
-    static std::vector<char> blob;
-    static bool loaded = false;
-
-    std::call_once(once, [] {
-        std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
-        if (!file.is_open()) {
-            LogE("failed to open shared asset blob: %s", SETTING_ASSET_FILEPATH);
-            return;
-        }
-        file.seekg(0, std::ios::end);
-        const std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
-        if (size <= 0) {
-            LogE("asset blob size is invalid");
-            return;
-        }
-        blob.resize((size_t)size);
-        if (!file.read(blob.data(), size)) {
-            blob.clear();
-            LogE("failed to read shared asset blob");
-            return;
-        }
-        loaded = true;
-    });
-
-    if (!loaded) {
-        return nullptr;
+    auto *runtime = AppRuntime::Instance();
+    if (runtime->GetResultSink() == nullptr) {
+        runtime->SetResultSink(&g_wasmSink);
     }
-    return &blob;
-}
-#endif
-
-class App
-{
-private:
-    SettingsCache m_settings;
-    KRandom m_random{0};
-
-    App() = default;
-
-public:
-    bool skipPolygons = false; // 批量模式跳过多边形计算
-    static App *Instance()
-    {
-#ifdef EMSCRIPTEN
-        static App inst;
-#else
-        // 每个线程拥有独立实例，支持多线程并行生成
-        thread_local App inst;
-#endif
-        return &inst;
-    }
-
-    void Initialize(int seed)
-    {
-#ifndef EMSCRIPTEN
-        if (const auto *blob = GetSharedResourceBlob(); blob != nullptr && !blob->empty()) {
-            std::string_view content(blob->data(), blob->size());
-            if (!m_settings.LoadSettingsCache(content)) {
-                LogE("load shared settings cache failed");
-            }
-            m_random = KRandom(seed);
-            return;
-        }
-#endif
-        uint32_t count = SETTING_ASSET_FILESIZE;
-        auto data = std::make_unique<char[]>(count);
-        jsExchangeData(RT_Resource, count, (size_t)data.get());
-        std::string_view content(data.get(), count);
-        if (!m_settings.LoadSettingsCache(content)) {
-            LogE("load settings cache failed");
-        }
-        m_random = KRandom(seed);
-    }
-
-    bool Generate(const std::string &code, int traits);
-    void SetSeedWithTraits(const std::vector<World *> &worlds, int traitsFlag);
-    void SetResultWorldInfo(int seed, World *world, std::vector<Site> &sites);
-    void SetResultTraits(const std::vector<const WorldTrait *> &traits);
-    void SetResultGeysers(int seed, const WorldGen &worldGen);
-    void SetResultPolygons(World *world, std::vector<Site> &sites);
-    // union sites with the same zone type. if result has hole return true.
-    static bool GetZonePolygon(Site &site, Polygon &polygon);
-};
-
-bool App::Generate(const std::string &code, int traitsFlag)
-{
-    if (!m_settings.CoordinateChanged(code, m_settings)) {
-        LogE("parse seed code %s failed.", code.c_str());
-        return false;
-    }
-    std::vector<World *> worlds;
-    for (auto &worldPlacement : m_settings.cluster->worldPlacements) {
-        auto itr = m_settings.worlds.find(worldPlacement.world);
-        if (itr == m_settings.worlds.end()) {
-            LogE("world %s was wrong.", worldPlacement.world.c_str());
-            return false;
-        }
-        itr->second.locationType = worldPlacement.locationType;
-        worlds.push_back(&itr->second);
-    }
-    if (worlds.size() == 1) {
-        worlds[0]->locationType = LocationType::StartWorld;
-    }
-    if (traitsFlag != 0) { // roll seed for preset traits
-        SetSeedWithTraits(worlds, traitsFlag);
-    }
-    m_settings.DoSubworldMixing(worlds);
-    int seed = m_settings.seed;
-    bool genWarpWorld = code.find("M-") == 0;
-    for (size_t i = 0; i < worlds.size(); ++i) {
-        auto world = worlds[i];
-        if (world->locationType == LocationType::Cluster) {
-            continue;
-        } else if (world->locationType == LocationType::StartWorld) {
-            // go on;
-        } else if (!world->startingBaseTemplate.contains("::bases/warpworld")) {
-            continue; // other inner cluster
-        } else if (!genWarpWorld) {
-            continue;
-        }
-        m_settings.seed = seed + i;
-        auto traits = m_settings.GetRandomTraits(*world);
-        for (auto trait : traits) {
-            world->ApplayTraits(*trait, m_settings);
-        }
-        WorldGen worldGen(*world, m_settings);
-        std::vector<Site> sites;
-        if (!worldGen.GenerateOverworld(sites)) {
-            LogE("generate overworld failed.");
-            return false;
-        }
-        SetResultWorldInfo(seed, world, sites);
-        SetResultTraits(traits);
-        SetResultGeysers(seed, worldGen);
-        if (!skipPolygons)
-            SetResultPolygons(world, sites);
-    }
-    return true;
-}
-
-void App::SetSeedWithTraits(const std::vector<World *> &worlds, int traitsFlag)
-{
-    std::vector<const WorldTrait *> presets;
-    int index = 0;
-    for (auto &pair : m_settings.traits) {
-        if ((traitsFlag >> index & 1) == 1) {
-            presets.push_back(&pair.second);
-        }
-        ++index;
-    }
-    if (presets.empty()) {
-        m_settings.seed = m_random.Next();
-        return;
-    }
-    index = 0;
-    World *world = worlds[index];
-    for (size_t i = 0; i < worlds.size(); ++i) {
-        world = worlds[i];
-        if (world->locationType == LocationType::StartWorld) {
-            index = i;
-            break;
-        }
-    }
-    size_t maxCount = 0;
-    int maxCountSeed = 0;
-    for (int i = 0; i < 1000; ++i) {
-        int seed = m_random.Next();
-        m_settings.seed = seed + index;
-        auto traits = m_settings.GetRandomTraits(*world);
-        m_settings.seed = seed;
-        size_t count = 0;
-        for (auto *preset : presets) {
-            if (std::ranges::contains(traits, preset)) {
-                ++count;
-            }
-        }
-        if (count == presets.size()) {
-            return;
-        } else if (maxCount < count) {
-            maxCount = count;
-            maxCountSeed = seed;
-        }
-    }
-    m_settings.seed = maxCountSeed;
-    LogI("can not find seed for preset traits");
-}
-
-void App::SetResultWorldInfo(int seed, World *world, std::vector<Site> &sites)
-{
-    Vector2i starting = {sites[0].x, sites[0].y};
-    Vector2i worldSize = world->worldsize;
-    starting.y = worldSize.y - starting.y;
-    int worldType = (world->locationType == LocationType::StartWorld) ? 0 : 1;
-    jsExchangeData(RT_Starting, worldType, (size_t)&starting);
-    jsExchangeData(RT_WorldSize, seed, (size_t)&worldSize);
-}
-
-void App::SetResultTraits(const std::vector<const WorldTrait *> &traits)
-{
-    std::vector<int> result;
-    result.reserve(traits.size());
-    for (auto &item : traits) {
-        uint32_t index = 0;
-        for (auto &pair : m_settings.traits) {
-            if (item == &pair.second) {
-                result.push_back(index);
-                break;
-            } else {
-                index++;
-            }
-        }
-    }
-    jsExchangeData(RT_Trait, (uint32_t)result.size(), (size_t)result.data());
-}
-
-void App::SetResultGeysers(int seed, const WorldGen &worldGen)
-{
-    seed += (int)m_settings.cluster->worldPlacements.size() - 1;
-    auto geysers = worldGen.GetGeysers(seed);
-    std::vector<int> result;
-    result.reserve(geysers.size() * 3);
-    for (auto &item : geysers) {
-        result.insert(result.end(), {item.z, item.x, item.y}); // z is type
-    }
-    jsExchangeData(RT_Geyser, (uint32_t)result.size(), (size_t)result.data());
-}
-
-void App::SetResultPolygons(World *world, std::vector<Site> &sites)
-{
-    std::vector<int> result;
-    std::ranges::for_each(sites, [](Site &site) { site.visited = false; });
-    for (auto &item : sites) {
-        if (item.visited) {
-            continue;
-        }
-        Polygon polygon;
-        bool hasHole = GetZonePolygon(item, polygon);
-        result.push_back(hasHole ? 1 : 0);
-        result.push_back((int)item.subworld->zoneType);
-        result.push_back((int)polygon.Vertices.size());
-        for (auto &vex : polygon.Vertices) {
-            result.push_back(vex.x);
-            result.push_back(world->worldsize.y - vex.y);
-        }
-    }
-    jsExchangeData(RT_Polygon, (uint32_t)result.size(), (size_t)result.data());
-}
-
-bool App::GetZonePolygon(Site &site, Polygon &polygon)
-{
-    ZoneType zoneType = site.subworld->zoneType;
-    ClipperLib::Clipper clipper;
-    std::stack<Site *> stack;
-    stack.push(&site);
-    while (!stack.empty()) {
-        auto top = stack.top();
-        stack.pop();
-        if (top->visited) {
-            continue;
-        }
-        ClipperLib::Path path;
-        for (Vector2f point : top->polygon.Vertices) {
-            point *= 10000.0f;
-            path.emplace_back((int)point.x, (int)point.y);
-        }
-        clipper.AddPath(path, ClipperLib::ptSubject, true);
-        top->visited = true;
-        for (auto neighbour : top->neighbours) {
-            if (neighbour->visited) {
-                continue;
-            }
-            if (neighbour->subworld->zoneType != zoneType) {
-                continue;
-            }
-            stack.push(neighbour);
-        }
-    }
-    ClipperLib::PolyTree polytree;
-    ClipperLib::Paths paths;
-    clipper.Execute(ClipperLib::ctUnion, polytree, ClipperLib::pftEvenOdd);
-    ClipperLib::PolyTreeToPaths(polytree, paths);
-    if (!paths.empty()) {
-        auto &path = paths[0];
-        for (auto &item : path) {
-            Vector2f point{(float)item.X, (float)item.Y};
-            polygon.Vertices.emplace_back(point * 0.0001f);
-        }
-    }
-    return paths.size() > 1;
+    return runtime;
 }
 
 extern "C" void EMSCRIPTEN_KEEPALIVE app_init(int seed)
 {
-    App::Instance()->Initialize(seed);
+    GetRuntime()->Initialize(seed);
 }
 
 #ifndef EMSCRIPTEN
@@ -408,7 +112,7 @@ extern "C" bool EMSCRIPTEN_KEEPALIVE app_generate(int type, int seed, int mix)
     if (!g_batchMode)
 #endif
         LogI("generate with code: %s", code.c_str());
-    return App::Instance()->Generate(code, traits);
+    return GetRuntime()->Generate(code, traits);
 }
 
 #ifndef EMSCRIPTEN
@@ -459,24 +163,8 @@ static int GeyserIdToIndex(const std::string &id)
 // ============================================================
 //  批量模式 — 数据捕获
 // ============================================================
-struct BatchCapture {
-    bool active = false;
-    int startX = 0, startY = 0; // 出生点坐标 (y 已翻转，用于显示)
-    int worldW = 0, worldH = 0; // 世界尺寸
-    struct Geyser {
-        int type, x, y;
-    };
-    std::vector<Geyser> geysers;
-    std::vector<int> traits;
-
-    void Reset()
-    {
-        geysers.clear();
-        traits.clear();
-        startX = startY = worldW = worldH = 0;
-    }
-};
-static thread_local BatchCapture g_batch;
+using BatchCapture = BatchCaptureRecord;
+static thread_local BatchCaptureSink g_batchSink;
 
 // ============================================================
 //  筛选规则
@@ -868,9 +556,11 @@ static BatchRunResult RunBatchWithPolicy(const FilterConfig &cfg,
     }
 
     auto worker = [&](int workerIndex) {
+        auto *runtime = AppRuntime::Instance();
+        runtime->SetResultSink(&g_batchSink);
+        runtime->SetSkipPolygons(true);
+        g_batchSink.SetActive(true);
         app_init(0);
-        App::Instance()->skipPolygons = true;
-        g_batch.active = true;
 
         std::string placementError;
         if (!BatchCpu::ApplyThreadPlacement(policy, (uint32_t)workerIndex, &placementError) &&
@@ -902,14 +592,14 @@ static BatchRunResult RunBatchWithPolicy(const FilterConfig &cfg,
                     break;
                 }
 
-                g_batch.Reset();
+                g_batchSink.Reset();
                 const bool generated = app_generate(cfg.worldType, seed, cfg.mixing);
-                const bool matched = generated && MatchFilter(cfg, g_batch);
+                const bool matched = generated && MatchFilter(cfg, g_batchSink.Data());
                 if (matched) {
                     totalMatches.fetch_add(1);
                     if (options.printMatches) {
                         std::lock_guard<std::mutex> lock(outputMutex);
-                        PrintMatch(seed, g_batch, cfg);
+                        PrintMatch(seed, g_batchSink.Data(), cfg);
                     }
                 }
 
@@ -1240,60 +930,38 @@ void jsExchangeData(uint32_t type, uint32_t count, size_t data)
     default:
         break;
 
-    case RT_Starting: {
-        auto ptr = (int32_t *)data;
-        if (g_batch.active && count == 0) {
-            // count=0 表示 StartWorld，捕获出生点坐标
-            g_batch.startX = ptr[0];
-            g_batch.startY = ptr[1];
-        }
+    case (uint32_t)ResultType::Starting:
         break;
-    }
 
-    case RT_Trait: {
+    case (uint32_t)ResultType::Trait: {
         auto ptr = (uint32_t *)data;
         auto end = ptr + count;
-        if (g_batch.active) {
-            while (ptr < end)
-                g_batch.traits.push_back((int)*ptr++);
-        } else {
-            while (ptr < end) {
-                auto index = *ptr++;
-                LogI("%s", g_traitNames[index]);
-            }
+        while (ptr < end) {
+            auto index = *ptr++;
+            LogI("%s", g_traitNames[index]);
         }
         break;
     }
 
-    case RT_Geyser: {
+    case (uint32_t)ResultType::Geyser: {
         auto ptr = (uint32_t *)data;
         auto end = ptr + count;
         while (ptr < end) {
             auto index = *ptr++;
             auto x = *ptr++;
             auto y = *ptr++;
-            if (g_batch.active) {
-                g_batch.geysers.push_back({(int)index, (int)x, (int)y});
-            } else {
-                LogI("%s: %d, %d", g_geyserNames[index], x, y);
-            }
+            LogI("%s: %d, %d", g_geyserNames[index], x, y);
         }
         break;
     }
 
-    case RT_WorldSize: {
-        auto ptr = (int32_t *)data;
-        if (g_batch.active && g_batch.worldW == 0) {
-            g_batch.worldW = ptr[0];
-            g_batch.worldH = ptr[1];
-        }
-        break;
-    }
-
-    case RT_Polygon:
+    case (uint32_t)ResultType::WorldSize:
         break;
 
-    case RT_Resource: {
+    case (uint32_t)ResultType::Polygon:
+        break;
+
+    case (uint32_t)ResultType::Resource: {
         auto ptr = (char *)data;
         *ptr = 'E';
         std::ifstream fstm(SETTING_ASSET_FILEPATH, std::ios::binary);

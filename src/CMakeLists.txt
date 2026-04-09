@@ -36,6 +36,12 @@ file(SIZE "${CMAKE_CURRENT_BINARY_DIR}/data.zip" SETTING_ASSET_FILESIZE)
 add_executable(oniWorldApp
     ${SETTING_HEADER_FILES}
     "${CMAKE_CURRENT_BINARY_DIR}/JsonDeserializeGen.hpp"
+    "App/ResultModels.hpp"
+    "App/ResultSink.hpp"
+    "App/AppRuntime.hpp"
+    "App/AppRuntime.cpp"
+    "App/WasmResultSink.cpp"
+    "App/BatchCaptureSink.cpp"
     "Setting/ComposableDictionary.hpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
