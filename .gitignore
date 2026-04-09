@@ -42,3 +42,7 @@ Thumbs.db
 Desktop.ini
 /llmdoc
 /devdoc
+/desktop/node_modules/
+/desktop/dist/
+/src-tauri/target/
+/src-tauri/gen/
