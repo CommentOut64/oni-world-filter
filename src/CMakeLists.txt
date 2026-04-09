@@ -65,6 +65,8 @@ add_executable(oniWorldApp
     "WorldGen.hpp"
     "WorldGen.cpp"
     "TemplateSpawning.cpp"
+    "BatchCpu/CpuOptimization.hpp"
+    "BatchCpu/CpuOptimization.cpp"
     "main.cpp"
 )
 if(EMSCRIPTEN)
