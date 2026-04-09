@@ -1,0 +1,13 @@
+# https://clang.llvm.org/extra/clang-tidy/index.html
+---
+Checks: '-*,bugprone-*,cert-*,misc-*,performance-*,readability-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+AnalyzeTemporaryDtors: false
+FormatStyle: none
+CheckOptions:
+    - key: readability-uppercase-literal-suffix.NewSuffixes
+      value: 'L;LL;LU;LLU'
+    - key: misc-const-correctness.AnalyzeValues
+      value: false
+...

@@ -1,0 +1,22 @@
+{
+    "worldType": 13,
+    "seedStart": 100000,
+    "seedEnd": 200000,
+    "mixing": 12187500,
+    "threads": 16,
+
+    "required": ["big_volcano"],
+
+    "forbidden": [],
+
+    "distance": [
+        {"geyser": "hot_water",      "minDist": 0, "maxDist": 100},
+        {"geyser": "filthy_water",    "minDist": 0, "maxDist": 75},
+        {"geyser": "salt_water",      "minDist": 0, "maxDist": 150},
+        {"geyser": "steam",           "minDist": 0, "maxDist": 100},
+        {"geyser": "methane",         "minDist": 0, "maxDist": 100},
+        {"geyser": "liquid_sulfur",   "minDist": 0, "maxDist": 100},
+        {"geyser": "molten_gold",     "minDist": 0, "maxDist": 100},
+        {"geyser": "molten_iron",     "minDist": 0, "maxDist": 100}
+    ]
+}

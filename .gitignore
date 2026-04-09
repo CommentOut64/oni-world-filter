@@ -1,0 +1,43 @@
+.vs/
+.vscode/
+out/
+node_modules/
+.pixi/
+
+# CMake (covers accidental in-source builds)
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+Testing/
+CTestTestfile.cmake
+Makefile
+build.ninja
+.ninja_deps
+.ninja_log
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# JavaScript/TypeScript logs and reports
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+coverage/
+
+# IDE and OS junk
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
+Desktop.ini
+/llmdoc

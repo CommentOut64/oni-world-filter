@@ -1,0 +1,21 @@
+[project]
+name = "oniWorldApp"
+version = "0.1.0"
+description = "Oxygen Not Included World Generation Simulator"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[dependencies]
+cmake = ">=3.20"
+ninja = "*"
+python = ">=3.10"
+gcc_win-64 = ">=14"
+gxx_win-64 = ">=14"
+
+[tasks]
+configure = "cmake --preset mingw-release"
+build = { cmd = "cmake --build out/build/mingw-release", depends-on = ["configure"] }
+configure-debug = "cmake --preset mingw-debug"
+build-debug = { cmd = "cmake --build out/build/mingw-debug", depends-on = ["configure-debug"] }
+start = { cmd = "out/build/mingw-release/oniWorldApp.exe", depends-on = ["build"] }
+clean = "cmake --build out/build/mingw-release --target clean"
