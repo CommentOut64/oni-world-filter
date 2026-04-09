@@ -1,0 +1,68 @@
+:root {
+  color: #e5ecf4;
+  background: radial-gradient(circle at top, #1d3f5b 0%, #0d1117 60%);
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.desktop-placeholder {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px 40px;
+}
+
+.placeholder-panel {
+  border: 1px solid rgba(158, 188, 214, 0.35);
+  border-radius: 16px;
+  padding: 24px;
+  background: rgba(11, 19, 30, 0.78);
+  backdrop-filter: blur(4px);
+}
+
+.placeholder-panel h1 {
+  margin: 0 0 8px;
+  font-size: 34px;
+  letter-spacing: 0.02em;
+}
+
+.placeholder-panel p {
+  margin: 0;
+  color: #b4c6da;
+}
+
+.placeholder-grid {
+  margin-top: 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.placeholder-grid article {
+  border: 1px solid rgba(152, 186, 216, 0.28);
+  border-radius: 12px;
+  padding: 18px;
+  background: rgba(13, 27, 39, 0.78);
+}
+
+.placeholder-grid h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.placeholder-grid p {
+  margin: 0;
+  color: #b8cce2;
+  line-height: 1.5;
+}
