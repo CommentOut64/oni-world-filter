@@ -49,6 +49,12 @@ set(ONI_BASE_SOURCES
     "App/BatchCaptureSink.cpp"
     "Batch/FilterConfig.hpp"
     "Batch/FilterConfig.cpp"
+    "Batch/CpuTopology.hpp"
+    "Batch/CpuTopology.cpp"
+    "Batch/ThreadPolicy.hpp"
+    "Batch/ThreadPolicy.cpp"
+    "Batch/ThroughputCalibration.hpp"
+    "Batch/ThroughputCalibration.cpp"
     "Batch/BatchMatcher.hpp"
     "Batch/BatchMatcher.cpp"
     "Batch/SearchRequest.hpp"
@@ -115,7 +121,7 @@ list(APPEND WASM_LINK_DEPENDS
 set_target_properties(oniWorldApp PROPERTIES LINK_DEPENDS "${WASM_LINK_DEPENDS}")
 elseif(MSVC)
 target_compile_options(oniWorldApp
-    PUBLIC "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244)
+    PUBLIC "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244 /wd4267)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 target_compile_options(oniWorldApp
     PUBLIC "-Wall" "-Wextra" "-Wno-conversion"
@@ -147,7 +153,11 @@ target_include_directories(oni-sidecar
 target_link_libraries(oni-sidecar PUBLIC clipper jsoncpp miniz)
 if(MSVC)
 target_compile_options(oni-sidecar
-    PUBLIC "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244)
+    PUBLIC "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244 /wd4267
+    PUBLIC "$<$<CONFIG:Release>:/Zi>")
+target_link_options(oni-sidecar
+    PRIVATE "$<$<CONFIG:Release>:/DEBUG:FULL>"
+    PRIVATE "$<$<CONFIG:Release>:/MAP:oni-sidecar.map>")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 target_compile_options(oni-sidecar
     PUBLIC "-Wall" "-Wextra" "-Wno-conversion"
@@ -193,6 +203,67 @@ if(TARGET Threads::Threads)
 target_link_libraries(test_batch_search_smoke PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_batch_search_smoke COMMAND test_batch_search_smoke)
+
+add_executable(test_cpu_topology
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_cpu_topology.cpp"
+    "Batch/CpuTopology.cpp"
+    "Batch/ThreadPolicy.cpp"
+    "BatchCpu/CpuOptimization.cpp"
+)
+target_include_directories(test_cpu_topology
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+if(TARGET Threads::Threads)
+target_link_libraries(test_cpu_topology PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_cpu_topology COMMAND test_cpu_topology)
+
+add_executable(test_throughput_calibration
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_throughput_calibration.cpp"
+    "Batch/ThroughputCalibration.cpp"
+    "BatchCpu/CpuOptimization.cpp"
+)
+target_include_directories(test_throughput_calibration
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+if(TARGET Threads::Threads)
+target_link_libraries(test_throughput_calibration PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_throughput_calibration COMMAND test_throughput_calibration)
+
+add_executable(test_adaptive_concurrency
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_adaptive_concurrency.cpp"
+    "Batch/BatchSearchService.cpp"
+    "BatchCpu/CpuOptimization.cpp"
+)
+target_include_directories(test_adaptive_concurrency
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+if(TARGET Threads::Threads)
+target_link_libraries(test_adaptive_concurrency PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_adaptive_concurrency COMMAND test_adaptive_concurrency)
+
+add_executable(test_settings_cache
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_settings_cache.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_settings_cache
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_settings_cache PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_settings_cache PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_settings_cache COMMAND test_settings_cache)
 
 add_executable(test_sidecar_protocol
     "../tests/native/test_main.cpp"

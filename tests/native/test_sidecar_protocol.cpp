@@ -75,6 +75,14 @@ int RunAllTests()
         Expect(result.request.search.seedEnd == 101000, "search request seedEnd mismatch", failures);
         Expect(result.request.search.mixing == 625, "search request mixing mismatch", failures);
         Expect(result.request.search.threads == 8, "search request threads mismatch", failures);
+        Expect(result.request.search.cpu.hasValue, "search request cpu should exist", failures);
+        Expect(result.request.search.cpu.mode == "custom", "search request cpu mode mismatch", failures);
+        Expect(result.request.search.cpu.workers == 8, "search request cpu workers mismatch", failures);
+        Expect(!result.request.search.cpu.allowSmt, "search request cpu allowSmt mismatch", failures);
+        Expect(result.request.search.cpu.chunkSize == 32, "search request cpu chunkSize mismatch", failures);
+        Expect(result.request.search.cpu.progressInterval == 400,
+               "search request cpu progressInterval mismatch",
+               failures);
         Expect(result.request.search.constraints.required.size() == 2,
                "search request required size mismatch",
                failures);
