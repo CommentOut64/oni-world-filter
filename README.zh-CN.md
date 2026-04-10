@@ -319,6 +319,11 @@ CLI 默认读取 `filter.json`，核心字段包括：
 - `test_filter_config`
 - `test_batch_matcher`
 - `test_batch_search_smoke`
+- `test_cpu_topology`
+- `test_throughput_calibration`
+- `test_adaptive_concurrency`
+- `test_settings_cache`
+- `test_sidecar_protocol`
 
 运行方式：
 
