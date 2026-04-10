@@ -33,14 +33,19 @@ endif()
 
 file(SIZE "${CMAKE_CURRENT_BINARY_DIR}/data.zip" SETTING_ASSET_FILESIZE)
 
-add_executable(oniWorldApp
+if(EMSCRIPTEN)
+set(ONI_ENTRY_SOURCE "entry_wasm.cpp")
+else()
+set(ONI_ENTRY_SOURCE "entry_cli.cpp")
+endif()
+
+set(ONI_BASE_SOURCES
     ${SETTING_HEADER_FILES}
     "${CMAKE_CURRENT_BINARY_DIR}/JsonDeserializeGen.hpp"
     "App/ResultModels.hpp"
     "App/ResultSink.hpp"
     "App/AppRuntime.hpp"
     "App/AppRuntime.cpp"
-    "App/WasmResultSink.cpp"
     "App/BatchCaptureSink.cpp"
     "Batch/FilterConfig.hpp"
     "Batch/FilterConfig.cpp"
@@ -50,6 +55,8 @@ add_executable(oniWorldApp
     "Batch/SearchEvents.hpp"
     "Batch/BatchSearchService.hpp"
     "Batch/BatchSearchService.cpp"
+    "Batch/SidecarProtocol.hpp"
+    "Batch/SidecarProtocol.cpp"
     "Setting/ComposableDictionary.hpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
@@ -81,7 +88,12 @@ add_executable(oniWorldApp
     "TemplateSpawning.cpp"
     "BatchCpu/CpuOptimization.hpp"
     "BatchCpu/CpuOptimization.cpp"
-    "main.cpp"
+)
+
+add_executable(oniWorldApp
+    ${ONI_BASE_SOURCES}
+    "App/WasmResultSink.cpp"
+    "${ONI_ENTRY_SOURCE}"
 )
 if(EMSCRIPTEN)
 target_compile_options(oniWorldApp PUBLIC "-Wall" "-Wextra" "-Werror")
@@ -120,6 +132,30 @@ target_include_directories(oniWorldApp
 )
 target_link_libraries(oniWorldApp PUBLIC clipper jsoncpp miniz)
 
+if(NOT EMSCRIPTEN AND ONI_BUILD_SIDECAR)
+add_executable(oni-sidecar EXCLUDE_FROM_ALL
+    ${ONI_BASE_SOURCES}
+    "entry_sidecar.cpp"
+)
+target_include_directories(oni-sidecar
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
+    PUBLIC "${CMAKE_CURRENT_BINARY_DIR}"
+    PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(oni-sidecar PUBLIC clipper jsoncpp miniz)
+if(MSVC)
+target_compile_options(oni-sidecar
+    PUBLIC "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+target_compile_options(oni-sidecar
+    PUBLIC "-Wall" "-Wextra" "-Wno-conversion"
+    PUBLIC "-finput-charset=UTF-8" "-fexec-charset=UTF-8")
+target_link_libraries(oni-sidecar PUBLIC Threads::Threads)
+endif()
+endif()
+
 if(NOT EMSCRIPTEN)
 add_executable(test_filter_config
     "../tests/native/test_main.cpp"
@@ -157,6 +193,18 @@ if(TARGET Threads::Threads)
 target_link_libraries(test_batch_search_smoke PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_batch_search_smoke COMMAND test_batch_search_smoke)
+
+add_executable(test_sidecar_protocol
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_sidecar_protocol.cpp"
+    "Batch/SidecarProtocol.cpp"
+    "Batch/FilterConfig.cpp"
+)
+target_include_directories(test_sidecar_protocol
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(test_sidecar_protocol PRIVATE jsoncpp)
+add_test(NAME test_sidecar_protocol COMMAND test_sidecar_protocol)
 endif()
 
 configure_file("config.h.in" "config.h")
