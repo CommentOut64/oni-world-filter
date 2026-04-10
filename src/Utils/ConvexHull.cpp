@@ -4,6 +4,14 @@ ConvexHullResult<Vector2f> ConvexHull::Create2D(std::vector<Vector2f> &vertices)
 {
     int NumOfDimensions = 2;
     int NumberOfVertices = (int)vertices.size();
+    ConvexHullResult<Vector2f> result;
+    if (NumberOfVertices < 3) {
+        result.Points.reserve(vertices.size());
+        for (auto &vertex : vertices) {
+            result.Points.push_back(&vertex);
+        }
+        return result;
+    }
     Positions.resize(NumberOfVertices * NumOfDimensions);
     size_t index = 0;
     for (auto &v : vertices) {
@@ -12,7 +20,6 @@ ConvexHullResult<Vector2f> ConvexHull::Create2D(std::vector<Vector2f> &vertices)
     }
     chAlgo.Initialize(Positions.data(), NumberOfVertices, NumOfDimensions);
     chAlgo.GetConvexHull();
-    ConvexHullResult<Vector2f> result;
     Get2DResultInOrder(vertices, result);
     return result;
 }
@@ -124,6 +131,13 @@ void ConvexHull::Get2DResultInOrder(std::vector<Vector2f> &data,
 {
     std::vector<ConvexFace<Vector2f>> Faces;
     GetConvexFaces<Vector2f>(data, true, 2, Faces);
+    if (Faces.empty()) {
+        result.Points.reserve(data.size());
+        for (auto &vertex : data) {
+            result.Points.push_back(&vertex);
+        }
+        return;
+    }
     int num = Faces.size();
     std::map<Vector2f *, ConvexFace<Vector2f> *> dictionary;
     for (auto &val : Faces) {

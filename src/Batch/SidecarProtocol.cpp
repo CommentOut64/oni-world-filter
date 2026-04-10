@@ -240,6 +240,29 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
 
+        const Json::Value cpu = root["cpu"];
+        if (!cpu.isNull()) {
+            if (!cpu.isObject()) {
+                SetParseError(result, "cpu must be object");
+                return result;
+            }
+            request.cpu.hasValue = true;
+            request.cpu.mode = cpu.get("mode", request.cpu.mode).asString();
+            request.cpu.workers = std::max(0, cpu.get("workers", request.cpu.workers).asInt());
+            request.cpu.allowSmt = cpu.get("allowSmt", request.cpu.allowSmt).asBool();
+            request.cpu.allowLowPerf = cpu.get("allowLowPerf", request.cpu.allowLowPerf).asBool();
+            request.cpu.placement = cpu.get("placement", request.cpu.placement).asString();
+            request.cpu.enableWarmup = cpu.get("enableWarmup", request.cpu.enableWarmup).asBool();
+            request.cpu.enableAdaptiveDown = cpu.get("enableAdaptiveDown", request.cpu.enableAdaptiveDown).asBool();
+            request.cpu.chunkSize = cpu.get("chunkSize", request.cpu.chunkSize).asInt();
+            request.cpu.progressInterval = cpu.get("progressInterval", request.cpu.progressInterval).asInt();
+            request.cpu.sampleWindowMs = cpu.get("sampleWindowMs", request.cpu.sampleWindowMs).asInt();
+            request.cpu.adaptiveMinWorkers = cpu.get("adaptiveMinWorkers", request.cpu.adaptiveMinWorkers).asInt();
+            request.cpu.adaptiveDropThreshold = cpu.get("adaptiveDropThreshold", request.cpu.adaptiveDropThreshold).asDouble();
+            request.cpu.adaptiveDropWindows = cpu.get("adaptiveDropWindows", request.cpu.adaptiveDropWindows).asInt();
+            request.cpu.adaptiveCooldownMs = cpu.get("adaptiveCooldownMs", request.cpu.adaptiveCooldownMs).asInt();
+        }
+
         const Json::Value constraints = root["constraints"];
         if (!constraints.isNull() && !constraints.isObject()) {
             SetParseError(result, "constraints must be object");
@@ -335,6 +358,23 @@ FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &requ
     cfg.seedEnd = request.seedEnd;
     cfg.mixing = request.mixing;
     cfg.threads = std::max(0, request.threads);
+    if (request.cpu.hasValue) {
+        cfg.hasCpuSection = true;
+        cfg.cpu.mode = request.cpu.mode;
+        cfg.cpu.workers = std::max(0, request.cpu.workers);
+        cfg.cpu.allowSmt = request.cpu.allowSmt;
+        cfg.cpu.allowLowPerf = request.cpu.allowLowPerf;
+        cfg.cpu.placement = request.cpu.placement;
+        cfg.cpu.enableWarmup = request.cpu.enableWarmup;
+        cfg.cpu.enableAdaptiveDown = request.cpu.enableAdaptiveDown;
+        cfg.cpu.chunkSize = std::clamp(request.cpu.chunkSize, 1, 2048);
+        cfg.cpu.progressInterval = std::clamp(request.cpu.progressInterval, 1, 1000000);
+        cfg.cpu.sampleWindowMs = std::clamp(request.cpu.sampleWindowMs, 200, 10000);
+        cfg.cpu.adaptiveMinWorkers = std::clamp(request.cpu.adaptiveMinWorkers, 1, 1024);
+        cfg.cpu.adaptiveDropThreshold = std::clamp(request.cpu.adaptiveDropThreshold, 0.0, 0.5);
+        cfg.cpu.adaptiveDropWindows = std::clamp(request.cpu.adaptiveDropWindows, 1, 10);
+        cfg.cpu.adaptiveCooldownMs = std::clamp(request.cpu.adaptiveCooldownMs, 1000, 60000);
+    }
 
     auto appendError = [&](FilterErrorCode code, std::string field, std::string detail) {
         if (errors == nullptr) {

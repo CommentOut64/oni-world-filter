@@ -20,9 +20,12 @@
 #include "App/AppRuntime.hpp"
 #include "App/ResultSink.hpp"
 #include "Batch/BatchSearchService.hpp"
-#include "BatchCpu/CpuOptimization.hpp"
 #include "Batch/BatchMatcher.hpp"
+#include "Batch/CpuTopology.hpp"
 #include "Batch/FilterConfig.hpp"
+#include "Batch/ThreadPolicy.hpp"
+#include "Batch/ThroughputCalibration.hpp"
+#include "BatchCpu/CpuOptimization.hpp"
 #include "config.h"
 #include "Setting/SettingsCache.hpp"
 
@@ -244,31 +247,6 @@ struct BatchRunOptions {
     BatchCpu::AdaptiveConfig adaptiveConfig{};
 };
 
-static BatchCpu::PlannerInput BuildPlannerInput(const Batch::FilterConfig &cfg,
-                                                const BatchCpu::CpuTopology &topology)
-{
-    BatchCpu::PlannerInput input;
-    input.topology = &topology;
-
-    const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
-    if (legacyThreadsOnly) {
-        input.mode = BatchCpu::CpuMode::Custom;
-        input.customWorkers = (uint32_t)cfg.threads;
-        input.customAllowSmt = true;
-        input.customAllowLowPerf = true;
-        input.customPlacement = BatchCpu::PlacementMode::Preferred;
-        return input;
-    }
-
-    input.mode = BatchCpu::ParseCpuMode(cfg.cpu.mode);
-    input.legacyThreadOverride = 0;
-    input.customWorkers = (uint32_t)std::max(0, cfg.cpu.workers);
-    input.customAllowSmt = cfg.cpu.allowSmt;
-    input.customAllowLowPerf = cfg.cpu.allowLowPerf;
-    input.customPlacement = BatchCpu::ParsePlacementMode(cfg.cpu.placement);
-    return input;
-}
-
 static void PrintThreadPolicy(const BatchCpu::ThreadPolicy &policy, const char *prefix)
 {
     printf("%sname=%s workers=%u placement=%s smt=%s low_perf=%s logical=[%s]\n",
@@ -433,12 +411,10 @@ int main(int argc, char *argv[])
         const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
         const bool benchmarkSilent = cfg.cpu.benchmarkSilent;
 
-        auto topology = BatchCpu::CpuTopologyDetector::Detect();
-        auto plannerInput = BuildPlannerInput(cfg, topology);
-        auto candidates = BatchCpu::ThreadPolicyPlanner::BuildCandidates(plannerInput);
-        if (candidates.empty()) {
-            candidates.push_back(BatchCpu::ThreadPolicyPlanner::BuildConservativePolicy(topology));
-        }
+        const auto topology = Batch::DetectCpuTopology();
+        const auto threadPolicyRequest = Batch::BuildThreadPolicyRequestFromFilter(cfg);
+        const auto plannerInput = Batch::BuildPlannerInput(threadPolicyRequest, topology);
+        const auto candidates = Batch::BuildThreadPolicyCandidates(threadPolicyRequest, topology);
 
         printf("Scanning seeds %d ~ %d (worldType=%d, mixing=%d)\n",
                cfg.seedStart, cfg.seedEnd, cfg.worldType, cfg.mixing);
@@ -472,8 +448,8 @@ int main(int argc, char *argv[])
             const int warmupMinSampledSeeds = std::min(
                 warmupTotalSeeds,
                 std::max(1, cfg.cpu.warmupMinSampledSeeds));
-            BatchCpu::WarmupConfig warmupConfig;
-            warmupConfig.enabled = true;
+            Batch::ThroughputCalibrationOptions warmupConfig;
+            warmupConfig.enableWarmup = true;
             warmupConfig.totalBudget = std::chrono::milliseconds(cfg.cpu.warmupTotalMs);
             warmupConfig.perCandidateBudget = std::chrono::milliseconds(cfg.cpu.warmupPerCandidateMs);
             warmupConfig.tieToleranceRatio = cfg.cpu.warmupTieTolerance;
@@ -490,7 +466,8 @@ int main(int argc, char *argv[])
                 printf("  [warmup] calibrating policies on seeds %d ~ %d ...\n",
                        cfg.seedStart, warmupEnd);
             }
-            auto warmupResults = BatchCpu::ThroughputCalibrator::Evaluate(
+            const auto calibration = Batch::SelectThreadPolicyWithWarmup(
+                "cli-session",
                 candidates,
                 warmupConfig,
                 [&](const BatchCpu::ThreadPolicy &policy, std::chrono::milliseconds budget) {
@@ -520,6 +497,7 @@ int main(int argc, char *argv[])
                     }
                     return bestRun.throughput;
                 });
+            const auto &warmupResults = calibration.warmupResults;
 
             if (!benchmarkSilent) {
                 for (size_t i = 0; i < warmupResults.size(); ++i) {
@@ -537,27 +515,23 @@ int main(int argc, char *argv[])
                 }
             }
 
-            auto selectableResults = warmupResults;
-            bool hasQualifiedResult = false;
-            for (auto &item : selectableResults) {
-                if ((int)item.stats.processedSeeds < warmupMinSampledSeeds) {
-                    item.stats.valid = false;
-                    continue;
+            if (!warmupResults.empty()) {
+                auto selectableResults = warmupResults;
+                bool hasQualifiedResult = false;
+                for (auto &item : selectableResults) {
+                    if ((int)item.stats.processedSeeds < warmupMinSampledSeeds) {
+                        item.stats.valid = false;
+                        continue;
+                    }
+                    if (item.stats.valid) {
+                        hasQualifiedResult = true;
+                    }
                 }
-                if (item.stats.valid) {
-                    hasQualifiedResult = true;
+                if (!hasQualifiedResult && cfg.cpu.printDiagnostics && !benchmarkSilent) {
+                    printf("  [warmup] warning: no candidate reached min sampled seeds, fallback to raw comparison\n");
                 }
             }
-            if (!hasQualifiedResult && cfg.cpu.printDiagnostics && !benchmarkSilent) {
-                printf("  [warmup] warning: no candidate reached min sampled seeds, fallback to raw comparison\n");
-            }
-            const auto &resultsForSelection =
-                hasQualifiedResult ? selectableResults : warmupResults;
-            const size_t bestIndex = BatchCpu::ThroughputCalibrator::PickBestIndex(
-                resultsForSelection, cfg.cpu.warmupTieTolerance);
-            if (!warmupResults.empty() && bestIndex < warmupResults.size()) {
-                selectedPolicy = warmupResults[bestIndex].policy;
-            }
+            selectedPolicy = calibration.selectedPolicy;
         }
 
         if (!benchmarkSilent) {

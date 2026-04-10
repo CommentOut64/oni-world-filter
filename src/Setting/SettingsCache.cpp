@@ -5,6 +5,7 @@
 #include <set>
 #include <algorithm>
 #include <filesystem>
+#include <mutex>
 #include <ranges>
 #include <regex>
 
@@ -18,6 +19,13 @@
 #include "Utils/SortHelper.hpp"
 
 Variant SettingsCache::m_nil;
+
+namespace {
+
+std::mutex g_sharedSettingsMutex;
+std::shared_ptr<const SettingsCache> g_sharedSettingsCache;
+
+} // namespace
 
 template<typename T>
 static bool LoadJsonFile(mz_zip_archive &zip, int index, T &result)
@@ -242,6 +250,55 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
         {"dlc4::worldMixing/PrehistoricMixingSettings", 1},
     };
     return true;
+}
+
+std::shared_ptr<const SettingsCache> SharedSettingsCache::GetOrCreate(
+    const BlobLoader &loader,
+    std::string *errorMessage)
+{
+    std::lock_guard<std::mutex> lock(g_sharedSettingsMutex);
+    if (g_sharedSettingsCache) {
+        return g_sharedSettingsCache;
+    }
+    if (!loader) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "shared settings cache loader is empty";
+        }
+        return nullptr;
+    }
+
+    std::vector<char> data;
+    std::string loadError;
+    if (!loader(data, &loadError)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = loadError.empty() ? "failed to load settings blob" : loadError;
+        }
+        return nullptr;
+    }
+    if (data.empty()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "settings blob is empty";
+        }
+        return nullptr;
+    }
+
+    auto cache = std::make_shared<SettingsCache>();
+    const std::string_view content(data.data(), data.size());
+    if (!cache->LoadSettingsCache(content)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to parse settings cache from blob";
+        }
+        return nullptr;
+    }
+
+    g_sharedSettingsCache = cache;
+    return g_sharedSettingsCache;
+}
+
+void SharedSettingsCache::ResetForTests()
+{
+    std::lock_guard<std::mutex> lock(g_sharedSettingsMutex);
+    g_sharedSettingsCache.reset();
 }
 
 static std::vector<std::string> ParseSettingCoordinate(const std::string &coord)

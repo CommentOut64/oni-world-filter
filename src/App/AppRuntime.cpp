@@ -13,38 +13,32 @@
 #include "config.h"
 
 #ifndef EMSCRIPTEN
-static const std::vector<char> *GetSharedResourceBlob()
+static bool LoadSharedResourceBlob(std::vector<char> &data, std::string *errorMessage)
 {
-    static std::once_flag once;
-    static std::vector<char> blob;
-    static bool loaded = false;
-
-    std::call_once(once, [] {
-        std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
-        if (!file.is_open()) {
-            LogE("failed to open shared asset blob: %s", SETTING_ASSET_FILEPATH);
-            return;
+    std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+    if (!file.is_open()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to open shared asset blob";
         }
-        file.seekg(0, std::ios::end);
-        const std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
-        if (size <= 0) {
-            LogE("asset blob size is invalid");
-            return;
-        }
-        blob.resize((size_t)size);
-        if (!file.read(blob.data(), size)) {
-            blob.clear();
-            LogE("failed to read shared asset blob");
-            return;
-        }
-        loaded = true;
-    });
-
-    if (!loaded) {
-        return nullptr;
+        return false;
     }
-    return &blob;
+    file.seekg(0, std::ios::end);
+    const std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    if (size <= 0) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "asset blob size is invalid";
+        }
+        return false;
+    }
+    data.resize((size_t)size);
+    if (!file.read(data.data(), size)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to read shared asset blob";
+        }
+        return false;
+    }
+    return true;
 }
 #endif
 
@@ -81,13 +75,15 @@ bool AppRuntime::IsSkippingPolygons() const
 void AppRuntime::Initialize(int seed)
 {
 #ifndef EMSCRIPTEN
-    if (const auto *blob = GetSharedResourceBlob(); blob != nullptr && !blob->empty()) {
-        std::string_view content(blob->data(), blob->size());
-        if (!m_settings.LoadSettingsCache(content)) {
-            LogE("load shared settings cache failed");
-        }
+    std::string sharedError;
+    const auto shared = SharedSettingsCache::GetOrCreate(LoadSharedResourceBlob, &sharedError);
+    if (shared != nullptr) {
+        m_settings = *shared;
         m_random = KRandom(seed);
         return;
+    }
+    if (!sharedError.empty()) {
+        LogE("load shared settings cache failed: %s", sharedError.c_str());
     }
 #endif
 
@@ -168,6 +164,10 @@ bool AppRuntime::Generate(const std::string &code, int traitsFlag)
         std::vector<Site> sites;
         if (!worldGen.GenerateOverworld(sites)) {
             LogE("generate overworld failed.");
+            return false;
+        }
+        if (sites.empty()) {
+            LogE("generate overworld produced empty sites.");
             return false;
         }
 

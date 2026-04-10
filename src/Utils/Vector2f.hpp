@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdio>
 
 template<typename T>
 struct Vector2 {
@@ -239,7 +240,7 @@ typedef Vector3<double> Vector3d;
 #define LogE(format, ...)
 #else
 #define LogI(format, ...)                                                      \
-    printf("info %s:%d " format "\n", __func__, __LINE__, ##__VA_ARGS__)
+    std::fprintf(stderr, "info %s:%d " format "\n", __func__, __LINE__, ##__VA_ARGS__)
 #define LogE(format, ...)                                                      \
-    printf("error %s:%d " format "\n", __func__, __LINE__, ##__VA_ARGS__)
+    std::fprintf(stderr, "error %s:%d " format "\n", __func__, __LINE__, ##__VA_ARGS__)
 #endif

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <string_view>
+#include <vector>
 
 #include "ClusterLayout.hpp"
 #include "TemplateContainer.hpp"
@@ -93,4 +96,14 @@ public:
 
 private:
     void ParseAndApplyMixingSettingsCode(const std::string &code);
+};
+
+class SharedSettingsCache
+{
+public:
+    using BlobLoader = std::function<bool(std::vector<char> &data, std::string *errorMessage)>;
+
+    static std::shared_ptr<const SettingsCache> GetOrCreate(const BlobLoader &loader,
+                                                            std::string *errorMessage = nullptr);
+    static void ResetForTests();
 };

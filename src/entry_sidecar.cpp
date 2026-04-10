@@ -3,19 +3,25 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <exception>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "App/AppRuntime.hpp"
 #include "App/ResultSink.hpp"
 #include "Batch/BatchMatcher.hpp"
 #include "Batch/BatchSearchService.hpp"
+#include "Batch/CpuTopology.hpp"
 #include "Batch/FilterConfig.hpp"
 #include "Batch/SidecarProtocol.hpp"
+#include "Batch/ThreadPolicy.hpp"
+#include "Batch/ThroughputCalibration.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
@@ -35,11 +41,105 @@ static const char *kWorldPrefixes[] = {
 static thread_local BatchCaptureSink g_batchSink;
 static std::mutex g_outputMutex;
 
+struct ActiveSearchState {
+    std::mutex mutex;
+    bool running = false;
+    std::string jobId;
+    std::shared_ptr<std::atomic<bool>> cancelToken;
+    std::thread worker;
+};
+
+static ActiveSearchState g_activeSearch;
+
 void EmitLine(const std::string &line)
 {
     std::lock_guard<std::mutex> lock(g_outputMutex);
     std::cout << line << '\n';
     std::cout.flush();
+}
+
+template<typename Builder>
+void EmitBuiltLine(Builder &&builder)
+{
+    std::lock_guard<std::mutex> lock(g_outputMutex);
+    const std::string line = builder();
+    std::cout << line << '\n';
+    std::cout.flush();
+}
+
+void JoinInactiveSearchWorker()
+{
+    std::thread worker;
+    {
+        std::lock_guard<std::mutex> lock(g_activeSearch.mutex);
+        if (!g_activeSearch.running && g_activeSearch.worker.joinable()) {
+            worker = std::move(g_activeSearch.worker);
+            g_activeSearch.jobId.clear();
+            g_activeSearch.cancelToken.reset();
+        }
+    }
+    if (worker.joinable()) {
+        worker.join();
+    }
+}
+
+void MarkSearchFinished(const std::string &jobId)
+{
+    std::lock_guard<std::mutex> lock(g_activeSearch.mutex);
+    if (g_activeSearch.running && g_activeSearch.jobId == jobId) {
+        g_activeSearch.running = false;
+    }
+}
+
+bool StartSearchWorker(const std::string &jobId,
+                       const std::shared_ptr<std::atomic<bool>> &cancelToken,
+                       std::thread &&worker,
+                       std::string *errorMessage)
+{
+    JoinInactiveSearchWorker();
+    std::lock_guard<std::mutex> lock(g_activeSearch.mutex);
+    if (g_activeSearch.running) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "another search job is still running";
+        }
+        return false;
+    }
+    g_activeSearch.running = true;
+    g_activeSearch.jobId = jobId;
+    g_activeSearch.cancelToken = cancelToken;
+    g_activeSearch.worker = std::move(worker);
+    return true;
+}
+
+bool RequestSearchCancel(const std::string &jobId)
+{
+    std::lock_guard<std::mutex> lock(g_activeSearch.mutex);
+    if (!g_activeSearch.running || !g_activeSearch.cancelToken) {
+        return false;
+    }
+    if (!jobId.empty() && g_activeSearch.jobId != jobId) {
+        return false;
+    }
+    g_activeSearch.cancelToken->store(true, std::memory_order_relaxed);
+    return true;
+}
+
+void ShutdownSearchWorker()
+{
+    RequestSearchCancel("");
+    std::thread worker;
+    {
+        std::lock_guard<std::mutex> lock(g_activeSearch.mutex);
+        if (g_activeSearch.worker.joinable()) {
+            worker = std::move(g_activeSearch.worker);
+        }
+        g_activeSearch.running = false;
+        g_activeSearch.jobId.clear();
+        g_activeSearch.cancelToken.reset();
+    }
+    if (worker.joinable()) {
+        worker.join();
+    }
 }
 
 bool BuildWorldCode(int worldType, int seed, int mixing, std::string *code)
@@ -95,30 +195,6 @@ private:
     std::optional<GeneratedWorldPreview> m_lastPreview;
 };
 
-BatchCpu::PlannerInput BuildPlannerInput(const Batch::FilterConfig &cfg,
-                                         const BatchCpu::CpuTopology &topology)
-{
-    BatchCpu::PlannerInput input;
-    input.topology = &topology;
-
-    const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
-    if (legacyThreadsOnly) {
-        input.mode = BatchCpu::CpuMode::Custom;
-        input.customWorkers = static_cast<uint32_t>(cfg.threads);
-        input.customAllowSmt = true;
-        input.customAllowLowPerf = true;
-        input.customPlacement = BatchCpu::PlacementMode::Preferred;
-        return input;
-    }
-
-    input.mode = BatchCpu::ParseCpuMode(cfg.cpu.mode);
-    input.customWorkers = static_cast<uint32_t>(std::max(0, cfg.cpu.workers));
-    input.customAllowSmt = cfg.cpu.allowSmt;
-    input.customAllowLowPerf = cfg.cpu.allowLowPerf;
-    input.customPlacement = BatchCpu::ParsePlacementMode(cfg.cpu.placement);
-    return input;
-}
-
 Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
                                         const BatchCpu::ThreadPolicy &policy,
                                         std::atomic<bool> *cancelRequested)
@@ -128,7 +204,12 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
     request.seedEnd = cfg.seedEnd;
     request.workerCount = std::max<uint32_t>(1u, policy.workerCount);
     request.chunkSize = cfg.hasCpuSection ? cfg.cpu.chunkSize : 64;
-    request.progressInterval = cfg.hasCpuSection ? cfg.cpu.progressInterval : 1000;
+    const auto totalSeeds = std::max(1, cfg.seedEnd - cfg.seedStart + 1);
+    const auto configuredProgressInterval =
+        cfg.hasCpuSection ? cfg.cpu.progressInterval : 1000;
+    const auto smallRangeProgressInterval = std::max(1, totalSeeds / 20);
+    request.progressInterval = std::max(
+        1, std::min(configuredProgressInterval, smallRangeProgressInterval));
     request.sampleWindow = std::chrono::milliseconds(
         cfg.hasCpuSection ? cfg.cpu.sampleWindowMs : 2000);
     request.maxRunDuration = std::chrono::milliseconds(0);
@@ -186,6 +267,54 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
     return request;
 }
 
+BatchCpu::ThreadPolicy SelectPolicy(const Batch::FilterConfig &cfg)
+{
+    const auto topology = Batch::DetectCpuTopology();
+    const auto policyRequest = Batch::BuildThreadPolicyRequestFromFilter(cfg);
+    const auto plannerInput = Batch::BuildPlannerInput(policyRequest, topology);
+    const auto candidates = Batch::BuildThreadPolicyCandidates(policyRequest, topology);
+    if (candidates.empty()) {
+        return BatchCpu::ThreadPolicy{};
+    }
+
+    const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
+    bool enableWarmup = cfg.cpu.enableWarmup && !legacyThreadsOnly &&
+                        plannerInput.mode != BatchCpu::CpuMode::Custom &&
+                        plannerInput.mode != BatchCpu::CpuMode::Conservative &&
+                        candidates.size() > 1;
+    if (cfg.seedStart >= cfg.seedEnd) {
+        enableWarmup = false;
+    }
+    if (!enableWarmup) {
+        return candidates.front();
+    }
+
+    const int warmupEnd = std::min(
+        cfg.seedEnd,
+        cfg.seedStart + std::max(1, cfg.cpu.warmupSeedCount) - 1);
+
+    Batch::ThroughputCalibrationOptions warmupConfig;
+    warmupConfig.enableWarmup = true;
+    warmupConfig.totalBudget = std::chrono::milliseconds(cfg.cpu.warmupTotalMs);
+    warmupConfig.perCandidateBudget = std::chrono::milliseconds(cfg.cpu.warmupPerCandidateMs);
+    warmupConfig.tieToleranceRatio = cfg.cpu.warmupTieTolerance;
+
+    const auto calibration = Batch::SelectThreadPolicyWithWarmup(
+        "sidecar-session",
+        candidates,
+        warmupConfig,
+        [&](const BatchCpu::ThreadPolicy &policy, std::chrono::milliseconds budget) {
+            auto warmupRequest = BuildSearchRequest(cfg, policy, nullptr);
+            warmupRequest.seedEnd = warmupEnd;
+            warmupRequest.enableAdaptive = false;
+            warmupRequest.adaptiveConfig.enabled = false;
+            warmupRequest.maxRunDuration = budget;
+            const auto run = Batch::BatchSearchService::Run(warmupRequest);
+            return run.throughput;
+        });
+    return calibration.selectedPolicy;
+}
+
 void RunSearchCommand(const Batch::SidecarSearchRequest &request)
 {
     std::vector<Batch::FilterError> errors;
@@ -202,38 +331,48 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
         return;
     }
 
-    auto topology = BatchCpu::CpuTopologyDetector::Detect();
-    auto plannerInput = BuildPlannerInput(cfg, topology);
-    auto candidates = BatchCpu::ThreadPolicyPlanner::BuildCandidates(plannerInput);
-    if (candidates.empty()) {
-        candidates.push_back(BatchCpu::ThreadPolicyPlanner::BuildConservativePolicy(topology));
+    const auto selectedPolicy = SelectPolicy(cfg);
+    auto cancelRequested = std::make_shared<std::atomic<bool>>(false);
+
+    std::thread worker([cfg, request, selectedPolicy, cancelRequested]() {
+        try {
+            Batch::SearchEventCallbacks callbacks;
+            callbacks.onStarted = [&](const Batch::SearchStartedEvent &event) {
+                EmitBuiltLine([&]() { return Batch::SerializeStartedEvent(request.jobId, event); });
+            };
+            callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
+                EmitBuiltLine([&]() { return Batch::SerializeProgressEvent(request.jobId, event); });
+            };
+            callbacks.onMatch = [&](const Batch::SearchMatchEvent &event) {
+                EmitBuiltLine([&]() { return Batch::SerializeMatchEvent(request.jobId, event); });
+            };
+            callbacks.onCompleted = [&](const Batch::SearchCompletedEvent &event) {
+                EmitBuiltLine([&]() { return Batch::SerializeCompletedEvent(request.jobId, event); });
+            };
+            callbacks.onFailed = [&](const Batch::SearchFailedEvent &event) {
+                EmitBuiltLine([&]() { return Batch::SerializeFailedEvent(request.jobId, event); });
+            };
+            callbacks.onCancelled = [&](const Batch::SearchCancelledEvent &event) {
+                EmitBuiltLine([&]() { return Batch::SerializeCancelledEvent(request.jobId, event); });
+            };
+
+            auto searchRequest = BuildSearchRequest(cfg, selectedPolicy, cancelRequested.get());
+            (void)Batch::BatchSearchService::Run(searchRequest, callbacks);
+        } catch (const std::exception &ex) {
+            EmitLine(Batch::SerializeFailedEvent(request.jobId, ex.what()));
+        } catch (...) {
+            EmitLine(Batch::SerializeFailedEvent(request.jobId, "search thread crashed"));
+        }
+        MarkSearchFinished(request.jobId);
+    });
+
+    std::string startError;
+    if (!StartSearchWorker(request.jobId, cancelRequested, std::move(worker), &startError)) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+        EmitLine(Batch::SerializeFailedEvent(request.jobId, startError));
     }
-    const auto selectedPolicy = candidates.front();
-
-    std::atomic<bool> cancelRequested{false};
-    auto searchRequest = BuildSearchRequest(cfg, selectedPolicy, &cancelRequested);
-
-    Batch::SearchEventCallbacks callbacks;
-    callbacks.onStarted = [&](const Batch::SearchStartedEvent &event) {
-        EmitLine(Batch::SerializeStartedEvent(request.jobId, event));
-    };
-    callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
-        EmitLine(Batch::SerializeProgressEvent(request.jobId, event));
-    };
-    callbacks.onMatch = [&](const Batch::SearchMatchEvent &event) {
-        EmitLine(Batch::SerializeMatchEvent(request.jobId, event));
-    };
-    callbacks.onCompleted = [&](const Batch::SearchCompletedEvent &event) {
-        EmitLine(Batch::SerializeCompletedEvent(request.jobId, event));
-    };
-    callbacks.onFailed = [&](const Batch::SearchFailedEvent &event) {
-        EmitLine(Batch::SerializeFailedEvent(request.jobId, event));
-    };
-    callbacks.onCancelled = [&](const Batch::SearchCancelledEvent &event) {
-        EmitLine(Batch::SerializeCancelledEvent(request.jobId, event));
-    };
-
-    (void)Batch::BatchSearchService::Run(searchRequest, callbacks);
 }
 
 void RunPreviewCommand(const Batch::SidecarPreviewRequest &request)
@@ -267,6 +406,7 @@ int main()
 {
     std::string line;
     while (std::getline(std::cin, line)) {
+        JoinInactiveSearchWorker();
         if (line.empty()) {
             continue;
         }
@@ -285,14 +425,18 @@ int main()
             RunPreviewCommand(parsed.request.preview);
             break;
         case Batch::SidecarCommandType::Cancel:
-            EmitLine(Batch::SerializeFailedEvent(parsed.request.cancel.jobId,
-                                                 "cancel command is not supported in this phase"));
+            if (!RequestSearchCancel(parsed.request.cancel.jobId)) {
+                EmitLine(Batch::SerializeFailedEvent(parsed.request.cancel.jobId,
+                                                     "job is not running"));
+            }
             break;
         default:
             EmitLine(Batch::SerializeFailedEvent("unknown", "unknown command"));
             break;
         }
     }
+
+    ShutdownSearchWorker();
     return 0;
 }
 

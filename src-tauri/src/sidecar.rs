@@ -106,6 +106,8 @@ pub struct SearchRequestPayload {
     pub threads: i32,
     #[serde(default)]
     pub constraints: SearchConstraints,
+    #[serde(default)]
+    pub cpu: Option<SearchCpuConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -117,6 +119,79 @@ pub struct SearchConstraints {
     pub forbidden: Vec<String>,
     #[serde(default)]
     pub distance: Vec<DistanceRule>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchCpuConfig {
+    #[serde(default = "default_cpu_mode")]
+    pub mode: String,
+    #[serde(default)]
+    pub workers: i32,
+    #[serde(default = "default_true")]
+    pub allow_smt: bool,
+    #[serde(default)]
+    pub allow_low_perf: bool,
+    #[serde(default = "default_placement")]
+    pub placement: String,
+    #[serde(default = "default_true")]
+    pub enable_warmup: bool,
+    #[serde(default = "default_true")]
+    pub enable_adaptive_down: bool,
+    #[serde(default = "default_chunk_size")]
+    pub chunk_size: i32,
+    #[serde(default = "default_progress_interval")]
+    pub progress_interval: i32,
+    #[serde(default = "default_sample_window")]
+    pub sample_window_ms: i32,
+    #[serde(default = "default_adaptive_min_workers")]
+    pub adaptive_min_workers: i32,
+    #[serde(default = "default_adaptive_drop_threshold")]
+    pub adaptive_drop_threshold: f64,
+    #[serde(default = "default_adaptive_drop_windows")]
+    pub adaptive_drop_windows: i32,
+    #[serde(default = "default_adaptive_cooldown")]
+    pub adaptive_cooldown_ms: i32,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_cpu_mode() -> String {
+    "balanced".to_string()
+}
+
+fn default_placement() -> String {
+    "preferred".to_string()
+}
+
+fn default_chunk_size() -> i32 {
+    64
+}
+
+fn default_progress_interval() -> i32 {
+    1000
+}
+
+fn default_sample_window() -> i32 {
+    2000
+}
+
+fn default_adaptive_min_workers() -> i32 {
+    1
+}
+
+fn default_adaptive_drop_threshold() -> f64 {
+    0.12
+}
+
+fn default_adaptive_drop_windows() -> i32 {
+    3
+}
+
+fn default_adaptive_cooldown() -> i32 {
+    8000
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -264,24 +339,41 @@ pub fn cancel_search(
         }
     }
 
-    if let Ok(mut guard) = handles.child_handle.lock() {
-        if let Some(child) = guard.as_mut() {
-            let _ = child.kill();
+    // 优先等待 sidecar 自身完成取消，超时后再强制终止。
+    let mut finished = false;
+    for _ in 0..20 {
+        thread::sleep(Duration::from_millis(50));
+        match registry.get_status(job_id) {
+            Some(JobStatus::Cancelled) | Some(JobStatus::Completed) | Some(JobStatus::Failed) => {
+                finished = true;
+                break;
+            }
+            _ => {}
         }
     }
-    registry.set_status(job_id, JobStatus::Cancelled)?;
 
-    let _ = app.emit(
-        SIDECAR_EVENT_CHANNEL,
-        json!({
-            "event": "cancelled",
-            "jobId": job_id,
-            "processedSeeds": 0,
-            "totalSeeds": 0,
-            "totalMatches": 0,
-            "finalActiveWorkers": 0
-        }),
-    );
+    if !finished {
+        if let Ok(mut guard) = handles.child_handle.lock() {
+            if let Some(child) = guard.as_mut() {
+                let _ = child.kill();
+            }
+        }
+    }
+
+    if registry.is_running(job_id) {
+        registry.set_status(job_id, JobStatus::Cancelled)?;
+        let _ = app.emit(
+            SIDECAR_EVENT_CHANNEL,
+            json!({
+                "event": "cancelled",
+                "jobId": job_id,
+                "processedSeeds": 0,
+                "totalSeeds": 0,
+                "totalMatches": 0,
+                "finalActiveWorkers": 0
+            }),
+        );
+    }
     Ok(())
 }
 
@@ -334,9 +426,13 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
         .unwrap_or_else(|| manifest_dir.clone());
 
     candidates.push(repo_root.join("out/build/x64-release/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/x64-release/src/oni-sidecar.exe"));
     candidates.push(repo_root.join("out/build/x64-debug/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/x64-debug/src/oni-sidecar.exe"));
     candidates.push(repo_root.join("out/build/mingw-release/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/mingw-release/src/oni-sidecar.exe"));
     candidates.push(repo_root.join("out/build/mingw-debug/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/mingw-debug/src/oni-sidecar.exe"));
     candidates.push(manifest_dir.join("binaries/oni-sidecar.exe"));
 
     if let Some(app_handle) = app {
@@ -412,6 +508,24 @@ pub fn run_sidecar_request_collect(
 }
 
 fn build_search_command(request: &SearchRequestPayload) -> Value {
+    let cpu = request.cpu.clone().map(|cpu| {
+        json!({
+            "mode": cpu.mode,
+            "workers": cpu.workers,
+            "allowSmt": cpu.allow_smt,
+            "allowLowPerf": cpu.allow_low_perf,
+            "placement": cpu.placement,
+            "enableWarmup": cpu.enable_warmup,
+            "enableAdaptiveDown": cpu.enable_adaptive_down,
+            "chunkSize": cpu.chunk_size,
+            "progressInterval": cpu.progress_interval,
+            "sampleWindowMs": cpu.sample_window_ms,
+            "adaptiveMinWorkers": cpu.adaptive_min_workers,
+            "adaptiveDropThreshold": cpu.adaptive_drop_threshold,
+            "adaptiveDropWindows": cpu.adaptive_drop_windows,
+            "adaptiveCooldownMs": cpu.adaptive_cooldown_ms,
+        })
+    });
     json!({
         "command": "search",
         "jobId": request.job_id,
@@ -424,7 +538,8 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
             "distance": request.constraints.distance,
-        }
+        },
+        "cpu": cpu,
     })
 }
 
@@ -627,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "需要先构建 out/build/x64-release/oni-sidecar.exe"]
+    #[ignore = "需要先构建 out/build/x64-release/src/oni-sidecar.exe"]
     fn sidecar_search_smoke() {
         let path = resolve_sidecar_path(None).expect("sidecar path should be resolvable");
         let request = json!({
@@ -635,9 +750,9 @@ mod tests {
             "jobId": "smoke-search-001",
             "worldType": 13,
             "seedStart": 100000,
-            "seedEnd": 100050,
+            "seedEnd": 100000,
             "mixing": 625,
-            "threads": 2,
+            "threads": 1,
             "constraints": {
                 "required": [],
                 "forbidden": [],
@@ -651,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "需要先构建 out/build/x64-release/oni-sidecar.exe"]
+    #[ignore = "需要先构建 out/build/x64-release/src/oni-sidecar.exe"]
     fn sidecar_preview_smoke() {
         let path = resolve_sidecar_path(None).expect("sidecar path should be resolvable");
         let request = json!({

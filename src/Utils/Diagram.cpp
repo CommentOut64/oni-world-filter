@@ -63,12 +63,15 @@ static Vector2f GetCircumcenter(ConvexFace<Site> &face)
 
 static void PolyForRandomPoints(std::vector<Vector2f> &verts)
 {
-    if (verts.empty()) {
+    if (verts.size() < 3) {
         return;
     }
     ConvexHull hull;
     auto hullResult = hull.Create2D(verts);
     auto &Points = hullResult.Points;
+    if (Points.size() < 3) {
+        return;
+    }
     double area = 0.0;
     int count = Points.size();
     for (int i = 0; i < count; i++) {
@@ -87,7 +90,9 @@ static void PolyForRandomPoints(std::vector<Vector2f> &verts)
             result.emplace_back(**itr);
         }
     }
-    verts.swap(result);
+    if (!result.empty()) {
+        verts.swap(result);
+    }
 }
 
 static bool ContainsVert(const ConvexFace<Site> *face, const Site *target)
