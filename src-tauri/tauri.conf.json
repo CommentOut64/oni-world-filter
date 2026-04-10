@@ -26,6 +26,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": [
+      "binaries/oni-sidecar.exe"
+    ],
     "icon": [
       "icons/icon.ico"
     ]

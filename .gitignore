@@ -46,3 +46,4 @@ Desktop.ini
 /desktop/dist/
 /src-tauri/target/
 /src-tauri/gen/
+/src-tauri/binaries/

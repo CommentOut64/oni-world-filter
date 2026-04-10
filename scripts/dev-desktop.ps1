@@ -33,6 +33,29 @@ function Assert-CargoTauri {
     }
 }
 
+function Ensure-SidecarBinary {
+    Write-Host "Configuring native build preset (x64-release)..."
+    cmake --preset x64-release
+    if ($LASTEXITCODE -ne 0) {
+        throw "cmake --preset x64-release failed with exit code $LASTEXITCODE"
+    }
+
+    Write-Host "Building oni-sidecar target..."
+    cmake --build out/build/x64-release --target oni-sidecar
+    if ($LASTEXITCODE -ne 0) {
+        throw "cmake --build out/build/x64-release --target oni-sidecar failed with exit code $LASTEXITCODE"
+    }
+
+    $source = Resolve-Path "out/build/x64-release/oni-sidecar.exe"
+    $targetDir = Join-Path $repoRoot "src-tauri/binaries"
+    if (-not (Test-Path -LiteralPath $targetDir)) {
+        New-Item -ItemType Directory -Path $targetDir | Out-Null
+    }
+    $target = Join-Path $targetDir "oni-sidecar.exe"
+    Copy-Item -LiteralPath $source -Destination $target -Force
+    Write-Host "Sidecar synced to $target"
+}
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Push-Location $repoRoot
 try {
@@ -42,6 +65,7 @@ try {
     }
 
     Assert-CargoTauri
+    Ensure-SidecarBinary
     Push-Location "src-tauri"
     try {
         cargo tauri dev
