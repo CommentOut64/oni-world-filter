@@ -46,7 +46,7 @@ function Ensure-SidecarBinary {
         throw "cmake --build out/build/x64-release --target oni-sidecar failed with exit code $LASTEXITCODE"
     }
 
-    $source = Resolve-Path "out/build/x64-release/oni-sidecar.exe"
+    $source = Resolve-Path "out/build/x64-release/src/oni-sidecar.exe"
     $targetDir = Join-Path $repoRoot "src-tauri/binaries"
     if (-not (Test-Path -LiteralPath $targetDir)) {
         New-Item -ItemType Directory -Path $targetDir | Out-Null
