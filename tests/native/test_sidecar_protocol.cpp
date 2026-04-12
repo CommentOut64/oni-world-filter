@@ -167,6 +167,26 @@ int RunAllTests()
     }
 
     {
+        Batch::SidecarSearchRequest request;
+        request.worldType = 13;
+        request.seedStart = 100000;
+        request.seedEnd = 100100;
+        request.constraints.count.push_back(Batch::SidecarCountRule{
+            .geyserId = "hot_water",
+            .minCount = 1,
+            .maxCount = 2,
+        });
+        std::vector<Batch::FilterError> errors;
+        const auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors);
+        Expect(errors.empty(), "sidecar count mapping should not produce errors", failures);
+        Expect(cfg.countRules.size() == 1, "sidecar count mapping should produce one count rule", failures);
+        if (!cfg.countRules.empty()) {
+            Expect(cfg.countRules[0].minCount == 1, "sidecar count min mismatch", failures);
+            Expect(cfg.countRules[0].maxCount == 2, "sidecar count max mismatch", failures);
+        }
+    }
+
+    {
         Batch::SearchStartedEvent started;
         started.seedStart = 1;
         started.seedEnd = 100;

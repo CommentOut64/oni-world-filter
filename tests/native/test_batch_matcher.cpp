@@ -33,8 +33,10 @@ int RunAllTests()
     int failures = 0;
     const int steam = Batch::GeyserIdToIndex("steam");
     const int hotWater = Batch::GeyserIdToIndex("hot_water");
+    const int methane = Batch::GeyserIdToIndex("methane");
     Expect(steam >= 0, "steam geyser id should exist", failures);
     Expect(hotWater >= 0, "hot_water geyser id should exist", failures);
+    Expect(methane >= 0, "methane geyser id should exist", failures);
 
     {
         Batch::FilterConfig cfg;
@@ -67,6 +69,36 @@ int RunAllTests()
         const auto result = Batch::MatchFilter(cfg, capture);
         Expect(result.Ok(), "distance test should not produce errors", failures);
         Expect(result.matched, "multi distance rules should match", failures);
+    }
+
+    {
+        Batch::FilterConfig cfg;
+        cfg.countRules.push_back({steam, 1, 2});
+        auto capture = MakeBaseCapture();
+        capture.geysers.push_back({steam, 70, 70});
+        const auto result = Batch::MatchFilter(cfg, capture);
+        Expect(result.Ok(), "count match test should not produce errors", failures);
+        Expect(result.matched, "count range [1,2] should match one steam", failures);
+    }
+
+    {
+        Batch::FilterConfig cfg;
+        cfg.countRules.push_back({steam, 2, 3});
+        auto capture = MakeBaseCapture();
+        capture.geysers.push_back({steam, 70, 70});
+        const auto result = Batch::MatchFilter(cfg, capture);
+        Expect(result.Ok(), "count mismatch test should not produce errors", failures);
+        Expect(!result.matched, "count range [2,3] should reject one steam", failures);
+    }
+
+    {
+        Batch::FilterConfig cfg;
+        cfg.forbidden = {methane};
+        cfg.countRules.push_back({methane, 1, 1});
+        auto capture = MakeBaseCapture();
+        const auto result = Batch::MatchFilter(cfg, capture);
+        Expect(result.Ok(), "forbidden+count conflict test should not produce errors", failures);
+        Expect(!result.matched, "forbidden+count.min=1 should be unmatched in execution layer", failures);
     }
 
     {

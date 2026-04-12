@@ -93,6 +93,53 @@ int RunAllTests()
     }
 
     {
+        const auto file = tempDir / "count-valid.json";
+        const std::string json = R"({
+  "count": [
+    { "geyser": "steam", "minCount": 1, "maxCount": 2 }
+  ]
+})";
+        Expect(WriteText(file, json), "write count-valid json failed", failures);
+        const auto result = Batch::LoadFilterConfig(file.string());
+        Expect(result.Ok(), "count-valid should parse", failures);
+        Expect(result.config.countRules.size() == 1, "count-valid should have one count rule", failures);
+        if (!result.config.countRules.empty()) {
+            Expect(result.config.countRules[0].minCount == 1, "count min mismatch", failures);
+            Expect(result.config.countRules[0].maxCount == 2, "count max mismatch", failures);
+        }
+    }
+
+    {
+        const auto file = tempDir / "count-missing-field.json";
+        const std::string json = R"({
+  "count": [
+    { "geyser": "steam", "minCount": 1 }
+  ]
+})";
+        Expect(WriteText(file, json), "write count-missing-field json failed", failures);
+        const auto result = Batch::LoadFilterConfig(file.string());
+        Expect(!result.Ok(), "count missing field should fail", failures);
+        Expect(ContainsErrorCode(result, Batch::FilterErrorCode::MissingCountField),
+               "count missing field should report error",
+               failures);
+    }
+
+    {
+        const auto file = tempDir / "count-invalid-range.json";
+        const std::string json = R"({
+  "count": [
+    { "geyser": "steam", "minCount": 3, "maxCount": 1 }
+  ]
+})";
+        Expect(WriteText(file, json), "write count-invalid-range json failed", failures);
+        const auto result = Batch::LoadFilterConfig(file.string());
+        Expect(!result.Ok(), "count invalid range should fail", failures);
+        Expect(ContainsErrorCode(result, Batch::FilterErrorCode::InvalidCountRange),
+               "count invalid range should report error",
+               failures);
+    }
+
+    {
         const auto file = tempDir / "seed-range-invalid.json";
         const std::string json = R"({
   "seedStart": 20,
