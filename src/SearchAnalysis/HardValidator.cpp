@@ -1,0 +1,237 @@
+#include "SearchAnalysis/HardValidator.hpp"
+
+#include <algorithm>
+
+#include "SearchAnalysis/SearchConstraintNormalizer.hpp"
+
+namespace SearchAnalysis {
+
+namespace {
+
+constexpr int kMixingMax = 48828124;
+
+void AddIssue(std::vector<ValidationIssue> *issues,
+              std::string layer,
+              std::string code,
+              std::string field,
+              std::string message)
+{
+    if (issues == nullptr) {
+        return;
+    }
+    issues->push_back(ValidationIssue{
+        .layer = std::move(layer),
+        .code = std::move(code),
+        .field = std::move(field),
+        .message = std::move(message),
+    });
+}
+
+void ValidateLayer1(const SearchAnalysisRequest &request,
+                    std::vector<ValidationIssue> *errors)
+{
+    if (request.seedStart < 0) {
+        AddIssue(errors,
+                 "layer1",
+                 "range.seed_start_negative",
+                 "seedStart",
+                 "seedStart 不能为负数");
+    }
+    if (request.seedEnd < 0) {
+        AddIssue(errors,
+                 "layer1",
+                 "range.seed_end_negative",
+                 "seedEnd",
+                 "seedEnd 不能为负数");
+    }
+    if (request.seedStart > request.seedEnd) {
+        AddIssue(errors,
+                 "layer1",
+                 "range.seed_start_gt_seed_end",
+                 "seedStart/seedEnd",
+                 "seedStart 必须 <= seedEnd");
+    }
+    if (request.mixing < 0 || request.mixing > kMixingMax) {
+        AddIssue(errors,
+                 "layer1",
+                 "range.mixing_out_of_bounds",
+                 "mixing",
+                 "mixing 超出有效范围");
+    }
+    if (request.threads < 0) {
+        AddIssue(errors,
+                 "layer1",
+                 "range.threads_negative",
+                 "threads",
+                 "threads 不能为负数");
+    }
+
+    for (size_t i = 0; i < request.constraints.distance.size(); ++i) {
+        const auto &rule = request.constraints.distance[i];
+        if (rule.minDist < 0.0) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.distance_min_negative",
+                     "constraints.distance[" + std::to_string(i) + "].minDist",
+                     "distance.minDist 不能为负数");
+        }
+        if (rule.maxDist < 0.0) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.distance_max_negative",
+                     "constraints.distance[" + std::to_string(i) + "].maxDist",
+                     "distance.maxDist 不能为负数");
+        }
+        if (rule.minDist > rule.maxDist) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.distance_min_gt_max",
+                     "constraints.distance[" + std::to_string(i) + "].maxDist",
+                     "distance.minDist 必须 <= distance.maxDist");
+        }
+    }
+
+    for (size_t i = 0; i < request.constraints.count.size(); ++i) {
+        const auto &rule = request.constraints.count[i];
+        if (rule.minCount < 0) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.count_min_negative",
+                     "constraints.count[" + std::to_string(i) + "].minCount",
+                     "count.minCount 不能为负数");
+        }
+        if (rule.maxCount < 0) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.count_max_negative",
+                     "constraints.count[" + std::to_string(i) + "].maxCount",
+                     "count.maxCount 不能为负数");
+        }
+        if (rule.minCount > rule.maxCount) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.count_min_gt_max",
+                     "constraints.count[" + std::to_string(i) + "].maxCount",
+                     "count.minCount 必须 <= count.maxCount");
+        }
+    }
+
+    if (request.cpu.hasValue) {
+        if (request.cpu.chunkSize < 1 || request.cpu.chunkSize > 2048) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.cpu_chunk_size",
+                     "cpu.chunkSize",
+                     "cpu.chunkSize 必须在 [1, 2048]");
+        }
+        if (request.cpu.progressInterval < 1 || request.cpu.progressInterval > 1000000) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.cpu_progress_interval",
+                     "cpu.progressInterval",
+                     "cpu.progressInterval 必须在 [1, 1000000]");
+        }
+        if (request.cpu.sampleWindowMs < 200 || request.cpu.sampleWindowMs > 10000) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.cpu_sample_window",
+                     "cpu.sampleWindowMs",
+                     "cpu.sampleWindowMs 必须在 [200, 10000]");
+        }
+        if (request.cpu.adaptiveMinWorkers < 1 || request.cpu.adaptiveMinWorkers > 1024) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.cpu_adaptive_min_workers",
+                     "cpu.adaptiveMinWorkers",
+                     "cpu.adaptiveMinWorkers 必须在 [1, 1024]");
+        }
+        if (request.cpu.adaptiveDropThreshold < 0.0 || request.cpu.adaptiveDropThreshold > 0.5) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.cpu_adaptive_drop_threshold",
+                     "cpu.adaptiveDropThreshold",
+                     "cpu.adaptiveDropThreshold 必须在 [0, 0.5]");
+        }
+        if (request.cpu.adaptiveDropWindows < 1 || request.cpu.adaptiveDropWindows > 10) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.cpu_adaptive_drop_windows",
+                     "cpu.adaptiveDropWindows",
+                     "cpu.adaptiveDropWindows 必须在 [1, 10]");
+        }
+        if (request.cpu.adaptiveCooldownMs < 1000 || request.cpu.adaptiveCooldownMs > 60000) {
+            AddIssue(errors,
+                     "layer1",
+                     "range.cpu_adaptive_cooldown",
+                     "cpu.adaptiveCooldownMs",
+                     "cpu.adaptiveCooldownMs 必须在 [1000, 60000]");
+        }
+    }
+}
+
+void ValidateLayer2(const NormalizedSearchRequest &request,
+                    const SearchCatalog &catalog,
+                    std::vector<ValidationIssue> *errors)
+{
+    if (request.worldType < 0 ||
+        request.worldType >= static_cast<int>(catalog.worlds.size())) {
+        AddIssue(errors,
+                 "layer2",
+                 "world.world_type_out_of_range",
+                 "worldType",
+                 "worldType 不在 catalog 范围内");
+    }
+
+    for (const auto &group : request.groups) {
+        if (group.geyserIndex < 0) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.unknown_geyser",
+                     "constraints",
+                     "存在未知 geyserId: " + group.geyserId);
+        }
+    }
+}
+
+void ValidateLayer3(const NormalizedSearchRequest &request,
+                    std::vector<ValidationIssue> *errors)
+{
+    for (const auto &group : request.groups) {
+        if (group.hasRequired && group.hasForbidden) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.required_forbidden",
+                     "constraints.required/constraints.forbidden",
+                     "同一 geyser 不能同时 required 和 forbidden: " + group.geyserId);
+        }
+        if (group.minCount > group.maxCount) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.count_min_gt_max",
+                     "constraints.count",
+                     "归并后 minCount > maxCount: " + group.geyserId);
+        }
+        if (group.hasForbidden && !group.distanceRules.empty()) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.forbidden_with_distance",
+                     "constraints.distance",
+                     "forbidden geyser 不能同时设置 distance: " + group.geyserId);
+        }
+    }
+}
+
+} // namespace
+
+SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
+                                       const SearchCatalog &catalog)
+{
+    SearchAnalysisResult result;
+    result.normalizedRequest = NormalizeSearchRequest(request);
+    ValidateLayer1(request, &result.errors);
+    ValidateLayer2(result.normalizedRequest, catalog, &result.errors);
+    ValidateLayer3(result.normalizedRequest, &result.errors);
+    return result;
+}
+
+} // namespace SearchAnalysis

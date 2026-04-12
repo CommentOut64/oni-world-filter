@@ -67,6 +67,12 @@ set(ONI_BASE_SOURCES
     "SearchAnalysis/SearchCatalog.cpp"
     "SearchAnalysis/TraitCatalog.hpp"
     "SearchAnalysis/TraitCatalog.cpp"
+    "SearchAnalysis/SearchConstraintModel.hpp"
+    "SearchAnalysis/SearchConstraintModel.cpp"
+    "SearchAnalysis/SearchConstraintNormalizer.hpp"
+    "SearchAnalysis/SearchConstraintNormalizer.cpp"
+    "SearchAnalysis/HardValidator.hpp"
+    "SearchAnalysis/HardValidator.cpp"
     "Setting/ComposableDictionary.hpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
@@ -280,6 +286,19 @@ target_include_directories(test_sidecar_protocol
 )
 target_link_libraries(test_sidecar_protocol PRIVATE jsoncpp)
 add_test(NAME test_sidecar_protocol COMMAND test_sidecar_protocol)
+
+add_executable(test_search_analysis
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_search_analysis.cpp"
+    "SearchAnalysis/SearchConstraintNormalizer.cpp"
+    "SearchAnalysis/HardValidator.cpp"
+    "Batch/FilterConfig.cpp"
+)
+target_include_directories(test_search_analysis
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(test_search_analysis PRIVATE jsoncpp)
+add_test(NAME test_search_analysis COMMAND test_search_analysis)
 endif()
 
 configure_file("config.h.in" "config.h")

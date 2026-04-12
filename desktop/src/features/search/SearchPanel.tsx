@@ -3,8 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { FormProvider, useForm } from "react-hook-form";
 
 import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
+import { analyzeSearchRequest, formatTauriError } from "../../lib/tauri";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
+import CountRuleEditor from "./CountRuleEditor";
 import DistanceRuleEditor from "./DistanceRuleEditor";
 import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
@@ -39,6 +41,29 @@ export default function SearchPanel() {
 
   const submit = methods.handleSubmit(async (values) => {
     const nextDraft = toSearchDraft(values);
+    try {
+      const analysis = await analyzeSearchRequest({
+        jobId: `analyze-${Date.now()}`,
+        worldType: nextDraft.worldType,
+        seedStart: nextDraft.seedStart,
+        seedEnd: nextDraft.seedEnd,
+        mixing: nextDraft.mixing,
+        threads: nextDraft.threads,
+        cpu: nextDraft.cpu,
+        constraints: nextDraft.constraints,
+      });
+      if (analysis.errors.length > 0) {
+        useSearchStore.setState({ lastError: analysis.errors[0].message });
+        return;
+      }
+      if (analysis.warnings.length > 0) {
+        useSearchStore.setState({ lastError: `[warning] ${analysis.warnings[0].message}` });
+      }
+    } catch (error) {
+      useSearchStore.setState({ lastError: formatTauriError(error) });
+      return;
+    }
+
     setDraft(nextDraft);
     clearPreview();
     await startSearchJob(nextDraft);
@@ -95,6 +120,7 @@ export default function SearchPanel() {
         <GeyserConstraintEditor title="必须包含(required)" type="required" geysers={geysers} />
         <GeyserConstraintEditor title="必须排除(forbidden)" type="forbidden" geysers={geysers} />
         <DistanceRuleEditor geysers={geysers} />
+        <CountRuleEditor geysers={geysers} />
 
         <SearchActions
           isSearching={isSearching}

@@ -4,10 +4,17 @@ export interface DistanceRule {
   maxDist: number;
 }
 
+export interface CountRule {
+  geyser: string;
+  minCount: number;
+  maxCount: number;
+}
+
 export interface SearchConstraints {
   required: string[];
   forbidden: string[];
   distance: DistanceRule[];
+  count: CountRule[];
 }
 
 export type CpuMode = "balanced" | "turbo" | "custom";
@@ -38,6 +45,51 @@ export interface SearchRequest {
   threads: number;
   constraints: SearchConstraints;
   cpu?: SearchCpuConfig;
+}
+
+export interface SearchAnalyzeRequest extends SearchRequest {
+  command?: "analyze_search_request";
+}
+
+export interface ValidationIssue {
+  layer: string;
+  code: string;
+  field: string;
+  message: string;
+}
+
+export interface NormalizedConstraintGroup {
+  geyserId: string;
+  geyserIndex: number;
+  minCount: number;
+  maxCount: number;
+  hasRequired: boolean;
+  hasForbidden: boolean;
+  hasExplicitCount: boolean;
+  distance: DistanceRule[];
+}
+
+export interface NormalizedSearchRequestPayload {
+  worldType: number;
+  seedStart: number;
+  seedEnd: number;
+  mixing: number;
+  threads: number;
+  groups: NormalizedConstraintGroup[];
+}
+
+export interface SearchAnalysisPayload {
+  normalizedRequest: NormalizedSearchRequestPayload;
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+  bottlenecks: string[];
+  predictedBottleneckProbability: number;
+}
+
+export interface SearchAnalysisEvent {
+  event: "search_analysis";
+  jobId: string;
+  analysis: SearchAnalysisPayload;
 }
 
 export interface PreviewRequest {

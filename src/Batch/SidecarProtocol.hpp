@@ -7,6 +7,7 @@
 #include "Batch/FilterConfig.hpp"
 #include "Batch/SearchEvents.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
+#include "SearchAnalysis/SearchConstraintModel.hpp"
 
 namespace Batch {
 
@@ -16,6 +17,7 @@ enum class SidecarCommandType {
     Preview,
     Cancel,
     GetSearchCatalog,
+    AnalyzeSearchRequest,
 };
 
 struct SidecarDistanceRule {
@@ -24,10 +26,17 @@ struct SidecarDistanceRule {
     float maxDist = 0.0f;
 };
 
+struct SidecarCountRule {
+    std::string geyserId;
+    int minCount = 0;
+    int maxCount = 0;
+};
+
 struct SidecarConstraints {
     std::vector<std::string> required;
     std::vector<std::string> forbidden;
     std::vector<SidecarDistanceRule> distance;
+    std::vector<SidecarCountRule> count;
 };
 
 struct SidecarCpuConfig {
@@ -74,12 +83,24 @@ struct SidecarGetSearchCatalogRequest {
     std::string jobId = "search-catalog";
 };
 
+struct SidecarAnalyzeSearchRequest {
+    std::string jobId;
+    int worldType = 0;
+    int seedStart = 1;
+    int seedEnd = 100000;
+    int mixing = 0;
+    int threads = 0;
+    SidecarConstraints constraints;
+    SidecarCpuConfig cpu;
+};
+
 struct SidecarRequest {
     SidecarCommandType command = SidecarCommandType::Unknown;
     SidecarSearchRequest search;
     SidecarPreviewRequest preview;
     SidecarCancelRequest cancel;
     SidecarGetSearchCatalogRequest getSearchCatalog;
+    SidecarAnalyzeSearchRequest analyze;
 };
 
 struct SidecarParseResult {
@@ -115,5 +136,7 @@ std::string SerializePreviewEvent(const std::string &jobId,
                                   const GeneratedWorldPreview &preview);
 std::string SerializeSearchCatalogEvent(const std::string &jobId,
                                         const SearchAnalysis::SearchCatalog &catalog);
+std::string SerializeSearchAnalysisEvent(const std::string &jobId,
+                                         const SearchAnalysis::SearchAnalysisResult &analysis);
 
 } // namespace Batch

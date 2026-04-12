@@ -17,6 +17,12 @@ const distanceRuleSchema = z.object({
   maxDist: z.coerce.number().min(0, "最大距离不能为负数"),
 });
 
+const countRuleSchema = z.object({
+  geyser: z.string().min(1, "请选择喷口类型"),
+  minCount: z.coerce.number().int().min(0, "最小数量不能为负数"),
+  maxCount: z.coerce.number().int().min(0, "最大数量不能为负数"),
+});
+
 export interface SearchSchemaOptions {
   worldTypeMax?: number;
   mixingMax?: number;
@@ -38,6 +44,7 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
       required: z.array(geyserItemSchema),
       forbidden: z.array(geyserItemSchema),
       distance: z.array(distanceRuleSchema),
+      count: z.array(countRuleSchema),
     })
     .superRefine((value, ctx) => {
       if (value.seedStart > value.seedEnd) {
@@ -66,9 +73,19 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
         }
       }
 
+      for (let i = 0; i < value.count.length; i += 1) {
+        if (value.count[i].minCount > value.count[i].maxCount) {
+          ctx.addIssue({
+            path: ["count", i, "maxCount"],
+            code: z.ZodIssueCode.custom,
+            message: "maxCount 必须大于等于 minCount",
+          });
+        }
+      }
+
       const checkUnique = (
         list: { geyser: string }[],
-        path: "required" | "forbidden" | "distance",
+        path: "required" | "forbidden" | "distance" | "count",
         message: string
       ) => {
         const set = new Set<string>();
@@ -88,6 +105,7 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
       checkUnique(value.required, "required", "required 约束中存在重复喷口");
       checkUnique(value.forbidden, "forbidden", "forbidden 约束中存在重复喷口");
       checkUnique(value.distance, "distance", "distance 规则中存在重复喷口");
+      checkUnique(value.count, "count", "count 规则中存在重复喷口");
     });
 }
 
@@ -126,6 +144,11 @@ export function toSearchDraft(values: SearchFormValues): SearchDraft {
         minDist: item.minDist,
         maxDist: item.maxDist,
       })),
+      count: values.count.map((item) => ({
+        geyser: item.geyser,
+        minCount: item.minCount,
+        maxCount: item.maxCount,
+      })),
     },
   };
 }
@@ -146,6 +169,11 @@ export function toSearchFormValues(draft: SearchDraft): SearchFormValues {
       geyser: item.geyser,
       minDist: item.minDist,
       maxDist: item.maxDist,
+    })),
+    count: draft.constraints.count.map((item) => ({
+      geyser: item.geyser,
+      minCount: item.minCount,
+      maxCount: item.maxCount,
     })),
   };
 }

@@ -5,6 +5,8 @@ import type {
   GeyserOption,
   PreviewEvent,
   PreviewRequest,
+  SearchAnalysisPayload,
+  SearchAnalyzeRequest,
   SearchCatalog,
   SearchRequest,
   SidecarEvent,
@@ -71,6 +73,28 @@ export async function getSearchCatalog(): Promise<SearchCatalog> {
   }
   const catalog = await invoke<SearchCatalog>("get_search_catalog");
   return normalizeSearchCatalog(catalog);
+}
+
+export async function analyzeSearchRequest(
+  request: SearchAnalyzeRequest
+): Promise<SearchAnalysisPayload> {
+  if (!inTauriRuntime()) {
+    return {
+      normalizedRequest: {
+        worldType: request.worldType,
+        seedStart: request.seedStart,
+        seedEnd: request.seedEnd,
+        mixing: request.mixing,
+        threads: request.threads,
+        groups: [],
+      },
+      errors: [],
+      warnings: [],
+      bottlenecks: [],
+      predictedBottleneckProbability: 1,
+    };
+  }
+  return invoke<SearchAnalysisPayload>("analyze_search_request", { request });
 }
 
 export async function subscribeSidecar(

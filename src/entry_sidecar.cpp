@@ -23,6 +23,7 @@
 #include "Batch/ThreadPolicy.hpp"
 #include "Batch/ThroughputCalibration.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
+#include "SearchAnalysis/HardValidator.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
@@ -434,6 +435,69 @@ void RunGetSearchCatalogCommand(const Batch::SidecarGetSearchCatalogRequest &req
     EmitLine(Batch::SerializeSearchCatalogEvent(request.jobId, catalog));
 }
 
+SearchAnalysis::SearchAnalysisRequest BuildAnalysisRequest(
+    const Batch::SidecarAnalyzeSearchRequest &request)
+{
+    SearchAnalysis::SearchAnalysisRequest analysisRequest;
+    analysisRequest.jobId = request.jobId;
+    analysisRequest.worldType = request.worldType;
+    analysisRequest.seedStart = request.seedStart;
+    analysisRequest.seedEnd = request.seedEnd;
+    analysisRequest.mixing = request.mixing;
+    analysisRequest.threads = request.threads;
+    analysisRequest.cpu.hasValue = request.cpu.hasValue;
+    analysisRequest.cpu.mode = request.cpu.mode;
+    analysisRequest.cpu.workers = request.cpu.workers;
+    analysisRequest.cpu.allowSmt = request.cpu.allowSmt;
+    analysisRequest.cpu.allowLowPerf = request.cpu.allowLowPerf;
+    analysisRequest.cpu.placement = request.cpu.placement;
+    analysisRequest.cpu.enableWarmup = request.cpu.enableWarmup;
+    analysisRequest.cpu.enableAdaptiveDown = request.cpu.enableAdaptiveDown;
+    analysisRequest.cpu.chunkSize = request.cpu.chunkSize;
+    analysisRequest.cpu.progressInterval = request.cpu.progressInterval;
+    analysisRequest.cpu.sampleWindowMs = request.cpu.sampleWindowMs;
+    analysisRequest.cpu.adaptiveMinWorkers = request.cpu.adaptiveMinWorkers;
+    analysisRequest.cpu.adaptiveDropThreshold = request.cpu.adaptiveDropThreshold;
+    analysisRequest.cpu.adaptiveDropWindows = request.cpu.adaptiveDropWindows;
+    analysisRequest.cpu.adaptiveCooldownMs = request.cpu.adaptiveCooldownMs;
+
+    analysisRequest.constraints.required = request.constraints.required;
+    analysisRequest.constraints.forbidden = request.constraints.forbidden;
+    analysisRequest.constraints.distance.reserve(request.constraints.distance.size());
+    for (const auto &item : request.constraints.distance) {
+        analysisRequest.constraints.distance.push_back(SearchAnalysis::DistanceConstraint{
+            .geyserId = item.geyserId,
+            .minDist = item.minDist,
+            .maxDist = item.maxDist,
+        });
+    }
+    analysisRequest.constraints.count.reserve(request.constraints.count.size());
+    for (const auto &item : request.constraints.count) {
+        analysisRequest.constraints.count.push_back(SearchAnalysis::CountConstraint{
+            .geyserId = item.geyserId,
+            .minCount = item.minCount,
+            .maxCount = item.maxCount,
+        });
+    }
+    return analysisRequest;
+}
+
+void RunAnalyzeSearchCommand(const Batch::SidecarAnalyzeSearchRequest &request)
+{
+    std::string errorMessage;
+    const auto settings = SharedSettingsCache::GetOrCreate(ReadSettingsBlob, &errorMessage);
+    if (!settings) {
+        const std::string message =
+            errorMessage.empty() ? "failed to load shared settings cache" : errorMessage;
+        EmitLine(Batch::SerializeFailedEvent(request.jobId, message));
+        return;
+    }
+    const auto catalog = SearchAnalysis::BuildSearchCatalog(*settings);
+    const auto analysisRequest = BuildAnalysisRequest(request);
+    const auto result = SearchAnalysis::RunSearchAnalysis(analysisRequest, catalog);
+    EmitLine(Batch::SerializeSearchAnalysisEvent(request.jobId, result));
+}
+
 } // namespace
 
 int main()
@@ -466,6 +530,9 @@ int main()
             break;
         case Batch::SidecarCommandType::GetSearchCatalog:
             RunGetSearchCatalogCommand(parsed.request.getSearchCatalog);
+            break;
+        case Batch::SidecarCommandType::AnalyzeSearchRequest:
+            RunAnalyzeSearchCommand(parsed.request.analyze);
             break;
         default:
             EmitLine(Batch::SerializeFailedEvent("unknown", "unknown command"));

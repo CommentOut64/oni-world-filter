@@ -24,6 +24,7 @@ const DEFAULT_CONSTRAINTS: SearchConstraints = {
   required: [],
   forbidden: [],
   distance: [],
+  count: [],
 };
 
 const DEFAULT_CPU_CONFIG: SearchCpuConfig = {
@@ -253,6 +254,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         required: [...draft.constraints.required],
         forbidden: [...draft.constraints.forbidden],
         distance: [...draft.constraints.distance],
+        count: [...draft.constraints.count],
       },
       cpu: { ...draft.cpu },
     };
@@ -337,6 +339,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         required: draft.constraints.required,
         forbidden: draft.constraints.forbidden,
         distance: draft.constraints.distance,
+        count: draft.constraints.count,
       },
       null,
       2

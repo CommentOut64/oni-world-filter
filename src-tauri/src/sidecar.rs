@@ -119,6 +119,8 @@ pub struct SearchConstraints {
     pub forbidden: Vec<String>,
     #[serde(default)]
     pub distance: Vec<DistanceRule>,
+    #[serde(default)]
+    pub count: Vec<CountRule>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -202,6 +204,14 @@ pub struct DistanceRule {
     pub max_dist: f64,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CountRule {
+    pub geyser: String,
+    pub min_count: i32,
+    pub max_count: i32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewRequestPayload {
@@ -269,6 +279,49 @@ pub struct SearchCatalogPayload {
     pub traits: Vec<TraitMeta>,
     pub mixing_slots: Vec<MixingSlotMeta>,
     pub parameter_specs: Vec<ParameterSpec>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidationIssue {
+    pub layer: String,
+    pub code: String,
+    pub field: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NormalizedConstraintGroup {
+    pub geyser_id: String,
+    pub geyser_index: i32,
+    pub min_count: i32,
+    pub max_count: i32,
+    pub has_required: bool,
+    pub has_forbidden: bool,
+    pub has_explicit_count: bool,
+    pub distance: Vec<DistanceRule>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NormalizedSearchRequestPayload {
+    pub world_type: i32,
+    pub seed_start: i32,
+    pub seed_end: i32,
+    pub mixing: i32,
+    pub threads: i32,
+    pub groups: Vec<NormalizedConstraintGroup>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchAnalysisPayload {
+    pub normalized_request: NormalizedSearchRequestPayload,
+    pub errors: Vec<ValidationIssue>,
+    pub warnings: Vec<ValidationIssue>,
+    pub bottlenecks: Vec<String>,
+    pub predicted_bottleneck_probability: f64,
 }
 
 pub fn list_world_options() -> Vec<WorldOption> {
@@ -484,6 +537,38 @@ pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayloa
     ))
 }
 
+pub fn analyze_search_request(
+    app: Option<&AppHandle>,
+    request: &SearchRequestPayload,
+) -> Result<SearchAnalysisPayload, HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    let sidecar_path = resolve_sidecar_path(app)?;
+    let events =
+        run_sidecar_request_collect(&sidecar_path, &build_analyze_search_command(request))?;
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("analyze 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("search_analysis")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            let analysis = event.get("analysis").cloned().ok_or_else(|| {
+                HostError::InvalidRequest("search_analysis 缺少 analysis 字段".to_string())
+            })?;
+            return serde_json::from_value(analysis).map_err(HostError::from);
+        }
+    }
+    Err(HostError::InvalidRequest(
+        "未收到 search_analysis 事件".to_string(),
+    ))
+}
+
 pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostError> {
     if let Some(path) = env::var_os("ONI_SIDECAR_PATH") {
         let candidate = PathBuf::from(path);
@@ -612,6 +697,7 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
             "distance": request.constraints.distance,
+            "count": request.constraints.count,
         },
         "cpu": cpu,
     })
@@ -631,6 +717,25 @@ fn build_get_search_catalog_command(job_id: &str) -> Value {
     json!({
         "command": "get_search_catalog",
         "jobId": job_id
+    })
+}
+
+fn build_analyze_search_command(request: &SearchRequestPayload) -> Value {
+    json!({
+        "command": "analyze_search_request",
+        "jobId": request.job_id,
+        "worldType": request.world_type,
+        "seedStart": request.seed_start,
+        "seedEnd": request.seed_end,
+        "mixing": request.mixing,
+        "threads": request.threads,
+        "constraints": {
+            "required": request.constraints.required,
+            "forbidden": request.constraints.forbidden,
+            "distance": request.constraints.distance,
+            "count": request.constraints.count,
+        },
+        "cpu": request.cpu,
     })
 }
 

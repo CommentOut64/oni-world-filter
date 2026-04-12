@@ -90,6 +90,138 @@ bool ParseStringArray(const Json::Value &array,
     return true;
 }
 
+bool ParseCpuConfig(const Json::Value &root,
+                    SidecarCpuConfig *cpu,
+                    SidecarParseResult *result)
+{
+    if (cpu == nullptr || result == nullptr) {
+        return false;
+    }
+    const Json::Value cpuNode = root["cpu"];
+    if (cpuNode.isNull()) {
+        return true;
+    }
+    if (!cpuNode.isObject()) {
+        SetParseError(*result, "cpu must be object");
+        return false;
+    }
+    cpu->hasValue = true;
+    cpu->mode = cpuNode.get("mode", cpu->mode).asString();
+    cpu->workers = std::max(0, cpuNode.get("workers", cpu->workers).asInt());
+    cpu->allowSmt = cpuNode.get("allowSmt", cpu->allowSmt).asBool();
+    cpu->allowLowPerf = cpuNode.get("allowLowPerf", cpu->allowLowPerf).asBool();
+    cpu->placement = cpuNode.get("placement", cpu->placement).asString();
+    cpu->enableWarmup = cpuNode.get("enableWarmup", cpu->enableWarmup).asBool();
+    cpu->enableAdaptiveDown = cpuNode.get("enableAdaptiveDown", cpu->enableAdaptiveDown).asBool();
+    cpu->chunkSize = cpuNode.get("chunkSize", cpu->chunkSize).asInt();
+    cpu->progressInterval = cpuNode.get("progressInterval", cpu->progressInterval).asInt();
+    cpu->sampleWindowMs = cpuNode.get("sampleWindowMs", cpu->sampleWindowMs).asInt();
+    cpu->adaptiveMinWorkers = cpuNode.get("adaptiveMinWorkers", cpu->adaptiveMinWorkers).asInt();
+    cpu->adaptiveDropThreshold = cpuNode.get("adaptiveDropThreshold", cpu->adaptiveDropThreshold).asDouble();
+    cpu->adaptiveDropWindows = cpuNode.get("adaptiveDropWindows", cpu->adaptiveDropWindows).asInt();
+    cpu->adaptiveCooldownMs = cpuNode.get("adaptiveCooldownMs", cpu->adaptiveCooldownMs).asInt();
+    return true;
+}
+
+bool ParseConstraints(const Json::Value &root,
+                      SidecarConstraints *constraints,
+                      SidecarParseResult *result,
+                      bool validateDistanceGeyserId)
+{
+    if (constraints == nullptr || result == nullptr) {
+        return false;
+    }
+    const Json::Value constraintsNode = root["constraints"];
+    if (!constraintsNode.isNull() && !constraintsNode.isObject()) {
+        SetParseError(*result, "constraints must be object");
+        return false;
+    }
+    if (!ParseStringArray(constraintsNode["required"],
+                          "constraints.required",
+                          &constraints->required,
+                          &result->error)) {
+        return false;
+    }
+    if (!ParseStringArray(constraintsNode["forbidden"],
+                          "constraints.forbidden",
+                          &constraints->forbidden,
+                          &result->error)) {
+        return false;
+    }
+
+    const Json::Value distance = constraintsNode["distance"];
+    if (!distance.isNull()) {
+        if (!distance.isArray()) {
+            SetParseError(*result, "constraints.distance must be array");
+            return false;
+        }
+        int index = 0;
+        for (const auto &item : distance) {
+            if (!item.isObject()) {
+                SetParseError(*result, "constraints.distance item must be object");
+                return false;
+            }
+            SidecarDistanceRule rule;
+            if (!RequireString(item, "geyser", &rule.geyserId, &result->error)) {
+                result->error = "constraints.distance[" + std::to_string(index) +
+                                "]: " + result->error;
+                return false;
+            }
+            if (validateDistanceGeyserId && GeyserIdToIndex(rule.geyserId) < 0) {
+                result->error = "constraints.distance[" + std::to_string(index) +
+                                "]: unknown geyser id";
+                return false;
+            }
+            if (!RequireNumber(item, "minDist", &rule.minDist, &result->error)) {
+                result->error = "constraints.distance[" + std::to_string(index) +
+                                "]: " + result->error;
+                return false;
+            }
+            if (!RequireNumber(item, "maxDist", &rule.maxDist, &result->error)) {
+                result->error = "constraints.distance[" + std::to_string(index) +
+                                "]: " + result->error;
+                return false;
+            }
+            constraints->distance.push_back(std::move(rule));
+            ++index;
+        }
+    }
+
+    const Json::Value count = constraintsNode["count"];
+    if (!count.isNull()) {
+        if (!count.isArray()) {
+            SetParseError(*result, "constraints.count must be array");
+            return false;
+        }
+        int index = 0;
+        for (const auto &item : count) {
+            if (!item.isObject()) {
+                SetParseError(*result, "constraints.count item must be object");
+                return false;
+            }
+            SidecarCountRule rule;
+            if (!RequireString(item, "geyser", &rule.geyserId, &result->error)) {
+                result->error = "constraints.count[" + std::to_string(index) +
+                                "]: " + result->error;
+                return false;
+            }
+            if (!RequireInt(item, "minCount", &rule.minCount, &result->error)) {
+                result->error = "constraints.count[" + std::to_string(index) +
+                                "]: " + result->error;
+                return false;
+            }
+            if (!RequireInt(item, "maxCount", &rule.maxCount, &result->error)) {
+                result->error = "constraints.count[" + std::to_string(index) +
+                                "]: " + result->error;
+                return false;
+            }
+            constraints->count.push_back(std::move(rule));
+            ++index;
+        }
+    }
+    return true;
+}
+
 Json::Value ToThroughputJson(const BatchCpu::ThroughputStats &throughput)
 {
     Json::Value value(Json::objectValue);
@@ -285,6 +417,70 @@ Json::Value BuildSearchCatalogJson(const SearchAnalysis::SearchCatalog &catalog)
     return root;
 }
 
+Json::Value BuildValidationIssuesJson(const std::vector<SearchAnalysis::ValidationIssue> &issues)
+{
+    Json::Value array(Json::arrayValue);
+    for (const auto &issue : issues) {
+        Json::Value item(Json::objectValue);
+        item["layer"] = issue.layer;
+        item["code"] = issue.code;
+        item["field"] = issue.field;
+        item["message"] = issue.message;
+        array.append(item);
+    }
+    return array;
+}
+
+Json::Value BuildNormalizedSearchRequestJson(const SearchAnalysis::NormalizedSearchRequest &request)
+{
+    Json::Value root(Json::objectValue);
+    root["worldType"] = request.worldType;
+    root["seedStart"] = request.seedStart;
+    root["seedEnd"] = request.seedEnd;
+    root["mixing"] = request.mixing;
+    root["threads"] = request.threads;
+
+    Json::Value groups(Json::arrayValue);
+    for (const auto &group : request.groups) {
+        Json::Value item(Json::objectValue);
+        item["geyserId"] = group.geyserId;
+        item["geyserIndex"] = group.geyserIndex;
+        item["minCount"] = group.minCount;
+        item["maxCount"] = group.maxCount;
+        item["hasRequired"] = group.hasRequired;
+        item["hasForbidden"] = group.hasForbidden;
+        item["hasExplicitCount"] = group.hasExplicitCount;
+
+        Json::Value distance(Json::arrayValue);
+        for (const auto &rule : group.distanceRules) {
+            Json::Value distanceItem(Json::objectValue);
+            distanceItem["geyser"] = rule.geyserId;
+            distanceItem["minDist"] = rule.minDist;
+            distanceItem["maxDist"] = rule.maxDist;
+            distance.append(distanceItem);
+        }
+        item["distance"] = distance;
+        groups.append(item);
+    }
+    root["groups"] = groups;
+    return root;
+}
+
+Json::Value BuildSearchAnalysisJson(const SearchAnalysis::SearchAnalysisResult &analysis)
+{
+    Json::Value root(Json::objectValue);
+    root["normalizedRequest"] = BuildNormalizedSearchRequestJson(analysis.normalizedRequest);
+    root["errors"] = BuildValidationIssuesJson(analysis.errors);
+    root["warnings"] = BuildValidationIssuesJson(analysis.warnings);
+    Json::Value bottlenecks(Json::arrayValue);
+    for (const auto &item : analysis.bottlenecks) {
+        bottlenecks.append(item);
+    }
+    root["bottlenecks"] = bottlenecks;
+    root["predictedBottleneckProbability"] = analysis.predictedBottleneckProbability;
+    return root;
+}
+
 } // namespace
 
 SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
@@ -330,84 +526,11 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             SetParseError(result, "seedEnd must be >= seedStart");
             return result;
         }
-
-        const Json::Value cpu = root["cpu"];
-        if (!cpu.isNull()) {
-            if (!cpu.isObject()) {
-                SetParseError(result, "cpu must be object");
-                return result;
-            }
-            request.cpu.hasValue = true;
-            request.cpu.mode = cpu.get("mode", request.cpu.mode).asString();
-            request.cpu.workers = std::max(0, cpu.get("workers", request.cpu.workers).asInt());
-            request.cpu.allowSmt = cpu.get("allowSmt", request.cpu.allowSmt).asBool();
-            request.cpu.allowLowPerf = cpu.get("allowLowPerf", request.cpu.allowLowPerf).asBool();
-            request.cpu.placement = cpu.get("placement", request.cpu.placement).asString();
-            request.cpu.enableWarmup = cpu.get("enableWarmup", request.cpu.enableWarmup).asBool();
-            request.cpu.enableAdaptiveDown = cpu.get("enableAdaptiveDown", request.cpu.enableAdaptiveDown).asBool();
-            request.cpu.chunkSize = cpu.get("chunkSize", request.cpu.chunkSize).asInt();
-            request.cpu.progressInterval = cpu.get("progressInterval", request.cpu.progressInterval).asInt();
-            request.cpu.sampleWindowMs = cpu.get("sampleWindowMs", request.cpu.sampleWindowMs).asInt();
-            request.cpu.adaptiveMinWorkers = cpu.get("adaptiveMinWorkers", request.cpu.adaptiveMinWorkers).asInt();
-            request.cpu.adaptiveDropThreshold = cpu.get("adaptiveDropThreshold", request.cpu.adaptiveDropThreshold).asDouble();
-            request.cpu.adaptiveDropWindows = cpu.get("adaptiveDropWindows", request.cpu.adaptiveDropWindows).asInt();
-            request.cpu.adaptiveCooldownMs = cpu.get("adaptiveCooldownMs", request.cpu.adaptiveCooldownMs).asInt();
-        }
-
-        const Json::Value constraints = root["constraints"];
-        if (!constraints.isNull() && !constraints.isObject()) {
-            SetParseError(result, "constraints must be object");
+        if (!ParseCpuConfig(root, &request.cpu, &result)) {
             return result;
         }
-        if (!ParseStringArray(constraints["required"],
-                              "constraints.required",
-                              &request.constraints.required,
-                              &result.error)) {
+        if (!ParseConstraints(root, &request.constraints, &result, true)) {
             return result;
-        }
-        if (!ParseStringArray(constraints["forbidden"],
-                              "constraints.forbidden",
-                              &request.constraints.forbidden,
-                              &result.error)) {
-            return result;
-        }
-
-        const Json::Value distance = constraints["distance"];
-        if (!distance.isNull()) {
-            if (!distance.isArray()) {
-                SetParseError(result, "constraints.distance must be array");
-                return result;
-            }
-            int index = 0;
-            for (const auto &item : distance) {
-                if (!item.isObject()) {
-                    SetParseError(result, "constraints.distance item must be object");
-                    return result;
-                }
-                SidecarDistanceRule rule;
-                if (!RequireString(item, "geyser", &rule.geyserId, &result.error)) {
-                    result.error = "constraints.distance[" + std::to_string(index) +
-                                   "]: " + result.error;
-                    return result;
-                }
-                if (GeyserIdToIndex(rule.geyserId) < 0) {
-                    result.error = "constraints.distance[" + std::to_string(index) +
-                                   "]: unknown geyser id";
-                    return result;
-                }
-                if (!RequireNumber(item, "minDist", &rule.minDist, &result.error)) {
-                    result.error = "constraints.distance[" + std::to_string(index) +
-                                   "]: " + result.error;
-                    return result;
-                }
-                if (!RequireNumber(item, "maxDist", &rule.maxDist, &result.error)) {
-                    result.error = "constraints.distance[" + std::to_string(index) +
-                                   "]: " + result.error;
-                    return result;
-                }
-                request.constraints.distance.push_back(std::move(rule));
-                ++index;
-            }
         }
         return result;
     }
@@ -450,6 +573,32 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         request.jobId = jobId.asString();
         if (request.jobId.empty()) {
             request.jobId = "search-catalog";
+        }
+        return result;
+    }
+
+    if (command == "analyze_search_request") {
+        result.request.command = SidecarCommandType::AnalyzeSearchRequest;
+        auto &request = result.request.analyze;
+        if (!RequireString(root, "jobId", &request.jobId, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "worldType", &request.worldType, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "seedStart", &request.seedStart, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "seedEnd", &request.seedEnd, &result.error)) {
+            return result;
+        }
+        request.mixing = root.get("mixing", request.mixing).asInt();
+        request.threads = std::max(0, root.get("threads", request.threads).asInt());
+        if (!ParseCpuConfig(root, &request.cpu, &result)) {
+            return result;
+        }
+        if (!ParseConstraints(root, &request.constraints, &result, false)) {
+            return result;
         }
         return result;
     }
@@ -633,6 +782,14 @@ std::string SerializeSearchCatalogEvent(const std::string &jobId,
 {
     Json::Value root = BuildBaseEventJson("search_catalog", jobId);
     root["catalog"] = BuildSearchCatalogJson(catalog);
+    return WriteCompactJson(root);
+}
+
+std::string SerializeSearchAnalysisEvent(const std::string &jobId,
+                                         const SearchAnalysis::SearchAnalysisResult &analysis)
+{
+    Json::Value root = BuildBaseEventJson("search_analysis", jobId);
+    root["analysis"] = BuildSearchAnalysisJson(analysis);
     return WriteCompactJson(root);
 }
 

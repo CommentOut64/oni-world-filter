@@ -1,8 +1,8 @@
 use tauri::{AppHandle, State};
 
 use crate::sidecar::{
-    self, GeyserOption, PreviewRequestPayload, SearchCatalogPayload, SearchRequestPayload,
-    WorldOption,
+    self, GeyserOption, PreviewRequestPayload, SearchAnalysisPayload, SearchCatalogPayload,
+    SearchRequestPayload, WorldOption,
 };
 use crate::state::AppState;
 
@@ -54,4 +54,18 @@ pub async fn get_search_catalog(app: AppHandle) -> Result<SearchCatalogPayload, 
         .await
         .map_err(|error| error.to_string())?
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn analyze_search_request(
+    app: AppHandle,
+    request: SearchRequestPayload,
+) -> Result<SearchAnalysisPayload, String> {
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        sidecar::analyze_search_request(Some(&app_handle), &request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
 }
