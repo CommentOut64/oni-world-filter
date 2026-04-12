@@ -222,6 +222,66 @@ FilterConfigLoadResult LoadFilterConfig(const std::string &path)
         cfg.distanceRules.push_back(rule);
     }
 
+    int countIndex = 0;
+    for (const auto &value : root["count"]) {
+        const std::string baseField = "count[" + std::to_string(countIndex) + "]";
+        ++countIndex;
+        if (!value.isObject()) {
+            AddError(result,
+                     FilterErrorCode::MissingCountField,
+                     baseField,
+                     "count rule must be object");
+            continue;
+        }
+        if (!value.isMember("geyser")) {
+            AddError(result,
+                     FilterErrorCode::MissingCountField,
+                     baseField + ".geyser",
+                     "required field is missing");
+            continue;
+        }
+        if (!value.isMember("minCount")) {
+            AddError(result,
+                     FilterErrorCode::MissingCountField,
+                     baseField + ".minCount",
+                     "required field is missing");
+            continue;
+        }
+        if (!value.isMember("maxCount")) {
+            AddError(result,
+                     FilterErrorCode::MissingCountField,
+                     baseField + ".maxCount",
+                     "required field is missing");
+            continue;
+        }
+
+        const std::string geyserId = value["geyser"].asString();
+        const int geyserType = GeyserIdToIndex(geyserId);
+        if (geyserType < 0) {
+            AddError(result,
+                     FilterErrorCode::UnknownCountGeyserId,
+                     baseField + ".geyser",
+                     geyserId);
+            continue;
+        }
+
+        const int minCount = value["minCount"].asInt();
+        const int maxCount = value["maxCount"].asInt();
+        if (minCount < 0 || maxCount < 0 || minCount > maxCount) {
+            AddError(result,
+                     FilterErrorCode::InvalidCountRange,
+                     baseField + ".minCount/maxCount",
+                     "count range is invalid");
+            continue;
+        }
+
+        cfg.countRules.push_back(FilterConfig::CountRule{
+            .type = geyserType,
+            .minCount = minCount,
+            .maxCount = maxCount,
+        });
+    }
+
     return result;
 }
 

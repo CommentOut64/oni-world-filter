@@ -70,6 +70,19 @@ MatchResult MatchFilter(const FilterConfig &cfg, const BatchCaptureRecord &captu
         }
     }
 
+    for (const auto &rule : cfg.countRules) {
+        int count = 0;
+        for (const auto &geyser : capture.geysers) {
+            if (geyser.type == rule.type) {
+                ++count;
+            }
+        }
+        if (count < rule.minCount || count > rule.maxCount) {
+            result.matched = false;
+            return result;
+        }
+    }
+
     result.matched = true;
     return result;
 }

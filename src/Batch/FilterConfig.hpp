@@ -39,6 +39,12 @@ struct FilterConfig {
         float maxDist = 1e9f;
     };
 
+    struct CountRule {
+        int type = -1;
+        int minCount = 0;
+        int maxCount = 0;
+    };
+
     int worldType = 0;
     int seedStart = 1;
     int seedEnd = 100000;
@@ -49,6 +55,7 @@ struct FilterConfig {
     std::vector<int> required;
     std::vector<int> forbidden;
     std::vector<DistRule> distanceRules;
+    std::vector<CountRule> countRules;
 };
 
 enum class FilterErrorCode {
@@ -59,6 +66,9 @@ enum class FilterErrorCode {
     UnknownForbiddenGeyserId,
     MissingDistanceField,
     UnknownDistanceGeyserId,
+    MissingCountField,
+    UnknownCountGeyserId,
+    InvalidCountRange,
 };
 
 struct FilterError {

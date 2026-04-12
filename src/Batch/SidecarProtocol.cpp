@@ -763,6 +763,27 @@ FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &requ
         });
     }
 
+    for (const auto &rule : request.constraints.count) {
+        const int index = GeyserIdToIndex(rule.geyserId);
+        if (index < 0) {
+            appendError(FilterErrorCode::UnknownCountGeyserId,
+                        "constraints.count.geyser",
+                        rule.geyserId);
+            continue;
+        }
+        if (rule.minCount < 0 || rule.maxCount < 0 || rule.minCount > rule.maxCount) {
+            appendError(FilterErrorCode::InvalidCountRange,
+                        "constraints.count.minCount/maxCount",
+                        "count range is invalid");
+            continue;
+        }
+        cfg.countRules.push_back(FilterConfig::CountRule{
+            .type = index,
+            .minCount = rule.minCount,
+            .maxCount = rule.maxCount,
+        });
+    }
+
     return cfg;
 }
 
