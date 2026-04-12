@@ -91,6 +91,46 @@ int RunAllTests()
         Expect(hasLayer3, "hard validator should include layer3 errors", failures);
     }
 
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.required = {"hot_water"};
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 500.0},
+        };
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 1, .maxCount = 4},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.possibleMaxCountByType["hot_water"] = 2;
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        bool hasDistanceLimitError = false;
+        bool hasCountLimitError = false;
+        for (const auto &issue : result.errors) {
+            if (issue.code == "world.distance_max_gt_world_diagonal") {
+                hasDistanceLimitError = true;
+            }
+            if (issue.code == "world.count_max_gt_possible_max") {
+                hasCountLimitError = true;
+            }
+        }
+        Expect(hasDistanceLimitError,
+               "layer2 should reject distance max out of world diagonal",
+               failures);
+        Expect(hasCountLimitError,
+               "layer2 should reject count max above possible world upper bound",
+               failures);
+    }
+
     if (failures == 0) {
         std::cout << "[PASS] test_search_analysis" << std::endl;
         return 0;

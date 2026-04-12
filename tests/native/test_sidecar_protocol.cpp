@@ -277,6 +277,46 @@ int RunAllTests()
         analysis.normalizedRequest.mixing = 625;
         analysis.normalizedRequest.seedStart = 100000;
         analysis.normalizedRequest.seedEnd = 101000;
+        analysis.worldProfile.valid = true;
+        analysis.worldProfile.worldType = 13;
+        analysis.worldProfile.worldCode = "V-SNDST-C-";
+        analysis.worldProfile.width = 256;
+        analysis.worldProfile.height = 384;
+        analysis.worldProfile.diagonal = 461.7;
+        analysis.worldProfile.activeMixingSlots = {0, 1};
+        analysis.worldProfile.disabledMixingSlots = {6, 7, 8, 9, 10};
+        analysis.worldProfile.possibleGeyserTypes = {"hot_water", "steam"};
+        analysis.worldProfile.impossibleGeyserTypes = {"molten_niobium"};
+        analysis.worldProfile.possibleMaxCountByType["hot_water"] = 3;
+        analysis.worldProfile.possibleMaxCountByType["molten_niobium"] = 0;
+        analysis.worldProfile.genericTypeUpperById["hot_water"] = 0.05;
+        analysis.worldProfile.genericSlotUpper = 4;
+        analysis.worldProfile.exactSourceSummary.push_back(SearchAnalysis::SourceSummary{
+            .ruleId = "rule-hot-water",
+            .templateName = "poi/hot_water",
+            .geyserId = "hot_water",
+            .upperBound = 1,
+            .sourceKind = "exact",
+            .poolId = "rule-hot-water",
+        });
+        analysis.worldProfile.genericSourceSummary.push_back(SearchAnalysis::SourceSummary{
+            .ruleId = "rule-generic",
+            .templateName = "geysers/generic",
+            .geyserId = "geysers/generic",
+            .upperBound = 4,
+            .sourceKind = "generic",
+            .poolId = "generic",
+        });
+        analysis.worldProfile.sourcePools.push_back(SearchAnalysis::SourcePool{
+            .poolId = "generic",
+            .sourceKind = "generic",
+            .capacityUpper = 4,
+        });
+        analysis.worldProfile.spatialEnvelopes.push_back(SearchAnalysis::SpatialEnvelope{
+            .envelopeId = "global",
+            .confidence = "low",
+            .method = "placeholder",
+        });
         analysis.normalizedRequest.groups.push_back(SearchAnalysis::ConstraintGroup{
             .geyserId = "hot_water",
             .geyserIndex = 2,
@@ -369,6 +409,18 @@ int RunAllTests()
                failures);
         Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["groups"].size() == 1,
                "search analysis normalized groups size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["valid"].asBool(),
+               "search analysis worldProfile valid mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleMaxCountByType"]["hot_water"].asInt() == 3,
+               "search analysis worldProfile possibleMaxCountByType mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["exactSourceSummary"].size() == 1,
+               "search analysis worldProfile exact source size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["sourcePools"].size() == 1,
+               "search analysis worldProfile sourcePools size mismatch",
                failures);
         Expect(searchAnalysisJson["analysis"]["errors"].size() == 1,
                "search analysis errors size mismatch",
