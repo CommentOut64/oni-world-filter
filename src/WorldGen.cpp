@@ -46,18 +46,39 @@ bool WorldGen::GenerateOverworld(std::vector<Site> &sites)
     Polygon bounds(Rect(0.0f, 0.0f, m_world.worldsize.x, m_world.worldsize.y));
     Diagram diagram(bounds, sites);
     if (usePD) {
-        diagram.ComputeNode();
-        diagram.ComputeNodePD();
+        if (!diagram.ComputeNode()) {
+            LogE("compute node failed.");
+            return false;
+        }
+        if (!diagram.ComputeNodePD()) {
+            LogE("compute node pd failed, fallback to compute node.");
+            if (!diagram.ComputeNode()) {
+                LogE("fallback compute node failed.");
+                return false;
+            }
+        }
     } else {
-        diagram.ComputeNode();
+        if (!diagram.ComputeNode()) {
+            LogE("compute node failed.");
+            return false;
+        }
     }
     PropagateDistanceTags(sites);
     ConvertUnknownCells(sites, random);
     if (usePD) {
-        diagram.ComputeNodePD();
+        if (!diagram.ComputeNodePD()) {
+            LogE("compute node pd failed after convert unknown cells, fallback to compute node.");
+            if (!diagram.ComputeNode()) {
+                LogE("fallback compute node failed after convert unknown cells.");
+                return false;
+            }
+        }
     }
     for (int i = 0; i < (int)sites.size(); ++i) {
-        GenerateChildren(sites[i], random, m_seed + i, usePD);
+        if (!GenerateChildren(sites[i], random, m_seed + i, usePD)) {
+            LogE("generate children failed at site index: %d", i);
+            return false;
+        }
     }
     auto allSites = ForceLowestToLeaf(sites);
     random = KRandom(m_seed);
@@ -537,7 +558,7 @@ void WorldGen::SetFeatureBiome(Site &site, KRandom &random,
     }
 }
 
-void WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
+bool WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
                                 bool usePD)
 {
     KRandom random(seed);
@@ -614,14 +635,27 @@ void WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
         SetFeatureBiome(child, externRrandom, feature);
     }
     Diagram diagram(site.polygon, *site.children);
-    diagram.ComputeNode();
+    if (!diagram.ComputeNode()) {
+        LogE("compute child node failed.");
+        return false;
+    }
     if (!subworld.dontRelaxChildren) {
         if (usePD) {
-            diagram.ComputeNodePD();
+            if (!diagram.ComputeNodePD()) {
+                LogE("compute child node pd failed, fallback to compute node.");
+                if (!diagram.ComputeNode()) {
+                    LogE("fallback compute child node failed.");
+                    return false;
+                }
+            }
         } else {
-            diagram.ComputeNode();
+            if (!diagram.ComputeNode()) {
+                LogE("compute child node re-run failed.");
+                return false;
+            }
         }
     }
+    return true;
 }
 
 std::vector<Vector3i> WorldGen::GetGeysers(int globalWorldSeed) const

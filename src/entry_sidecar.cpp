@@ -126,7 +126,6 @@ bool RequestSearchCancel(const std::string &jobId)
 
 void ShutdownSearchWorker()
 {
-    RequestSearchCancel("");
     std::thread worker;
     {
         std::lock_guard<std::mutex> lock(g_activeSearch.mutex);

@@ -41,7 +41,7 @@ private:
     bool GenerateSeedPoints(KRandom &random, std::vector<Site> &sites);
     void PropagateDistanceTags(std::vector<Site> &sites) const;
     void ConvertUnknownCells(std::vector<Site> &allSites, KRandom &random);
-    void GenerateChildren(Site &site, KRandom &random, int seed, bool usePD);
+    bool GenerateChildren(Site &site, KRandom &random, int seed, bool usePD);
     void SetFeatureBiome(Site &site, KRandom &random, const Feature *feature);
     bool DetermineTemplates(std::vector<Site *> &sites, KRandom &random);
 };
