@@ -780,4 +780,48 @@ mod tests {
             run_sidecar_request_collect(&path, &request).expect("preview smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "preview"));
     }
+
+    #[test]
+    #[ignore = "需要先构建 out/build/x64-release/src/oni-sidecar.exe"]
+    fn sidecar_search_regression_seed_100030_should_not_crash() {
+        let path = resolve_sidecar_path(None).expect("sidecar path should be resolvable");
+        let request = json!({
+            "command": "search",
+            "jobId": "regression-search-100030",
+            "worldType": 13,
+            "seedStart": 100030,
+            "seedEnd": 100030,
+            "mixing": 625,
+            "threads": 1,
+            "constraints": {
+                "required": [],
+                "forbidden": [],
+                "distance": []
+            }
+        });
+        let events =
+            run_sidecar_request_collect(&path, &request).expect("search should not crash");
+        assert!(events.iter().any(|event| event["event"] == "started"));
+        assert!(events.iter().any(|event| {
+            event["event"] == "completed" || event["event"] == "failed"
+        }));
+    }
+
+    #[test]
+    #[ignore = "需要先构建 out/build/x64-release/src/oni-sidecar.exe"]
+    fn sidecar_preview_regression_seed_100030_should_not_crash() {
+        let path = resolve_sidecar_path(None).expect("sidecar path should be resolvable");
+        let request = json!({
+            "command": "preview",
+            "jobId": "regression-preview-100030",
+            "worldType": 13,
+            "seed": 100030,
+            "mixing": 625
+        });
+        let events =
+            run_sidecar_request_collect(&path, &request).expect("preview should not crash");
+        assert!(events.iter().any(|event| {
+            event["event"] == "preview" || event["event"] == "failed"
+        }));
+    }
 }
