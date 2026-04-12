@@ -5,11 +5,13 @@ import type {
   GeyserOption,
   PreviewEvent,
   PreviewRequest,
+  SearchCatalog,
   SearchRequest,
   SidecarEvent,
   SidecarStderrEvent,
   WorldOption,
 } from "./contracts";
+import { EMPTY_SEARCH_CATALOG, normalizeSearchCatalog } from "./searchCatalog";
 
 const SIDECAR_EVENT_CHANNEL = "sidecar://event";
 const SIDECAR_STDERR_CHANNEL = "sidecar://stderr";
@@ -61,6 +63,14 @@ export async function listGeysers(): Promise<GeyserOption[]> {
     return [];
   }
   return invoke<GeyserOption[]>("list_geysers");
+}
+
+export async function getSearchCatalog(): Promise<SearchCatalog> {
+  if (!inTauriRuntime()) {
+    return EMPTY_SEARCH_CATALOG;
+  }
+  const catalog = await invoke<SearchCatalog>("get_search_catalog");
+  return normalizeSearchCatalog(catalog);
 }
 
 export async function subscribeSidecar(

@@ -1,17 +1,20 @@
+import { useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FormProvider, useForm } from "react-hook-form";
 
+import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
 import DistanceRuleEditor from "./DistanceRuleEditor";
 import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
 import SearchActions from "./SearchActions";
-import { searchSchema, toSearchDraft, toSearchFormValues, type SearchFormValues } from "./searchSchema";
+import { createSearchSchema, toSearchDraft, toSearchFormValues, type SearchFormValues } from "./searchSchema";
 import WorldSelector from "./WorldSelector";
 
 export default function SearchPanel() {
   const worlds = useSearchStore((state) => state.worlds);
+  const catalog = useSearchStore((state) => state.catalog);
   const geysers = useSearchStore((state) => state.geysers);
   const draft = useSearchStore((state) => state.draft);
   const isSearching = useSearchStore((state) => state.isSearching);
@@ -22,8 +25,14 @@ export default function SearchPanel() {
   const setDraft = useSearchStore((state) => state.setDraft);
   const clearPreview = usePreviewStore((state) => state.clear);
 
+  const schema = useMemo(() => {
+    const worldTypeMax = worlds.length > 0 ? worlds.length - 1 : undefined;
+    const mixingMax = getParameterSpecStaticMax(catalog, "mixing") ?? undefined;
+    return createSearchSchema({ worldTypeMax, mixingMax });
+  }, [catalog, worlds]);
+
   const methods = useForm<SearchFormValues>({
-    resolver: zodResolver(searchSchema),
+    resolver: zodResolver(schema),
     mode: "onChange",
     defaultValues: toSearchFormValues(draft),
   });

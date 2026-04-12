@@ -194,6 +194,97 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
     return root;
 }
 
+Json::Value BuildSearchCatalogJson(const SearchAnalysis::SearchCatalog &catalog)
+{
+    Json::Value root(Json::objectValue);
+
+    Json::Value worlds(Json::arrayValue);
+    for (const auto &item : catalog.worlds) {
+        Json::Value world(Json::objectValue);
+        world["id"] = item.id;
+        world["code"] = item.code;
+        worlds.append(world);
+    }
+    root["worlds"] = worlds;
+
+    Json::Value geysers(Json::arrayValue);
+    for (const auto &item : catalog.geysers) {
+        Json::Value geyser(Json::objectValue);
+        geyser["id"] = item.id;
+        geyser["key"] = item.key;
+        geysers.append(geyser);
+    }
+    root["geysers"] = geysers;
+
+    Json::Value traits(Json::arrayValue);
+    for (const auto &item : catalog.traits) {
+        Json::Value trait(Json::objectValue);
+        trait["id"] = item.id;
+        trait["name"] = item.name;
+        trait["description"] = item.description;
+
+        Json::Value traitTags(Json::arrayValue);
+        for (const auto &tag : item.traitTags) {
+            traitTags.append(tag);
+        }
+        trait["traitTags"] = traitTags;
+
+        Json::Value exclusiveWith(Json::arrayValue);
+        for (const auto &id : item.exclusiveWith) {
+            exclusiveWith.append(id);
+        }
+        trait["exclusiveWith"] = exclusiveWith;
+
+        Json::Value exclusiveWithTags(Json::arrayValue);
+        for (const auto &tag : item.exclusiveWithTags) {
+            exclusiveWithTags.append(tag);
+        }
+        trait["exclusiveWithTags"] = exclusiveWithTags;
+
+        Json::Value forbiddenDLCIds(Json::arrayValue);
+        for (const auto &id : item.forbiddenDLCIds) {
+            forbiddenDLCIds.append(id);
+        }
+        trait["forbiddenDLCIds"] = forbiddenDLCIds;
+
+        Json::Value effectSummary(Json::arrayValue);
+        for (const auto &summary : item.effectSummary) {
+            effectSummary.append(summary);
+        }
+        trait["effectSummary"] = effectSummary;
+        trait["searchable"] = item.searchable;
+
+        traits.append(trait);
+    }
+    root["traits"] = traits;
+
+    Json::Value mixingSlots(Json::arrayValue);
+    for (const auto &item : catalog.mixingSlots) {
+        Json::Value slot(Json::objectValue);
+        slot["slot"] = item.slot;
+        slot["path"] = item.path;
+        slot["type"] = item.type;
+        slot["name"] = item.name;
+        slot["description"] = item.description;
+        mixingSlots.append(slot);
+    }
+    root["mixingSlots"] = mixingSlots;
+
+    Json::Value parameterSpecs(Json::arrayValue);
+    for (const auto &item : catalog.parameterSpecs) {
+        Json::Value spec(Json::objectValue);
+        spec["id"] = item.id;
+        spec["valueType"] = item.valueType;
+        spec["meaning"] = item.meaning;
+        spec["staticRange"] = item.staticRange;
+        spec["supportsDynamicRange"] = item.supportsDynamicRange;
+        spec["source"] = item.source;
+        parameterSpecs.append(spec);
+    }
+    root["parameterSpecs"] = parameterSpecs;
+    return root;
+}
+
 } // namespace
 
 SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
@@ -341,6 +432,24 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         result.request.command = SidecarCommandType::Cancel;
         if (!RequireString(root, "jobId", &result.request.cancel.jobId, &result.error)) {
             return result;
+        }
+        return result;
+    }
+
+    if (command == "get_search_catalog") {
+        result.request.command = SidecarCommandType::GetSearchCatalog;
+        auto &request = result.request.getSearchCatalog;
+        const Json::Value jobId = root["jobId"];
+        if (jobId.isNull()) {
+            return result;
+        }
+        if (!jobId.isString()) {
+            SetParseError(result, "field must be string: jobId");
+            return result;
+        }
+        request.jobId = jobId.asString();
+        if (request.jobId.empty()) {
+            request.jobId = "search-catalog";
         }
         return result;
     }
@@ -516,6 +625,14 @@ std::string SerializePreviewEvent(const std::string &jobId,
     root["seed"] = request.seed;
     root["mixing"] = request.mixing;
     root["preview"] = BuildPreviewJson(preview);
+    return WriteCompactJson(root);
+}
+
+std::string SerializeSearchCatalogEvent(const std::string &jobId,
+                                        const SearchAnalysis::SearchCatalog &catalog)
+{
+    Json::Value root = BuildBaseEventJson("search_catalog", jobId);
+    root["catalog"] = BuildSearchCatalogJson(catalog);
     return WriteCompactJson(root);
 }
 

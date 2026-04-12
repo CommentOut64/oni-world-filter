@@ -23,20 +23,11 @@
 #include "Batch/ThreadPolicy.hpp"
 #include "Batch/ThroughputCalibration.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
+#include "SearchAnalysis/SearchCatalog.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
 
 namespace {
-
-static const char *kWorldPrefixes[] = {
-    "SNDST-A-",  "OCAN-A-",    "S-FRZ-",     "LUSH-A-",    "FRST-A-",
-    "VOLCA-",    "BAD-A-",     "HTFST-A-",   "OASIS-A-",   "CER-A-",
-    "CERS-A-",   "PRE-A-",     "PRES-A-",    "V-SNDST-C-", "V-OCAN-C-",
-    "V-SWMP-C-", "V-SFRZ-C-",  "V-LUSH-C-",  "V-FRST-C-",  "V-VOLCA-C-",
-    "V-BAD-C-",  "V-HTFST-C-", "V-OASIS-C-", "V-CER-C-",   "V-CERS-C-",
-    "V-PRE-C-",  "V-PRES-C-",  "SNDST-C-",   "PRE-C-",     "CER-C-",
-    "FRST-C-",   "SWMP-C-",    "M-SWMP-C-",  "M-BAD-C-",   "M-FRZ-C-",
-    "M-FLIP-C-", "M-RAD-C-",   "M-CERS-C-"};
 
 static thread_local BatchCaptureSink g_batchSink;
 static std::mutex g_outputMutex;
@@ -146,13 +137,42 @@ bool BuildWorldCode(int worldType, int seed, int mixing, std::string *code)
     if (code == nullptr) {
         return false;
     }
-    if (worldType < 0 || static_cast<int>(std::size(kWorldPrefixes)) <= worldType) {
+    const auto &worldPrefixes = SearchAnalysis::GetWorldPrefixes();
+    if (worldType < 0 || static_cast<int>(worldPrefixes.size()) <= worldType) {
         return false;
     }
-    *code = kWorldPrefixes[worldType];
+    *code = worldPrefixes[static_cast<size_t>(worldType)];
     *code += std::to_string(seed);
     *code += "-0-D3-";
     *code += SettingsCache::BinaryToBase36(mixing);
+    return true;
+}
+
+bool ReadSettingsBlob(std::vector<char> &data, std::string *errorMessage)
+{
+    std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+    if (!file.is_open()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to open settings asset blob";
+        }
+        return false;
+    }
+    file.seekg(0, std::ios::end);
+    const auto size = file.tellg();
+    if (size <= 0) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "settings asset blob is empty";
+        }
+        return false;
+    }
+    file.seekg(0, std::ios::beg);
+    data.resize(static_cast<size_t>(size));
+    if (!file.read(data.data(), size)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to read settings asset blob";
+        }
+        return false;
+    }
     return true;
 }
 
@@ -399,6 +419,21 @@ void RunPreviewCommand(const Batch::SidecarPreviewRequest &request)
     EmitLine(Batch::SerializePreviewEvent(request.jobId, request, previewSink.LastPreview().value()));
 }
 
+void RunGetSearchCatalogCommand(const Batch::SidecarGetSearchCatalogRequest &request)
+{
+    std::string errorMessage;
+    const auto settings = SharedSettingsCache::GetOrCreate(ReadSettingsBlob, &errorMessage);
+    if (!settings) {
+        const std::string message =
+            errorMessage.empty() ? "failed to load shared settings cache" : errorMessage;
+        EmitLine(Batch::SerializeFailedEvent(request.jobId, message));
+        return;
+    }
+
+    const auto catalog = SearchAnalysis::BuildSearchCatalog(*settings);
+    EmitLine(Batch::SerializeSearchCatalogEvent(request.jobId, catalog));
+}
+
 } // namespace
 
 int main()
@@ -428,6 +463,9 @@ int main()
                 EmitLine(Batch::SerializeFailedEvent(parsed.request.cancel.jobId,
                                                      "job is not running"));
             }
+            break;
+        case Batch::SidecarCommandType::GetSearchCatalog:
+            RunGetSearchCatalogCommand(parsed.request.getSearchCatalog);
             break;
         default:
             EmitLine(Batch::SerializeFailedEvent("unknown", "unknown command"));

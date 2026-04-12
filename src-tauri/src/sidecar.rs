@@ -212,18 +212,63 @@ pub struct PreviewRequestPayload {
     pub mixing: i32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorldOption {
     pub id: i32,
     pub code: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeyserOption {
     pub id: i32,
     pub key: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraitMeta {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub trait_tags: Vec<String>,
+    pub exclusive_with: Vec<String>,
+    pub exclusive_with_tags: Vec<String>,
+    pub forbidden_dlc_ids: Vec<String>,
+    pub effect_summary: Vec<String>,
+    pub searchable: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MixingSlotMeta {
+    pub slot: i32,
+    pub path: String,
+    pub r#type: String,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParameterSpec {
+    pub id: String,
+    pub value_type: String,
+    pub meaning: String,
+    pub static_range: String,
+    pub supports_dynamic_range: bool,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchCatalogPayload {
+    pub worlds: Vec<WorldOption>,
+    pub geysers: Vec<GeyserOption>,
+    pub traits: Vec<TraitMeta>,
+    pub mixing_slots: Vec<MixingSlotMeta>,
+    pub parameter_specs: Vec<ParameterSpec>,
 }
 
 pub fn list_world_options() -> Vec<WorldOption> {
@@ -410,6 +455,35 @@ pub fn load_preview(
     Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
 }
 
+pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayload, HostError> {
+    let sidecar_path = resolve_sidecar_path(app)?;
+    let job_id = "search-catalog";
+    let request = build_get_search_catalog_command(job_id);
+    let events = run_sidecar_request_collect(&sidecar_path, &request)?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("catalog 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("search_catalog")
+            && event.get("jobId").and_then(Value::as_str) == Some(job_id)
+        {
+            let catalog = event.get("catalog").cloned().ok_or_else(|| {
+                HostError::InvalidRequest("search_catalog 缺少 catalog 字段".to_string())
+            })?;
+            return serde_json::from_value(catalog).map_err(HostError::from);
+        }
+    }
+
+    Err(HostError::InvalidRequest(
+        "未收到 search_catalog 事件".to_string(),
+    ))
+}
+
 pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostError> {
     if let Some(path) = env::var_os("ONI_SIDECAR_PATH") {
         let candidate = PathBuf::from(path);
@@ -550,6 +624,13 @@ fn build_preview_command(request: &PreviewRequestPayload) -> Value {
         "worldType": request.world_type,
         "seed": request.seed,
         "mixing": request.mixing
+    })
+}
+
+fn build_get_search_catalog_command(job_id: &str) -> Value {
+    json!({
+        "command": "get_search_catalog",
+        "jobId": job_id
     })
 }
 
@@ -799,12 +880,11 @@ mod tests {
                 "distance": []
             }
         });
-        let events =
-            run_sidecar_request_collect(&path, &request).expect("search should not crash");
+        let events = run_sidecar_request_collect(&path, &request).expect("search should not crash");
         assert!(events.iter().any(|event| event["event"] == "started"));
-        assert!(events.iter().any(|event| {
-            event["event"] == "completed" || event["event"] == "failed"
-        }));
+        assert!(events
+            .iter()
+            .any(|event| { event["event"] == "completed" || event["event"] == "failed" }));
     }
 
     #[test]
@@ -820,8 +900,8 @@ mod tests {
         });
         let events =
             run_sidecar_request_collect(&path, &request).expect("preview should not crash");
-        assert!(events.iter().any(|event| {
-            event["event"] == "preview" || event["event"] == "failed"
-        }));
+        assert!(events
+            .iter()
+            .any(|event| { event["event"] == "preview" || event["event"] == "failed" }));
     }
 }

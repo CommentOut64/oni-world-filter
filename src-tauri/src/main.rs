@@ -15,7 +15,8 @@ fn main() {
             commands::cancel_search,
             commands::load_preview,
             commands::list_worlds,
-            commands::list_geysers
+            commands::list_geysers,
+            commands::get_search_catalog
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

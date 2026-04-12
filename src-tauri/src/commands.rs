@@ -1,7 +1,8 @@
 use tauri::{AppHandle, State};
 
 use crate::sidecar::{
-    self, GeyserOption, PreviewRequestPayload, SearchRequestPayload, WorldOption,
+    self, GeyserOption, PreviewRequestPayload, SearchCatalogPayload, SearchRequestPayload,
+    WorldOption,
 };
 use crate::state::AppState;
 
@@ -44,4 +45,13 @@ pub fn list_worlds() -> Vec<WorldOption> {
 #[tauri::command]
 pub fn list_geysers() -> Vec<GeyserOption> {
     sidecar::list_geyser_options()
+}
+
+#[tauri::command]
+pub async fn get_search_catalog(app: AppHandle) -> Result<SearchCatalogPayload, String> {
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || sidecar::get_search_catalog(Some(&app_handle)))
+        .await
+        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())
 }

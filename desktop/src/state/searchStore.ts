@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type {
   SearchCpuConfig,
   GeyserOption,
+  SearchCatalog,
   SearchConstraints,
   SearchMatchEvent,
   SearchMatchSummary,
@@ -14,8 +15,7 @@ import type {
 import {
   cancelSearch,
   formatTauriError,
-  listGeysers,
-  listWorlds,
+  getSearchCatalog,
   startSearch,
   subscribeSidecar,
 } from "../lib/tauri";
@@ -74,6 +74,7 @@ interface SearchStats {
 }
 
 interface SearchState {
+  catalog: SearchCatalog | null;
   worlds: WorldOption[];
   geysers: GeyserOption[];
   bootstrapped: boolean;
@@ -180,6 +181,7 @@ function updateProgress(state: SearchState, event: SearchProgressEvent): SearchS
 }
 
 export const useSearchStore = create<SearchState>((set, get) => ({
+  catalog: null,
   worlds: [],
   geysers: [],
   bootstrapped: false,
@@ -207,10 +209,11 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       return;
     }
     try {
-      const [worlds, geysers] = await Promise.all([listWorlds(), listGeysers()]);
+      const catalog = await getSearchCatalog();
       set({
-        worlds,
-        geysers,
+        catalog,
+        worlds: catalog.worlds,
+        geysers: catalog.geysers,
         bootstrapped: true,
       });
     } catch (error) {

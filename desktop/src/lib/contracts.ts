@@ -57,6 +57,43 @@ export interface GeyserOption {
   key: string;
 }
 
+export interface TraitMeta {
+  id: string;
+  name: string;
+  description: string;
+  traitTags: string[];
+  exclusiveWith: string[];
+  exclusiveWithTags: string[];
+  forbiddenDLCIds: string[];
+  effectSummary: string[];
+  searchable: boolean;
+}
+
+export interface MixingSlotMeta {
+  slot: number;
+  path: string;
+  type: string;
+  name: string;
+  description: string;
+}
+
+export interface ParameterSpec {
+  id: string;
+  valueType: string;
+  meaning: string;
+  staticRange: string;
+  supportsDynamicRange: boolean;
+  source: string;
+}
+
+export interface SearchCatalog {
+  worlds: WorldOption[];
+  geysers: GeyserOption[];
+  traits: TraitMeta[];
+  mixingSlots: MixingSlotMeta[];
+  parameterSpecs: ParameterSpec[];
+}
+
 export interface Point {
   x: number;
   y: number;

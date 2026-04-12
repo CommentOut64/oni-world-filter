@@ -6,6 +6,7 @@
 #include "App/ResultModels.hpp"
 #include "Batch/FilterConfig.hpp"
 #include "Batch/SearchEvents.hpp"
+#include "SearchAnalysis/SearchCatalog.hpp"
 
 namespace Batch {
 
@@ -14,6 +15,7 @@ enum class SidecarCommandType {
     Search,
     Preview,
     Cancel,
+    GetSearchCatalog,
 };
 
 struct SidecarDistanceRule {
@@ -68,11 +70,16 @@ struct SidecarCancelRequest {
     std::string jobId;
 };
 
+struct SidecarGetSearchCatalogRequest {
+    std::string jobId = "search-catalog";
+};
+
 struct SidecarRequest {
     SidecarCommandType command = SidecarCommandType::Unknown;
     SidecarSearchRequest search;
     SidecarPreviewRequest preview;
     SidecarCancelRequest cancel;
+    SidecarGetSearchCatalogRequest getSearchCatalog;
 };
 
 struct SidecarParseResult {
@@ -106,5 +113,7 @@ std::string SerializeCancelledEvent(const std::string &jobId,
 std::string SerializePreviewEvent(const std::string &jobId,
                                   const SidecarPreviewRequest &request,
                                   const GeneratedWorldPreview &preview);
+std::string SerializeSearchCatalogEvent(const std::string &jobId,
+                                        const SearchAnalysis::SearchCatalog &catalog);
 
 } // namespace Batch
