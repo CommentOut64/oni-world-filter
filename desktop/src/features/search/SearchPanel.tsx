@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FormProvider, useForm } from "react-hook-form";
 
+import type { SearchAnalysisPayload } from "../../lib/contracts";
 import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
 import { analyzeSearchRequest, formatTauriError } from "../../lib/tauri";
 import { usePreviewStore } from "../../state/previewStore";
@@ -10,6 +11,7 @@ import CountRuleEditor from "./CountRuleEditor";
 import DistanceRuleEditor from "./DistanceRuleEditor";
 import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
+import SearchAnalysisHints from "./SearchAnalysisHints";
 import SearchActions from "./SearchActions";
 import { createSearchSchema, toSearchDraft, toSearchFormValues, type SearchFormValues } from "./searchSchema";
 import WorldSelector from "./WorldSelector";
@@ -39,6 +41,7 @@ export default function SearchPanel() {
     defaultValues: toSearchFormValues(draft),
   });
   const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
+  const [lastAnalysis, setLastAnalysis] = useState<SearchAnalysisPayload | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
 
@@ -107,6 +110,7 @@ export default function SearchPanel() {
 
   const submit = methods.handleSubmit(async (values) => {
     const nextDraft = toSearchDraft(values);
+    setLastAnalysis(null);
     try {
       const analysis = await analyzeSearchRequest({
         jobId: `analyze-${Date.now()}`,
@@ -118,6 +122,7 @@ export default function SearchPanel() {
         cpu: nextDraft.cpu,
         constraints: nextDraft.constraints,
       });
+      setLastAnalysis(analysis);
       if (analysis.errors.length > 0) {
         useSearchStore.setState({ lastError: analysis.errors[0].message });
         return;
@@ -126,6 +131,7 @@ export default function SearchPanel() {
         useSearchStore.setState({ lastError: `[warning] ${analysis.warnings[0].message}` });
       }
     } catch (error) {
+      setLastAnalysis(null);
       useSearchStore.setState({ lastError: formatTauriError(error) });
       return;
     }
@@ -197,6 +203,7 @@ export default function SearchPanel() {
         />
         <DistanceRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
         <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
+        <SearchAnalysisHints analysis={lastAnalysis} />
 
         <SearchActions
           isSearching={isSearching}

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "SearchAnalysis/BottleneckSelectivityPredictor.hpp"
 #include "SearchAnalysis/SearchConstraintNormalizer.hpp"
 
 namespace SearchAnalysis {
@@ -290,6 +291,13 @@ SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
     ValidateLayer1(request, &result.errors);
     ValidateLayer2(request, result.normalizedRequest, catalog, worldProfile, &result.errors);
     ValidateLayer3(result.normalizedRequest, &result.errors);
+    if (result.errors.empty()) {
+        RunBottleneckSelectivityPredictor(result.normalizedRequest,
+                                          worldProfile,
+                                          &result.warnings,
+                                          &result.bottlenecks,
+                                          &result.predictedBottleneckProbability);
+    }
     return result;
 }
 

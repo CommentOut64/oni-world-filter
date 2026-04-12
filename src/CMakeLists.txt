@@ -73,6 +73,12 @@ set(ONI_BASE_SOURCES
     "SearchAnalysis/SearchConstraintNormalizer.cpp"
     "SearchAnalysis/HardValidator.hpp"
     "SearchAnalysis/HardValidator.cpp"
+    "SearchAnalysis/PoissonBinomial.hpp"
+    "SearchAnalysis/PoissonBinomial.cpp"
+    "SearchAnalysis/ExplainabilityBuilder.hpp"
+    "SearchAnalysis/ExplainabilityBuilder.cpp"
+    "SearchAnalysis/BottleneckSelectivityPredictor.hpp"
+    "SearchAnalysis/BottleneckSelectivityPredictor.cpp"
     "SearchAnalysis/WorldEnvelopeProfile.hpp"
     "SearchAnalysis/WorldEnvelopeProfile.cpp"
     "Setting/ComposableDictionary.hpp"
@@ -294,6 +300,9 @@ add_executable(test_search_analysis
     "../tests/native/test_search_analysis.cpp"
     "SearchAnalysis/SearchConstraintNormalizer.cpp"
     "SearchAnalysis/HardValidator.cpp"
+    "SearchAnalysis/PoissonBinomial.cpp"
+    "SearchAnalysis/ExplainabilityBuilder.cpp"
+    "SearchAnalysis/BottleneckSelectivityPredictor.cpp"
     "Batch/FilterConfig.cpp"
 )
 target_include_directories(test_search_analysis
@@ -301,6 +310,17 @@ target_include_directories(test_search_analysis
 )
 target_link_libraries(test_search_analysis PRIVATE jsoncpp)
 add_test(NAME test_search_analysis COMMAND test_search_analysis)
+
+add_executable(test_poisson_binomial
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_poisson_binomial.cpp"
+    "SearchAnalysis/PoissonBinomial.cpp"
+)
+target_include_directories(test_poisson_binomial
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(test_poisson_binomial PRIVATE jsoncpp)
+add_test(NAME test_poisson_binomial COMMAND test_poisson_binomial)
 
 add_executable(test_world_envelope_profile
     "../tests/native/test_main.cpp"

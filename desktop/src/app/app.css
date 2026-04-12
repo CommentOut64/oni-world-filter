@@ -207,6 +207,66 @@ select {
   gap: 8px;
 }
 
+.analysis-hints {
+  margin-top: 14px;
+  border: 1px solid rgba(96, 145, 183, 0.34);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(7, 17, 29, 0.65);
+  display: grid;
+  gap: 6px;
+}
+
+.analysis-hints header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysis-hints h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.analysis-hints-strong {
+  border-color: rgba(241, 109, 109, 0.72);
+}
+
+.analysis-hints-warning {
+  border-color: rgba(230, 182, 91, 0.72);
+}
+
+.analysis-probability {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.analysis-bottlenecks {
+  margin: 0;
+  color: #d8e9fb;
+  font-size: 12px;
+}
+
+.analysis-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.analysis-list li {
+  font-size: 12px;
+}
+
+.analysis-list-warning li {
+  color: #f8ddb4;
+}
+
+.analysis-list-error li {
+  color: var(--error);
+}
+
 button {
   border: 1px solid rgba(110, 164, 207, 0.42);
   border-radius: 8px;
