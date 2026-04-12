@@ -95,6 +95,9 @@ int RunAllTests()
         Expect(result.request.search.constraints.distance[0].geyserId == "hot_water",
                "search request distance geyser mismatch",
                failures);
+        Expect(result.request.search.constraints.count.empty(),
+               "search request count should default to empty",
+               failures);
     }
 
     {
@@ -113,6 +116,48 @@ int RunAllTests()
         Expect(result.request.preview.worldType == 13, "preview request worldType mismatch", failures);
         Expect(result.request.preview.seed == 100123, "preview request seed mismatch", failures);
         Expect(result.request.preview.mixing == 625, "preview request mixing mismatch", failures);
+    }
+
+    {
+        const auto path = FixturePath("analyze-search-request.json");
+        const auto jsonText = ReadText(path);
+        Expect(!jsonText.empty(), "analyze_search_request fixture should be readable", failures);
+
+        const auto result = Batch::ParseSidecarRequest(jsonText);
+        Expect(result.Ok(), "analyze_search_request should parse", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::AnalyzeSearchRequest,
+               "analyze_search_request command mismatch",
+               failures);
+        Expect(result.request.analyze.jobId == "job-analyze-001",
+               "analyze_search_request jobId mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.count.size() == 1,
+               "analyze_search_request count size mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.count[0].geyserId == "hot_water",
+               "analyze_search_request count geyser mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.count[0].minCount == 1,
+               "analyze_search_request minCount mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.count[0].maxCount == 2,
+               "analyze_search_request maxCount mismatch",
+               failures);
+    }
+
+    {
+        const auto path = FixturePath("get-search-catalog-request.json");
+        const auto jsonText = ReadText(path);
+        Expect(!jsonText.empty(), "get_search_catalog fixture should be readable", failures);
+
+        const auto result = Batch::ParseSidecarRequest(jsonText);
+        Expect(result.Ok(), "get_search_catalog request should parse", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::GetSearchCatalog,
+               "get_search_catalog command mismatch",
+               failures);
+        Expect(result.request.getSearchCatalog.jobId == "job-search-catalog-001",
+               "get_search_catalog jobId mismatch",
+               failures);
     }
 
     {
@@ -197,6 +242,62 @@ int RunAllTests()
         polygon.vertices.push_back({3, 4});
         preview.polygons.push_back(std::move(polygon));
 
+        SearchAnalysis::SearchCatalog catalog;
+        catalog.worlds.push_back({.id = 13, .code = "V-SNDST-C-"});
+        catalog.geysers.push_back({.id = 2, .key = "hot_water"});
+        catalog.traits.push_back(SearchAnalysis::TraitMeta{
+            .id = "traits/SunnySpeed",
+            .name = "Sunny Speed",
+            .description = "speed boost",
+            .traitTags = {"temperature"},
+            .exclusiveWith = {"traits/Other"},
+            .exclusiveWithTags = {"unique"},
+            .forbiddenDLCIds = {"EXPANSION1_ID"},
+            .effectSummary = {"globalFeatureMods=1"},
+            .searchable = false,
+        });
+        catalog.mixingSlots.push_back(SearchAnalysis::MixingSlotMeta{
+            .slot = 0,
+            .path = "DLC2_ID",
+            .type = "dlc",
+            .name = "The Frosty Planet Pack",
+            .description = "",
+        });
+        catalog.parameterSpecs.push_back(SearchAnalysis::ParameterSpec{
+            .id = "mixing",
+            .valueType = "base5-encoded-int",
+            .meaning = "mixing code",
+            .staticRange = "0..48828124",
+            .supportsDynamicRange = true,
+            .source = "SettingsCache::ParseAndApplyMixingSettingsCode",
+        });
+
+        SearchAnalysis::SearchAnalysisResult analysis;
+        analysis.normalizedRequest.worldType = 13;
+        analysis.normalizedRequest.mixing = 625;
+        analysis.normalizedRequest.seedStart = 100000;
+        analysis.normalizedRequest.seedEnd = 101000;
+        analysis.normalizedRequest.groups.push_back(SearchAnalysis::ConstraintGroup{
+            .geyserId = "hot_water",
+            .geyserIndex = 2,
+            .minCount = 1,
+            .maxCount = 2,
+            .hasRequired = true,
+            .hasForbidden = false,
+            .hasExplicitCount = true,
+            .distanceRules = {SearchAnalysis::DistanceConstraint{
+                .geyserId = "hot_water",
+                .minDist = 0.0,
+                .maxDist = 80.0,
+            }},
+        });
+        analysis.errors.push_back(SearchAnalysis::ValidationIssue{
+            .layer = "layer3",
+            .code = "conflict.required_forbidden",
+            .field = "constraints.required/constraints.forbidden",
+            .message = "同一 geyser 不能同时 required 和 forbidden",
+        });
+
         const auto startedJson = ParseJsonObject(
             Batch::SerializeStartedEvent("job-1", started),
             failures,
@@ -225,6 +326,14 @@ int RunAllTests()
             Batch::SerializePreviewEvent("job-preview-001", previewRequest, preview),
             failures,
             "preview event json parse failed");
+        const auto searchCatalogJson = ParseJsonObject(
+            Batch::SerializeSearchCatalogEvent("job-search-catalog-001", catalog),
+            failures,
+            "search catalog event json parse failed");
+        const auto searchAnalysisJson = ParseJsonObject(
+            Batch::SerializeSearchAnalysisEvent("job-analyze-001", analysis),
+            failures,
+            "search analysis event json parse failed");
 
         Expect(startedJson["event"].asString() == "started", "started event type mismatch", failures);
         Expect(progressJson["event"].asString() == "progress", "progress event type mismatch", failures);
@@ -242,6 +351,27 @@ int RunAllTests()
         Expect(previewJson["preview"]["polygons"].size() == 1, "preview polygon size mismatch", failures);
         Expect(previewJson["preview"]["summary"]["seed"].asInt() == 100123,
                "preview summary seed mismatch",
+               failures);
+        Expect(searchCatalogJson["event"].asString() == "search_catalog",
+               "search catalog event type mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["worlds"].size() == 1,
+               "search catalog worlds size mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["mixingSlots"].size() == 1,
+               "search catalog mixingSlots size mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["parameterSpecs"][0]["supportsDynamicRange"].asBool(),
+               "search catalog parameter spec dynamic flag mismatch",
+               failures);
+        Expect(searchAnalysisJson["event"].asString() == "search_analysis",
+               "search analysis event type mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["groups"].size() == 1,
+               "search analysis normalized groups size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["errors"].size() == 1,
+               "search analysis errors size mismatch",
                failures);
     }
 
