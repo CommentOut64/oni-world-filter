@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -317,11 +318,61 @@ pub struct NormalizedSearchRequestPayload {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchAnalysisPayload {
+    pub world_profile: WorldEnvelopeProfilePayload,
     pub normalized_request: NormalizedSearchRequestPayload,
     pub errors: Vec<ValidationIssue>,
     pub warnings: Vec<ValidationIssue>,
     pub bottlenecks: Vec<String>,
     pub predicted_bottleneck_probability: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceSummaryPayload {
+    pub rule_id: String,
+    pub template_name: String,
+    pub geyser_id: String,
+    pub upper_bound: i32,
+    pub source_kind: String,
+    pub pool_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpatialEnvelopePayload {
+    pub envelope_id: String,
+    pub confidence: String,
+    pub method: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldEnvelopeProfilePayload {
+    pub valid: bool,
+    pub world_type: i32,
+    pub world_code: String,
+    pub width: i32,
+    pub height: i32,
+    pub diagonal: f64,
+    pub active_mixing_slots: Vec<i32>,
+    pub disabled_mixing_slots: Vec<i32>,
+    pub possible_geyser_types: Vec<String>,
+    pub impossible_geyser_types: Vec<String>,
+    pub possible_max_count_by_type: BTreeMap<String, i32>,
+    pub generic_type_upper_by_id: BTreeMap<String, f64>,
+    pub generic_slot_upper: i32,
+    pub exact_source_summary: Vec<SourceSummaryPayload>,
+    pub generic_source_summary: Vec<SourceSummaryPayload>,
+    pub source_pools: Vec<SourcePoolPayload>,
+    pub spatial_envelopes: Vec<SpatialEnvelopePayload>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourcePoolPayload {
+    pub pool_id: String,
+    pub source_kind: String,
+    pub capacity_upper: i32,
 }
 
 pub fn list_world_options() -> Vec<WorldOption> {

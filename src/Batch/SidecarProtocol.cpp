@@ -469,6 +469,91 @@ Json::Value BuildNormalizedSearchRequestJson(const SearchAnalysis::NormalizedSea
 Json::Value BuildSearchAnalysisJson(const SearchAnalysis::SearchAnalysisResult &analysis)
 {
     Json::Value root(Json::objectValue);
+    Json::Value worldProfile(Json::objectValue);
+    worldProfile["valid"] = analysis.worldProfile.valid;
+    worldProfile["worldType"] = analysis.worldProfile.worldType;
+    worldProfile["worldCode"] = analysis.worldProfile.worldCode;
+    worldProfile["width"] = analysis.worldProfile.width;
+    worldProfile["height"] = analysis.worldProfile.height;
+    worldProfile["diagonal"] = analysis.worldProfile.diagonal;
+
+    Json::Value activeMixingSlots(Json::arrayValue);
+    for (int slot : analysis.worldProfile.activeMixingSlots) {
+        activeMixingSlots.append(slot);
+    }
+    worldProfile["activeMixingSlots"] = activeMixingSlots;
+
+    Json::Value disabledMixingSlots(Json::arrayValue);
+    for (int slot : analysis.worldProfile.disabledMixingSlots) {
+        disabledMixingSlots.append(slot);
+    }
+    worldProfile["disabledMixingSlots"] = disabledMixingSlots;
+
+    Json::Value possibleGeyserTypes(Json::arrayValue);
+    for (const auto &id : analysis.worldProfile.possibleGeyserTypes) {
+        possibleGeyserTypes.append(id);
+    }
+    worldProfile["possibleGeyserTypes"] = possibleGeyserTypes;
+
+    Json::Value impossibleGeyserTypes(Json::arrayValue);
+    for (const auto &id : analysis.worldProfile.impossibleGeyserTypes) {
+        impossibleGeyserTypes.append(id);
+    }
+    worldProfile["impossibleGeyserTypes"] = impossibleGeyserTypes;
+
+    Json::Value possibleMaxCountByType(Json::objectValue);
+    for (const auto &[id, count] : analysis.worldProfile.possibleMaxCountByType) {
+        possibleMaxCountByType[id] = count;
+    }
+    worldProfile["possibleMaxCountByType"] = possibleMaxCountByType;
+
+    Json::Value genericTypeUpperById(Json::objectValue);
+    for (const auto &[id, upper] : analysis.worldProfile.genericTypeUpperById) {
+        genericTypeUpperById[id] = upper;
+    }
+    worldProfile["genericTypeUpperById"] = genericTypeUpperById;
+    worldProfile["genericSlotUpper"] = analysis.worldProfile.genericSlotUpper;
+
+    auto buildSourceSummaryArray = [](const std::vector<SearchAnalysis::SourceSummary> &sources) {
+        Json::Value array(Json::arrayValue);
+        for (const auto &source : sources) {
+            Json::Value item(Json::objectValue);
+            item["ruleId"] = source.ruleId;
+            item["templateName"] = source.templateName;
+            item["geyserId"] = source.geyserId;
+            item["upperBound"] = source.upperBound;
+            item["sourceKind"] = source.sourceKind;
+            item["poolId"] = source.poolId;
+            array.append(item);
+        }
+        return array;
+    };
+    worldProfile["exactSourceSummary"] =
+        buildSourceSummaryArray(analysis.worldProfile.exactSourceSummary);
+    worldProfile["genericSourceSummary"] =
+        buildSourceSummaryArray(analysis.worldProfile.genericSourceSummary);
+
+    Json::Value sourcePools(Json::arrayValue);
+    for (const auto &pool : analysis.worldProfile.sourcePools) {
+        Json::Value item(Json::objectValue);
+        item["poolId"] = pool.poolId;
+        item["sourceKind"] = pool.sourceKind;
+        item["capacityUpper"] = pool.capacityUpper;
+        sourcePools.append(item);
+    }
+    worldProfile["sourcePools"] = sourcePools;
+
+    Json::Value spatialEnvelopes(Json::arrayValue);
+    for (const auto &envelope : analysis.worldProfile.spatialEnvelopes) {
+        Json::Value item(Json::objectValue);
+        item["envelopeId"] = envelope.envelopeId;
+        item["confidence"] = envelope.confidence;
+        item["method"] = envelope.method;
+        spatialEnvelopes.append(item);
+    }
+    worldProfile["spatialEnvelopes"] = spatialEnvelopes;
+
+    root["worldProfile"] = worldProfile;
     root["normalizedRequest"] = BuildNormalizedSearchRequestJson(analysis.normalizedRequest);
     root["errors"] = BuildValidationIssuesJson(analysis.errors);
     root["warnings"] = BuildValidationIssuesJson(analysis.warnings);

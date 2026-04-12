@@ -73,6 +73,8 @@ set(ONI_BASE_SOURCES
     "SearchAnalysis/SearchConstraintNormalizer.cpp"
     "SearchAnalysis/HardValidator.hpp"
     "SearchAnalysis/HardValidator.cpp"
+    "SearchAnalysis/WorldEnvelopeProfile.hpp"
+    "SearchAnalysis/WorldEnvelopeProfile.cpp"
     "Setting/ComposableDictionary.hpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
@@ -299,6 +301,28 @@ target_include_directories(test_search_analysis
 )
 target_link_libraries(test_search_analysis PRIVATE jsoncpp)
 add_test(NAME test_search_analysis COMMAND test_search_analysis)
+
+add_executable(test_world_envelope_profile
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_world_envelope_profile.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/JsonDeserializeGen.hpp"
+    "SearchAnalysis/WorldEnvelopeProfile.cpp"
+    "SearchAnalysis/SearchCatalog.cpp"
+    "SearchAnalysis/TraitCatalog.cpp"
+    "Batch/FilterConfig.cpp"
+    "Setting/SettingsCache.cpp"
+    "Setting/WorldGenClasses.cpp"
+    "Utils/KRandom.cpp"
+)
+target_include_directories(test_world_envelope_profile
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_world_envelope_profile PRIVATE clipper jsoncpp miniz)
+add_test(NAME test_world_envelope_profile COMMAND test_world_envelope_profile)
 endif()
 
 configure_file("config.h.in" "config.h")

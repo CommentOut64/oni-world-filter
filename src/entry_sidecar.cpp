@@ -25,6 +25,7 @@
 #include "BatchCpu/CpuOptimization.hpp"
 #include "SearchAnalysis/HardValidator.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
+#include "SearchAnalysis/WorldEnvelopeProfile.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
 
@@ -494,7 +495,10 @@ void RunAnalyzeSearchCommand(const Batch::SidecarAnalyzeSearchRequest &request)
     }
     const auto catalog = SearchAnalysis::BuildSearchCatalog(*settings);
     const auto analysisRequest = BuildAnalysisRequest(request);
-    const auto result = SearchAnalysis::RunSearchAnalysis(analysisRequest, catalog);
+    const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(*settings,
+                                                                     request.worldType,
+                                                                     request.mixing);
+    const auto result = SearchAnalysis::RunSearchAnalysis(analysisRequest, catalog, &profile);
     EmitLine(Batch::SerializeSearchAnalysisEvent(request.jobId, result));
 }
 

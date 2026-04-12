@@ -79,11 +79,53 @@ export interface NormalizedSearchRequestPayload {
 }
 
 export interface SearchAnalysisPayload {
+  worldProfile: WorldEnvelopeProfile;
   normalizedRequest: NormalizedSearchRequestPayload;
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
   bottlenecks: string[];
   predictedBottleneckProbability: number;
+}
+
+export interface SourceSummary {
+  ruleId: string;
+  templateName: string;
+  geyserId: string;
+  upperBound: number;
+  sourceKind: string;
+  poolId: string;
+}
+
+export interface SpatialEnvelope {
+  envelopeId: string;
+  confidence: string;
+  method: string;
+}
+
+export interface WorldEnvelopeProfile {
+  valid: boolean;
+  worldType: number;
+  worldCode: string;
+  width: number;
+  height: number;
+  diagonal: number;
+  activeMixingSlots: number[];
+  disabledMixingSlots: number[];
+  possibleGeyserTypes: string[];
+  impossibleGeyserTypes: string[];
+  possibleMaxCountByType: Record<string, number>;
+  genericTypeUpperById: Record<string, number>;
+  genericSlotUpper: number;
+  exactSourceSummary: SourceSummary[];
+  genericSourceSummary: SourceSummary[];
+  sourcePools: SourcePool[];
+  spatialEnvelopes: SpatialEnvelope[];
+}
+
+export interface SourcePool {
+  poolId: string;
+  sourceKind: string;
+  capacityUpper: number;
 }
 
 export interface SearchAnalysisEvent {

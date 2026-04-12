@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "SearchAnalysis/WorldEnvelopeProfile.hpp"
+
 namespace SearchAnalysis {
 
 struct DistanceConstraint {
@@ -83,6 +85,7 @@ struct ValidationIssue {
 };
 
 struct SearchAnalysisResult {
+    WorldEnvelopeProfile worldProfile;
     NormalizedSearchRequest normalizedRequest;
     std::vector<ValidationIssue> errors;
     std::vector<ValidationIssue> warnings;

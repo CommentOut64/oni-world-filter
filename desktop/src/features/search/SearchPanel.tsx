@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -38,6 +38,72 @@ export default function SearchPanel() {
     mode: "onChange",
     defaultValues: toSearchFormValues(draft),
   });
+  const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
+  const watchWorldType = methods.watch("worldType");
+  const watchMixing = methods.watch("mixing");
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const analysis = await analyzeSearchRequest({
+          jobId: `analyze-profile-${Date.now()}`,
+          worldType: Number.isFinite(watchWorldType) ? watchWorldType : draft.worldType,
+          seedStart: 0,
+          seedEnd: 0,
+          mixing: Number.isFinite(watchMixing) ? watchMixing : draft.mixing,
+          threads: 0,
+          constraints: {
+            required: [],
+            forbidden: [],
+            distance: [],
+            count: [],
+          },
+        });
+        if (!cancelled) {
+          setDisabledGeyserKeys(new Set(analysis.worldProfile.impossibleGeyserTypes));
+        }
+      } catch {
+        if (!cancelled) {
+          setDisabledGeyserKeys(new Set());
+        }
+      }
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [draft.mixing, draft.worldType, watchMixing, watchWorldType]);
+
+  useEffect(() => {
+    if (disabledGeyserKeys.size === 0) {
+      return;
+    }
+
+    const values = methods.getValues();
+    const nextRequired = values.required.filter((item) => !disabledGeyserKeys.has(item.geyser));
+    const nextForbidden = values.forbidden.filter((item) => !disabledGeyserKeys.has(item.geyser));
+    const nextDistance = values.distance.filter((item) => !disabledGeyserKeys.has(item.geyser));
+    const nextCount = values.count.filter((item) => !disabledGeyserKeys.has(item.geyser));
+
+    const removedCount =
+      (values.required.length - nextRequired.length) +
+      (values.forbidden.length - nextForbidden.length) +
+      (values.distance.length - nextDistance.length) +
+      (values.count.length - nextCount.length);
+    if (removedCount === 0) {
+      return;
+    }
+
+    methods.setValue("required", nextRequired, { shouldValidate: true, shouldDirty: true });
+    methods.setValue("forbidden", nextForbidden, { shouldValidate: true, shouldDirty: true });
+    methods.setValue("distance", nextDistance, { shouldValidate: true, shouldDirty: true });
+    methods.setValue("count", nextCount, { shouldValidate: true, shouldDirty: true });
+    useSearchStore.setState({
+      lastError: `世界参数变更后，已自动移除 ${removedCount} 条当前世界不可生成的喷口约束`,
+    });
+  }, [disabledGeyserKeys, methods]);
 
   const submit = methods.handleSubmit(async (values) => {
     const nextDraft = toSearchDraft(values);
@@ -117,10 +183,20 @@ export default function SearchPanel() {
           </label>
         </div>
 
-        <GeyserConstraintEditor title="必须包含(required)" type="required" geysers={geysers} />
-        <GeyserConstraintEditor title="必须排除(forbidden)" type="forbidden" geysers={geysers} />
-        <DistanceRuleEditor geysers={geysers} />
-        <CountRuleEditor geysers={geysers} />
+        <GeyserConstraintEditor
+          title="必须包含(required)"
+          type="required"
+          geysers={geysers}
+          disabledGeyserKeys={disabledGeyserKeys}
+        />
+        <GeyserConstraintEditor
+          title="必须排除(forbidden)"
+          type="forbidden"
+          geysers={geysers}
+          disabledGeyserKeys={disabledGeyserKeys}
+        />
+        <DistanceRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
+        <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
 
         <SearchActions
           isSearching={isSearching}

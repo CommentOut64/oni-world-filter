@@ -169,8 +169,10 @@ void ValidateLayer1(const SearchAnalysisRequest &request,
     }
 }
 
-void ValidateLayer2(const NormalizedSearchRequest &request,
+void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
+                    const NormalizedSearchRequest &request,
                     const SearchCatalog &catalog,
+                    const WorldEnvelopeProfile *worldProfile,
                     std::vector<ValidationIssue> *errors)
 {
     if (request.worldType < 0 ||
@@ -189,6 +191,59 @@ void ValidateLayer2(const NormalizedSearchRequest &request,
                      "world.unknown_geyser",
                      "constraints",
                      "存在未知 geyserId: " + group.geyserId);
+        }
+    }
+
+    if (worldProfile == nullptr || !worldProfile->valid) {
+        return;
+    }
+
+    for (size_t i = 0; i < rawRequest.constraints.distance.size(); ++i) {
+        const auto &rule = rawRequest.constraints.distance[i];
+        if (rule.maxDist > worldProfile->diagonal) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.distance_max_gt_world_diagonal",
+                     "constraints.distance[" + std::to_string(i) + "].maxDist",
+                     "distance.maxDist 超过当前世界对角线");
+        }
+        if (rule.minDist > worldProfile->diagonal) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.distance_min_gt_world_diagonal",
+                     "constraints.distance[" + std::to_string(i) + "].minDist",
+                     "distance.minDist 超过当前世界对角线");
+        }
+    }
+
+    for (const auto &group : request.groups) {
+        if (group.geyserIndex < 0) {
+            continue;
+        }
+        auto itr = worldProfile->possibleMaxCountByType.find(group.geyserId);
+        const int possibleMax =
+            (itr == worldProfile->possibleMaxCountByType.end()) ? 0 : itr->second;
+        if (possibleMax <= 0) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.geyser_impossible",
+                     "constraints",
+                     "当前 worldType + mixing 下 geyser 不可能出现: " + group.geyserId);
+            continue;
+        }
+        if (group.maxCount > possibleMax) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.count_max_gt_possible_max",
+                     "constraints.count",
+                     "count.maxCount 超过当前世界上界: " + group.geyserId);
+        }
+        if (group.minCount > possibleMax) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.count_min_gt_possible_max",
+                     "constraints.count",
+                     "count.minCount 超过当前世界上界: " + group.geyserId);
         }
     }
 }
@@ -224,12 +279,16 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
 } // namespace
 
 SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
-                                       const SearchCatalog &catalog)
+                                       const SearchCatalog &catalog,
+                                       const WorldEnvelopeProfile *worldProfile)
 {
     SearchAnalysisResult result;
+    if (worldProfile != nullptr) {
+        result.worldProfile = *worldProfile;
+    }
     result.normalizedRequest = NormalizeSearchRequest(request);
     ValidateLayer1(request, &result.errors);
-    ValidateLayer2(result.normalizedRequest, catalog, &result.errors);
+    ValidateLayer2(request, result.normalizedRequest, catalog, worldProfile, &result.errors);
     ValidateLayer3(result.normalizedRequest, &result.errors);
     return result;
 }

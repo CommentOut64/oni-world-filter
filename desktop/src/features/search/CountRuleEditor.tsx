@@ -5,9 +5,10 @@ import type { SearchFormValues } from "./searchSchema";
 
 interface CountRuleEditorProps {
   geysers: GeyserOption[];
+  disabledGeyserKeys?: ReadonlySet<string>;
 }
 
-export default function CountRuleEditor({ geysers }: CountRuleEditorProps) {
+export default function CountRuleEditor({ geysers, disabledGeyserKeys }: CountRuleEditorProps) {
   const {
     control,
     register,
@@ -17,6 +18,7 @@ export default function CountRuleEditor({ geysers }: CountRuleEditorProps) {
     control,
     name: "count",
   });
+  const firstEnabledGeyser = geysers.find((item) => !disabledGeyserKeys?.has(item.key))?.key ?? "";
 
   return (
     <section className="constraint-editor">
@@ -26,7 +28,7 @@ export default function CountRuleEditor({ geysers }: CountRuleEditorProps) {
           type="button"
           onClick={() =>
             append({
-              geyser: geysers[0]?.key ?? "",
+              geyser: firstEnabledGeyser,
               minCount: 0,
               maxCount: 1,
             })
@@ -41,8 +43,9 @@ export default function CountRuleEditor({ geysers }: CountRuleEditorProps) {
           <select {...register(`count.${index}.geyser`)}>
             <option value="">请选择喷口</option>
             {geysers.map((item) => (
-              <option key={item.id} value={item.key}>
+              <option key={item.id} value={item.key} disabled={disabledGeyserKeys?.has(item.key)}>
                 {item.key}
+                {disabledGeyserKeys?.has(item.key) ? " (当前世界不可生成)" : ""}
               </option>
             ))}
           </select>

@@ -7,12 +7,14 @@ interface GeyserConstraintEditorProps {
   title: string;
   type: "required" | "forbidden";
   geysers: GeyserOption[];
+  disabledGeyserKeys?: ReadonlySet<string>;
 }
 
 export default function GeyserConstraintEditor({
   title,
   type,
   geysers,
+  disabledGeyserKeys,
 }: GeyserConstraintEditorProps) {
   const {
     control,
@@ -25,12 +27,13 @@ export default function GeyserConstraintEditor({
   });
 
   const fieldErrors = errors[type];
+  const firstEnabledGeyser = geysers.find((item) => !disabledGeyserKeys?.has(item.key))?.key ?? "";
 
   return (
     <section className="constraint-editor">
       <header>
         <h4>{title}</h4>
-        <button type="button" onClick={() => append({ geyser: geysers[0]?.key ?? "" })}>
+        <button type="button" onClick={() => append({ geyser: firstEnabledGeyser })}>
           新增
         </button>
       </header>
@@ -40,8 +43,9 @@ export default function GeyserConstraintEditor({
           <select {...register(`${type}.${index}.geyser`)}>
             <option value="">请选择喷口</option>
             {geysers.map((item) => (
-              <option key={item.id} value={item.key}>
+              <option key={item.id} value={item.key} disabled={disabledGeyserKeys?.has(item.key)}>
                 {item.key}
+                {disabledGeyserKeys?.has(item.key) ? " (当前世界不可生成)" : ""}
               </option>
             ))}
           </select>

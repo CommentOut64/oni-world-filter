@@ -1,0 +1,414 @@
+#include "SearchAnalysis/WorldEnvelopeProfile.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <map>
+#include <ranges>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "Batch/FilterConfig.hpp"
+#include "SearchAnalysis/SearchCatalog.hpp"
+#include "Setting/SettingsCache.hpp"
+
+namespace SearchAnalysis {
+
+namespace {
+
+constexpr int kMixingMax = 48828124;
+
+std::string BuildWorldCode(int worldType, int mixing)
+{
+    const auto &prefixes = GetWorldPrefixes();
+    if (worldType < 0 || worldType >= static_cast<int>(prefixes.size())) {
+        return {};
+    }
+    const int normalizedMixing = std::clamp(mixing, 0, kMixingMax);
+    std::string code = prefixes[static_cast<size_t>(worldType)];
+    code += "100000-0-D3-";
+    code += SettingsCache::BinaryToBase36(static_cast<uint32_t>(normalizedMixing));
+    return code;
+}
+
+uint64_t Fnv1a64(const std::string &text)
+{
+    uint64_t hash = 1469598103934665603ULL;
+    for (unsigned char c : text) {
+        hash ^= static_cast<uint64_t>(c);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+std::string BuildRuleId(const TemplateSpawnRules &rule, int ruleIndex)
+{
+    if (!rule.ruleId.empty()) {
+        return rule.ruleId;
+    }
+
+    std::string signature;
+    signature.reserve(256);
+    signature += "idx=" + std::to_string(ruleIndex);
+    signature += ";list=" + std::to_string(static_cast<int>(rule.listRule));
+    signature += ";some=" + std::to_string(rule.someCount);
+    signature += ";more=" + std::to_string(rule.moreCount);
+    signature += ";times=" + std::to_string(rule.times);
+    signature += ";rangeX=" + std::to_string(rule.range.x);
+    signature += ";rangeY=" + std::to_string(rule.range.y);
+    signature += ";dup=" + std::to_string(rule.allowDuplicates ? 1 : 0);
+    signature += ";names=";
+    for (const auto &name : rule.names) {
+        signature += name;
+        signature.push_back('|');
+    }
+
+    const uint64_t hash = Fnv1a64(signature);
+    return "sig:" + std::to_string(hash);
+}
+
+int ComputeRuleMaxPerExecution(const TemplateSpawnRules &rule)
+{
+    const int nameCount = static_cast<int>(rule.names.size());
+    switch (rule.listRule) {
+    case ListRule::GuaranteeAll:
+    case ListRule::TryAll:
+        return std::max(0, nameCount);
+    case ListRule::GuaranteeSome:
+    case ListRule::TrySome:
+        return std::max(0, rule.someCount);
+    case ListRule::GuaranteeSomeTryMore:
+        return std::max(0, rule.someCount + rule.moreCount);
+    case ListRule::GuaranteeOne:
+    case ListRule::TryOne:
+        return 1;
+    case ListRule::GuaranteeRange:
+    case ListRule::TryRange:
+        // 规划文档要求 range 类型按 range.y 作为单次执行上界。
+        return std::max(0, static_cast<int>(rule.range.y));
+    default:
+        break;
+    }
+    return 0;
+}
+
+std::vector<World *> CollectClusterWorlds(SettingsCache *settings)
+{
+    std::vector<World *> worlds;
+    if (settings == nullptr || settings->cluster == nullptr) {
+        return worlds;
+    }
+    worlds.reserve(settings->cluster->worldPlacements.size());
+    for (const auto &placement : settings->cluster->worldPlacements) {
+        const auto itr = settings->worlds.find(placement.world);
+        if (itr == settings->worlds.end()) {
+            continue;
+        }
+        itr->second.locationType = placement.locationType;
+        worlds.push_back(&itr->second);
+    }
+    if (worlds.size() == 1) {
+        worlds.front()->locationType = LocationType::StartWorld;
+    }
+    return worlds;
+}
+
+World *PickTargetWorld(const std::vector<World *> &worlds)
+{
+    for (auto *world : worlds) {
+        if (world != nullptr && world->locationType == LocationType::StartWorld) {
+            return world;
+        }
+    }
+    if (!worlds.empty()) {
+        return worlds.front();
+    }
+    return nullptr;
+}
+
+std::vector<const TemplateSpawnRules *> CollectTemplateRules(const World &world,
+                                                             const SettingsCache &settings)
+{
+    std::vector<const TemplateSpawnRules *> rules;
+    rules.reserve(world.worldTemplateRules2.size() + world.subworldFiles2.size() * 2);
+    for (const auto *item : world.worldTemplateRules2) {
+        if (item != nullptr) {
+            rules.push_back(item);
+        }
+    }
+    for (const auto *subworldFile : world.subworldFiles2) {
+        if (subworldFile == nullptr) {
+            continue;
+        }
+        const auto itr = settings.subworlds.find(subworldFile->name);
+        if (itr == settings.subworlds.end()) {
+            continue;
+        }
+        for (const auto &rule : itr->second.subworldTemplateRules) {
+            rules.push_back(&rule);
+        }
+    }
+    return rules;
+}
+
+std::vector<std::string> ExtractTemplateGeyserIds(const SettingsCache &settings,
+                                                  const std::string &templateName)
+{
+    std::vector<std::string> result;
+    if (templateName == "geysers/generic") {
+        return result;
+    }
+
+    if (templateName.starts_with("poi/oil/")) {
+        result.push_back("oil_reservoir");
+        return result;
+    }
+    if (templateName.starts_with("expansion1::poi/warp/receiver")) {
+        result.push_back("warp_sender");
+        return result;
+    }
+    if (templateName.starts_with("expansion1::poi/warp/sender")) {
+        result.push_back("warp_receiver");
+        return result;
+    }
+    if (templateName.starts_with("expansion1::poi/warp/teleporter")) {
+        result.push_back("warp_portal");
+        return result;
+    }
+    if (templateName.starts_with("expansion1::poi/traits/cryopod")) {
+        result.push_back("cryo_tank");
+        return result;
+    }
+
+    const auto templateItr = settings.templates.find(templateName);
+    if (templateItr == settings.templates.end()) {
+        return result;
+    }
+
+    std::set<std::string> dedup;
+    for (const auto &entity : templateItr->second.otherEntities) {
+        constexpr const char *prefix = "GeyserGeneric_";
+        if (entity.id.rfind(prefix, 0) != 0) {
+            continue;
+        }
+        const std::string geyser = entity.id.substr(14);
+        if (Batch::GeyserIdToIndex(geyser) < 0) {
+            continue;
+        }
+        if (dedup.insert(geyser).second) {
+            result.push_back(geyser);
+        }
+    }
+    return result;
+}
+
+void BuildGenericTypeUpperById(const SettingsCache &settings,
+                               std::map<std::string, double> *out)
+{
+    if (out == nullptr) {
+        return;
+    }
+    out->clear();
+    const auto &ids = Batch::GetGeyserIds();
+    for (const auto &id : ids) {
+        (*out)[id] = 0.0;
+    }
+
+    if (settings.IsSpaceOutEnabled()) {
+        const double upper = 1.0 / 23.0;
+        for (int i = 0; i <= 22 && i < static_cast<int>(ids.size()); ++i) {
+            (*out)[ids[static_cast<size_t>(i)]] = upper;
+        }
+        return;
+    }
+
+    const double upper = 1.0 / 20.0;
+    for (int i = 0; i <= 18 && i < static_cast<int>(ids.size()); ++i) {
+        (*out)[ids[static_cast<size_t>(i)]] = upper;
+    }
+    if (21 < static_cast<int>(ids.size())) {
+        (*out)[ids[21]] = upper;
+    }
+}
+
+void BuildGeyserEnvelope(const SettingsCache &settings,
+                         const World &world,
+                         WorldEnvelopeProfile *profile)
+{
+    if (profile == nullptr) {
+        return;
+    }
+    const auto &geyserIds = Batch::GetGeyserIds();
+    profile->possibleMaxCountByType.clear();
+    for (const auto &geyserId : geyserIds) {
+        profile->possibleMaxCountByType[geyserId] = 0;
+    }
+    BuildGenericTypeUpperById(settings, &profile->genericTypeUpperById);
+
+    const auto rules = CollectTemplateRules(world, settings);
+    profile->exactSourceSummary.clear();
+    profile->genericSourceSummary.clear();
+    profile->sourcePools.clear();
+    profile->genericSlotUpper = 0;
+    std::map<std::string, int> poolCapacityUpper;
+    int ruleIndex = 0;
+    for (const auto *rule : rules) {
+        if (rule == nullptr) {
+            ++ruleIndex;
+            continue;
+        }
+        const int perExecutionMax = ComputeRuleMaxPerExecution(*rule);
+        const int executionTimes = std::max(1, rule->times);
+        const int totalRuleUpper = perExecutionMax * executionTimes;
+        if (totalRuleUpper <= 0) {
+            ++ruleIndex;
+            continue;
+        }
+        const std::string ruleId = BuildRuleId(*rule, ruleIndex);
+        const bool containsGeneric =
+            std::ranges::find(rule->names, std::string("geysers/generic")) != rule->names.end();
+        if (containsGeneric) {
+            profile->genericSlotUpper += totalRuleUpper;
+            poolCapacityUpper["generic"] += totalRuleUpper;
+            profile->genericSourceSummary.push_back(SourceSummary{
+                .ruleId = ruleId,
+                .templateName = "geysers/generic",
+                .geyserId = "geysers/generic",
+                .upperBound = totalRuleUpper,
+                .sourceKind = "generic",
+                .poolId = "generic",
+            });
+        }
+
+        for (const auto &name : rule->names) {
+            if (name == "geysers/generic") {
+                continue;
+            }
+            const auto geysers = ExtractTemplateGeyserIds(settings, name);
+            if (geysers.empty()) {
+                continue;
+            }
+            if (perExecutionMax <= 0) {
+                continue;
+            }
+            const int templateUpper = rule->allowDuplicates ? executionTimes : 1;
+            for (const auto &geyserId : geysers) {
+                profile->possibleMaxCountByType[geyserId] += templateUpper;
+                const auto existing = poolCapacityUpper.find(ruleId);
+                if (existing == poolCapacityUpper.end()) {
+                    poolCapacityUpper.emplace(ruleId, totalRuleUpper);
+                } else {
+                    existing->second = std::max(existing->second, totalRuleUpper);
+                }
+                profile->exactSourceSummary.push_back(SourceSummary{
+                    .ruleId = ruleId,
+                    .templateName = name,
+                    .geyserId = geyserId,
+                    .upperBound = templateUpper,
+                    .sourceKind = "exact",
+                    .poolId = ruleId,
+                });
+            }
+        }
+        ++ruleIndex;
+    }
+
+    for (const auto &[geyserId, upper] : profile->genericTypeUpperById) {
+        if (upper > 0.0) {
+            profile->possibleMaxCountByType[geyserId] += profile->genericSlotUpper;
+        }
+    }
+
+    profile->possibleGeyserTypes.clear();
+    profile->impossibleGeyserTypes.clear();
+    for (const auto &geyserId : geyserIds) {
+        const auto itr = profile->possibleMaxCountByType.find(geyserId);
+        if (itr != profile->possibleMaxCountByType.end() && itr->second > 0) {
+            profile->possibleGeyserTypes.push_back(geyserId);
+        } else {
+            profile->impossibleGeyserTypes.push_back(geyserId);
+        }
+    }
+
+    for (const auto &[poolId, capacity] : poolCapacityUpper) {
+        profile->sourcePools.push_back(SourcePool{
+            .poolId = poolId,
+            .sourceKind = (poolId == "generic") ? "generic" : "exact",
+            .capacityUpper = capacity,
+        });
+    }
+}
+
+} // namespace
+
+WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
+                                                 int worldType,
+                                                 int mixing,
+                                                 std::string *errorMessage)
+{
+    WorldEnvelopeProfile profile;
+    profile.worldType = worldType;
+    profile.worldCode = BuildWorldCode(worldType, mixing);
+    profile.spatialEnvelopes.push_back(SpatialEnvelope{
+        .envelopeId = "global",
+        .confidence = "low",
+        .method = "placeholder",
+    });
+
+    if (profile.worldCode.empty()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "worldType 超出有效范围";
+        }
+        return profile;
+    }
+
+    SettingsCache settings = baseSettings;
+    if (!settings.CoordinateChanged(profile.worldCode, settings)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "world code 解析失败";
+        }
+        return profile;
+    }
+
+    auto worlds = CollectClusterWorlds(&settings);
+    if (worlds.empty()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "cluster 未绑定可用 world";
+        }
+        return profile;
+    }
+
+    settings.DoSubworldMixing(worlds);
+    World *targetWorld = PickTargetWorld(worlds);
+    if (targetWorld == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "无法确定目标 world";
+        }
+        return profile;
+    }
+
+    profile.width = static_cast<int>(targetWorld->worldsize.x);
+    profile.height = static_cast<int>(targetWorld->worldsize.y);
+    profile.diagonal = std::sqrt(
+        static_cast<double>(profile.width) * static_cast<double>(profile.width) +
+        static_cast<double>(profile.height) * static_cast<double>(profile.height));
+
+    profile.activeMixingSlots.clear();
+    profile.disabledMixingSlots.clear();
+    for (size_t slot = 0; slot < settings.mixConfigs.size(); ++slot) {
+        const auto level = settings.mixConfigs[slot].level;
+        if (level == MixingLevel::Disabled) {
+            profile.disabledMixingSlots.push_back(static_cast<int>(slot));
+        } else {
+            profile.activeMixingSlots.push_back(static_cast<int>(slot));
+        }
+    }
+
+    BuildGeyserEnvelope(settings, *targetWorld, &profile);
+    profile.valid = true;
+    return profile;
+}
+
+} // namespace SearchAnalysis

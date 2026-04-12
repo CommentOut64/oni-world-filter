@@ -80,6 +80,25 @@ export async function analyzeSearchRequest(
 ): Promise<SearchAnalysisPayload> {
   if (!inTauriRuntime()) {
     return {
+      worldProfile: {
+        valid: false,
+        worldType: request.worldType,
+        worldCode: "",
+        width: 0,
+        height: 0,
+        diagonal: 0,
+        activeMixingSlots: [],
+        disabledMixingSlots: [],
+        possibleGeyserTypes: [],
+        impossibleGeyserTypes: [],
+        possibleMaxCountByType: {},
+        genericTypeUpperById: {},
+        genericSlotUpper: 0,
+        exactSourceSummary: [],
+        genericSourceSummary: [],
+        sourcePools: [],
+        spatialEnvelopes: [],
+      },
       normalizedRequest: {
         worldType: request.worldType,
         seedStart: request.seedStart,

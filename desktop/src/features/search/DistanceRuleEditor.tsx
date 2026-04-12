@@ -5,9 +5,10 @@ import type { SearchFormValues } from "./searchSchema";
 
 interface DistanceRuleEditorProps {
   geysers: GeyserOption[];
+  disabledGeyserKeys?: ReadonlySet<string>;
 }
 
-export default function DistanceRuleEditor({ geysers }: DistanceRuleEditorProps) {
+export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: DistanceRuleEditorProps) {
   const {
     control,
     register,
@@ -17,6 +18,7 @@ export default function DistanceRuleEditor({ geysers }: DistanceRuleEditorProps)
     control,
     name: "distance",
   });
+  const firstEnabledGeyser = geysers.find((item) => !disabledGeyserKeys?.has(item.key))?.key ?? "";
 
   return (
     <section className="constraint-editor">
@@ -26,7 +28,7 @@ export default function DistanceRuleEditor({ geysers }: DistanceRuleEditorProps)
           type="button"
           onClick={() =>
             append({
-              geyser: geysers[0]?.key ?? "",
+              geyser: firstEnabledGeyser,
               minDist: 0,
               maxDist: 80,
             })
@@ -41,8 +43,9 @@ export default function DistanceRuleEditor({ geysers }: DistanceRuleEditorProps)
           <select {...register(`distance.${index}.geyser`)}>
             <option value="">请选择喷口</option>
             {geysers.map((item) => (
-              <option key={item.id} value={item.key}>
+              <option key={item.id} value={item.key} disabled={disabledGeyserKeys?.has(item.key)}>
                 {item.key}
+                {disabledGeyserKeys?.has(item.key) ? " (当前世界不可生成)" : ""}
               </option>
             ))}
           </select>
