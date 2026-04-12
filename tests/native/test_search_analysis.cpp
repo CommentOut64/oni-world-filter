@@ -22,6 +22,7 @@ SearchAnalysis::SearchCatalog BuildMockCatalog()
     catalog.worlds.push_back({.id = 1, .code = "OCAN-A-"});
     catalog.geysers.push_back({.id = 0, .key = "steam"});
     catalog.geysers.push_back({.id = 2, .key = "hot_water"});
+    catalog.geysers.push_back({.id = 15, .key = "methane"});
     return catalog;
 }
 
@@ -89,6 +90,105 @@ int RunAllTests()
         Expect(hasLayer1, "hard validator should include layer1 errors", failures);
         Expect(hasLayer2, "hard validator should include layer2 errors", failures);
         Expect(hasLayer3, "hard validator should include layer3 errors", failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 1, .maxCount = 1},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 400.0;
+        profile.possibleMaxCountByType["hot_water"] = 3;
+        profile.genericTypeUpperById["hot_water"] = 0.01;
+        profile.genericSlotUpper = 1;
+        profile.genericSourceSummary.push_back(SearchAnalysis::SourceSummary{
+            .ruleId = "rule-generic",
+            .templateName = "geysers/generic",
+            .geyserId = "geysers/generic",
+            .upperBound = 1,
+            .sourceKind = "generic",
+            .poolId = "generic",
+        });
+        profile.sourcePools.push_back(SearchAnalysis::SourcePool{
+            .poolId = "generic",
+            .sourceKind = "generic",
+            .capacityUpper = 1,
+        });
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(result.errors.empty(), "layer4 warning case should not have errors", failures);
+        Expect(!result.warnings.empty(),
+               "layer4 should emit warning for low predicted probability",
+               failures);
+        Expect(result.predictedBottleneckProbability < 0.05,
+               "layer4 predicted probability should be low",
+               failures);
+        Expect(!result.bottlenecks.empty(),
+               "layer4 should include bottleneck geyser list",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 3, .maxCount = 3},
+            {.geyserId = "methane", .minCount = 2, .maxCount = 2},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 400.0;
+        profile.possibleMaxCountByType["hot_water"] = 5;
+        profile.possibleMaxCountByType["methane"] = 5;
+        profile.genericTypeUpperById["hot_water"] = 0.1;
+        profile.genericTypeUpperById["methane"] = 0.1;
+        profile.genericSlotUpper = 4;
+        profile.genericSourceSummary.push_back(SearchAnalysis::SourceSummary{
+            .ruleId = "rule-generic",
+            .templateName = "geysers/generic",
+            .geyserId = "geysers/generic",
+            .upperBound = 4,
+            .sourceKind = "generic",
+            .poolId = "generic",
+        });
+        profile.sourcePools.push_back(SearchAnalysis::SourcePool{
+            .poolId = "generic",
+            .sourceKind = "generic",
+            .capacityUpper = 4,
+        });
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(result.errors.empty(),
+               "generic capacity pruning case should not have hard errors",
+               failures);
+        Expect(result.predictedBottleneckProbability <= 1e-9,
+               "generic capacity pruning should drive predicted probability to zero",
+               failures);
+        bool hasCapacityWarning = false;
+        for (const auto &issue : result.warnings) {
+            if (issue.code == "predict.generic_capacity_pruned") {
+                hasCapacityWarning = true;
+                break;
+            }
+        }
+        Expect(hasCapacityWarning,
+               "generic capacity pruning should emit dedicated warning code",
+               failures);
     }
 
     {
