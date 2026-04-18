@@ -32,6 +32,16 @@ int RunAllTests()
 {
     int failures = 0;
 
+    auto HasIssue = [](const std::vector<SearchAnalysis::ValidationIssue> &issues,
+                       const char *code) {
+        for (const auto &issue : issues) {
+            if (issue.code == code) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     {
         SearchAnalysis::SearchAnalysisRequest request;
         request.worldType = 1;
@@ -286,6 +296,118 @@ int RunAllTests()
         }
         Expect(!hasUnexpectedCountMaxError,
                "required-only group should not trigger count max upper-bound error",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 50.0},
+        };
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 0, .maxCount = 0},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.possibleMaxCountByType["hot_water"] = 2;
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(HasIssue(result.errors, "conflict.forbidden_with_distance"),
+               "count.max=0 with distance should be treated as forbidden conflict",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.mixing = 1;
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.disabledMixingSlots = {0};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(HasIssue(result.errors, "world.disabled_mixing_slot_enabled"),
+               "enabled disabled mixing slot should be rejected in layer2",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 50.0},
+        };
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 1, .maxCount = 1},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.width = 200;
+        profile.height = 200;
+        profile.diagonal = 282.8;
+        profile.possibleMaxCountByType["hot_water"] = 1;
+        profile.exactSourceSummary.push_back(SearchAnalysis::SourceSummary{
+            .ruleId = "rule-hot-water",
+            .templateName = "poi/hot_water",
+            .geyserId = "hot_water",
+            .upperBound = 1,
+            .sourceKind = "exact",
+            .poolId = "rule-hot-water",
+            .envelopeId = "env-hot-water",
+        });
+        profile.sourcePools.push_back(SearchAnalysis::SourcePool{
+            .poolId = "rule-hot-water",
+            .sourceKind = "exact",
+            .capacityUpper = 1,
+        });
+        profile.spatialEnvelopes.push_back(SearchAnalysis::SpatialEnvelope{
+            .envelopeId = "env-hot-water",
+            .confidence = "medium",
+            .method = "candidate-sites",
+        });
+        profile.envelopeStatsById["env-hot-water"] = SearchAnalysis::EnvelopeStats{
+            .candidateCount = 4,
+            .candidateDistances = {10.0, 20.0, 90.0, 130.0},
+            .confidence = "medium",
+            .method = "candidate-sites",
+        };
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(result.errors.empty(), "envelope-backed distance test should not hard fail", failures);
+        Expect(result.predictedBottleneckProbability > 0.49 &&
+                   result.predictedBottleneckProbability < 0.51,
+               "distance probability should use source-conditioned envelope mass",
+               failures);
+        bool hasLowProbabilityWarning = false;
+        for (const auto &issue : result.warnings) {
+            if (issue.code.rfind("predict.low_probability", 0) == 0) {
+                hasLowProbabilityWarning = true;
+                break;
+            }
+        }
+        Expect(!hasLowProbabilityWarning,
+               "source-conditioned envelope should avoid false low-probability warning",
                failures);
     }
 
