@@ -13,7 +13,7 @@ import type {
   SidecarStderrEvent,
   WorldOption,
 } from "./contracts";
-import { EMPTY_SEARCH_CATALOG, normalizeSearchCatalog } from "./searchCatalog";
+import { FALLBACK_SEARCH_CATALOG, normalizeSearchCatalog } from "./searchCatalog";
 
 const SIDECAR_EVENT_CHANNEL = "sidecar://event";
 const SIDECAR_STDERR_CHANNEL = "sidecar://stderr";
@@ -55,21 +55,21 @@ export async function loadPreview(request: PreviewRequest): Promise<PreviewEvent
 
 export async function listWorlds(): Promise<WorldOption[]> {
   if (!inTauriRuntime()) {
-    return [];
+    return FALLBACK_SEARCH_CATALOG.worlds;
   }
   return invoke<WorldOption[]>("list_worlds");
 }
 
 export async function listGeysers(): Promise<GeyserOption[]> {
   if (!inTauriRuntime()) {
-    return [];
+    return FALLBACK_SEARCH_CATALOG.geysers;
   }
   return invoke<GeyserOption[]>("list_geysers");
 }
 
 export async function getSearchCatalog(): Promise<SearchCatalog> {
   if (!inTauriRuntime()) {
-    return EMPTY_SEARCH_CATALOG;
+    return FALLBACK_SEARCH_CATALOG;
   }
   const catalog = await invoke<SearchCatalog>("get_search_catalog");
   return normalizeSearchCatalog(catalog);
