@@ -3,5 +3,10 @@
   "identifier": "default",
   "description": "Default desktop capability for the main window and host-side search commands.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
+  ]
 }

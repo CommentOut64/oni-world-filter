@@ -22,3 +22,41 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::Value;
+
+    fn default_capability_permissions() -> Vec<String> {
+        let capability: Value = serde_json::from_str(include_str!("../capabilities/default.json"))
+            .expect("default capability should be valid json");
+        capability["permissions"]
+            .as_array()
+            .expect("default capability should declare permissions")
+            .iter()
+            .map(|entry| {
+                entry.as_str()
+                    .expect("permission entry should be a string")
+                    .to_string()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn default_capability_allows_host_debug_window_lifecycle() {
+        let permissions = default_capability_permissions();
+
+        assert!(
+            permissions.contains(&"core:webview:allow-create-webview-window".to_string()),
+            "default capability must allow creating the host debug webview window"
+        );
+        assert!(
+            permissions.contains(&"core:window:allow-show".to_string()),
+            "default capability must allow showing an existing host debug window"
+        );
+        assert!(
+            permissions.contains(&"core:window:allow-set-focus".to_string()),
+            "default capability must allow focusing an existing host debug window"
+        );
+    }
+}
