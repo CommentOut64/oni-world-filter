@@ -11,6 +11,7 @@
 #include "Utils/Voronoi.hpp"
 #include "Utils/Diagram.hpp"
 #include "Utils/PointGenerator.hpp"
+#include "Utils/RecoverableDiagnostics.hpp"
 
 struct WeightedSubWorld {
     const SubWorld *subWorld;
@@ -51,7 +52,10 @@ bool WorldGen::GenerateOverworld(std::vector<Site> &sites)
             return false;
         }
         if (!diagram.ComputeNodePD()) {
-            LogE("compute node pd failed, fallback to compute node.");
+            if (ShouldEmitRecoverableWorldGenDiagnostic(
+                    "compute node pd failed, fallback to compute node.")) {
+                LogE("compute node pd failed, fallback to compute node.");
+            }
             if (!diagram.ComputeNode()) {
                 LogE("fallback compute node failed.");
                 return false;
@@ -67,7 +71,10 @@ bool WorldGen::GenerateOverworld(std::vector<Site> &sites)
     ConvertUnknownCells(sites, random);
     if (usePD) {
         if (!diagram.ComputeNodePD()) {
-            LogE("compute node pd failed after convert unknown cells, fallback to compute node.");
+            if (ShouldEmitRecoverableWorldGenDiagnostic(
+                    "compute node pd failed after convert unknown cells, fallback to compute node.")) {
+                LogE("compute node pd failed after convert unknown cells, fallback to compute node.");
+            }
             if (!diagram.ComputeNode()) {
                 LogE("fallback compute node failed after convert unknown cells.");
                 return false;
@@ -642,7 +649,10 @@ bool WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
     if (!subworld.dontRelaxChildren) {
         if (usePD) {
             if (!diagram.ComputeNodePD()) {
-                LogE("compute child node pd failed, fallback to compute node.");
+                if (ShouldEmitRecoverableWorldGenDiagnostic(
+                        "compute child node pd failed, fallback to compute node.")) {
+                    LogE("compute child node pd failed, fallback to compute node.");
+                }
                 if (!diagram.ComputeNode()) {
                     LogE("fallback compute child node failed.");
                     return false;

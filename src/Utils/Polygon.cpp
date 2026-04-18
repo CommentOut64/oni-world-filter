@@ -6,6 +6,7 @@
 #include <clipper.hpp>
 
 #include "Setting/SettingsCache.hpp"
+#include "Utils/RecoverableDiagnostics.hpp"
 
 void Polygon::Swap(Polygon &other)
 {
@@ -130,7 +131,9 @@ void Polygon::Intersect(const Polygon &clip)
             this->Vertices.emplace_back(point * 0.0001f);
         }
     } else {
-        LogE("intersection result is empty.");
+        if (ShouldEmitRecoverableWorldGenDiagnostic("intersection result is empty.")) {
+            LogE("intersection result is empty.");
+        }
         std::stringstream sstm;
         sstm << "subj: ";
         for (auto &item : subjs) {
@@ -140,7 +143,10 @@ void Polygon::Intersect(const Polygon &clip)
         for (auto &item : clips) {
             sstm << item.X << "," << item.Y << ";";
         }
-        LogE("%s\n", sstm.str().c_str());
+        const std::string detail = sstm.str();
+        if (ShouldEmitRecoverableWorldGenDiagnostic(detail)) {
+            LogE("%s\n", detail.c_str());
+        }
     }
 }
 
