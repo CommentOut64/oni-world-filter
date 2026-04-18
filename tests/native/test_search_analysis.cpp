@@ -231,6 +231,64 @@ int RunAllTests()
                failures);
     }
 
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 50.0},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.possibleMaxCountByType["hot_water"] = 2;
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        bool hasUnexpectedCountMaxError = false;
+        for (const auto &issue : result.errors) {
+            if (issue.code == "world.count_max_gt_possible_max") {
+                hasUnexpectedCountMaxError = true;
+                break;
+            }
+        }
+        Expect(!hasUnexpectedCountMaxError,
+               "distance-only group should not trigger count max upper-bound error",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.required = {"hot_water"};
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.possibleMaxCountByType["hot_water"] = 2;
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        bool hasUnexpectedCountMaxError = false;
+        for (const auto &issue : result.errors) {
+            if (issue.code == "world.count_max_gt_possible_max") {
+                hasUnexpectedCountMaxError = true;
+                break;
+            }
+        }
+        Expect(!hasUnexpectedCountMaxError,
+               "required-only group should not trigger count max upper-bound error",
+               failures);
+    }
+
     if (failures == 0) {
         std::cout << "[PASS] test_search_analysis" << std::endl;
         return 0;
