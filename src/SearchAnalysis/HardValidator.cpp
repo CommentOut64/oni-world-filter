@@ -232,7 +232,9 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
                      "当前 worldType + mixing 下 geyser 不可能出现: " + group.geyserId);
             continue;
         }
-        if (group.maxCount > possibleMax) {
+        // 仅当请求显式给出上界（count / forbidden）时，才比较 count.max 上界。
+        const bool hasExplicitUpperBound = group.hasExplicitCount || group.hasForbidden;
+        if (hasExplicitUpperBound && group.maxCount > possibleMax) {
             AddIssue(errors,
                      "layer2",
                      "world.count_max_gt_possible_max",
