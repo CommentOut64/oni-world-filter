@@ -296,6 +296,15 @@ target_include_directories(test_sidecar_protocol
 target_link_libraries(test_sidecar_protocol PRIVATE jsoncpp)
 add_test(NAME test_sidecar_protocol COMMAND test_sidecar_protocol)
 
+add_executable(test_recoverable_diagnostics
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_recoverable_diagnostics.cpp"
+)
+target_include_directories(test_recoverable_diagnostics
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+add_test(NAME test_recoverable_diagnostics COMMAND test_recoverable_diagnostics)
+
 add_executable(test_search_analysis
     "../tests/native/test_main.cpp"
     "../tests/native/test_search_analysis.cpp"
