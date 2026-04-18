@@ -11,6 +11,18 @@ namespace {
 
 constexpr int kMixingMax = 48828124;
 
+int ReadMixingSlotLevel(int mixing, int slot)
+{
+    if (slot < 0) {
+        return 0;
+    }
+    int value = std::max(0, mixing);
+    for (int i = 0; i < slot; ++i) {
+        value /= 5;
+    }
+    return value % 5;
+}
+
 void AddIssue(std::vector<ValidationIssue> *issues,
               std::string layer,
               std::string code,
@@ -199,6 +211,28 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
         return;
     }
 
+    std::vector<int> enabledDisabledSlots;
+    enabledDisabledSlots.reserve(worldProfile->disabledMixingSlots.size());
+    for (const int slot : worldProfile->disabledMixingSlots) {
+        if (ReadMixingSlotLevel(rawRequest.mixing, slot) > 0) {
+            enabledDisabledSlots.push_back(slot);
+        }
+    }
+    if (!enabledDisabledSlots.empty()) {
+        std::string message = "当前 worldType 禁用了 mixing slot: ";
+        for (size_t i = 0; i < enabledDisabledSlots.size(); ++i) {
+            if (i != 0) {
+                message += ", ";
+            }
+            message += std::to_string(enabledDisabledSlots[i]);
+        }
+        AddIssue(errors,
+                 "layer2",
+                 "world.disabled_mixing_slot_enabled",
+                 "mixing",
+                 std::move(message));
+    }
+
     for (size_t i = 0; i < rawRequest.constraints.distance.size(); ++i) {
         const auto &rule = rawRequest.constraints.distance[i];
         if (rule.maxDist > worldProfile->diagonal) {
@@ -255,6 +289,8 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
                     std::vector<ValidationIssue> *errors)
 {
     for (const auto &group : request.groups) {
+        const bool emptiedByUpperBound =
+            (group.hasForbidden || group.hasExplicitCount) && group.maxCount <= 0;
         if (group.hasRequired && group.hasForbidden) {
             AddIssue(errors,
                      "layer3",
@@ -269,12 +305,12 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
                      "constraints.count",
                      "归并后 minCount > maxCount: " + group.geyserId);
         }
-        if (group.hasForbidden && !group.distanceRules.empty()) {
+        if (emptiedByUpperBound && !group.distanceRules.empty()) {
             AddIssue(errors,
                      "layer3",
                      "conflict.forbidden_with_distance",
                      "constraints.distance",
-                     "forbidden geyser 不能同时设置 distance: " + group.geyserId);
+                     "已被排空的 geyser 不能同时设置 distance: " + group.geyserId);
         }
     }
 }

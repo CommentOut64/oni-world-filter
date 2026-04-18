@@ -4,6 +4,7 @@ import { FormProvider, useForm } from "react-hook-form";
 
 import type { SearchAnalysisPayload } from "../../lib/contracts";
 import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
+import type { SearchDraft } from "../../state/searchStore";
 import { analyzeSearchRequest, formatTauriError } from "../../lib/tauri";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
@@ -11,13 +12,11 @@ import CountRuleEditor from "./CountRuleEditor";
 import DistanceRuleEditor from "./DistanceRuleEditor";
 import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
-import SearchAnalysisHints from "./SearchAnalysisHints";
 import SearchActions from "./SearchActions";
+import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
+import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay";
 import {
   createSearchSchema,
-  decodeMixingToLevels,
-  encodeMixingFromLevels,
-  MIXING_SLOT_COUNT,
   toSearchDraft,
   toSearchFormValues,
   type SearchFormValues,
@@ -56,7 +55,10 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
   });
   const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
   const [disabledMixingSlots, setDisabledMixingSlots] = useState<Set<number>>(new Set());
-  const [lastAnalysis, setLastAnalysis] = useState<SearchAnalysisPayload | null>(null);
+  const [pendingWarningConfirmation, setPendingWarningConfirmation] = useState<{
+    draft: SearchDraft;
+    analysis: SearchAnalysisPayload;
+  } | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
   const watchCpuMode = methods.watch("cpuMode");
@@ -97,65 +99,18 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
     };
   }, [draft.mixing, draft.worldType, watchMixing, watchWorldType]);
 
-  useEffect(() => {
-    if (disabledMixingSlots.size === 0) {
-      return;
+  const startSearchWithDraft = async (nextDraft: SearchDraft) => {
+    setDraft(nextDraft);
+    clearPreview();
+    const started = await startSearchJob(nextDraft);
+    if (started) {
+      onSearchStarted?.();
     }
-    const slotCount = Math.max(catalog?.mixingSlots.length ?? 0, MIXING_SLOT_COUNT);
-    const currentMixing = Number.isFinite(watchMixing) ? Math.max(0, Math.trunc(watchMixing)) : 0;
-    const nextLevels = decodeMixingToLevels(currentMixing, slotCount);
-    let forcedCount = 0;
-    for (const slot of disabledMixingSlots) {
-      if (slot < 0 || slot >= nextLevels.length) {
-        continue;
-      }
-      if (nextLevels[slot] !== 0) {
-        nextLevels[slot] = 0;
-        forcedCount += 1;
-      }
-    }
-    if (forcedCount === 0) {
-      return;
-    }
-    const nextMixing = encodeMixingFromLevels(nextLevels);
-    methods.setValue("mixing", nextMixing, { shouldValidate: true, shouldDirty: true });
-    useSearchStore.setState({
-      lastError: `世界参数变更后，已自动关闭 ${forcedCount} 个当前世界禁用的 mixing slot`,
-    });
-  }, [catalog?.mixingSlots.length, disabledMixingSlots, methods, watchMixing]);
-
-  useEffect(() => {
-    if (disabledGeyserKeys.size === 0) {
-      return;
-    }
-
-    const values = methods.getValues();
-    const nextRequired = values.required.filter((item) => !disabledGeyserKeys.has(item.geyser));
-    const nextForbidden = values.forbidden.filter((item) => !disabledGeyserKeys.has(item.geyser));
-    const nextDistance = values.distance.filter((item) => !disabledGeyserKeys.has(item.geyser));
-    const nextCount = values.count.filter((item) => !disabledGeyserKeys.has(item.geyser));
-
-    const removedCount =
-      (values.required.length - nextRequired.length) +
-      (values.forbidden.length - nextForbidden.length) +
-      (values.distance.length - nextDistance.length) +
-      (values.count.length - nextCount.length);
-    if (removedCount === 0) {
-      return;
-    }
-
-    methods.setValue("required", nextRequired, { shouldValidate: true, shouldDirty: true });
-    methods.setValue("forbidden", nextForbidden, { shouldValidate: true, shouldDirty: true });
-    methods.setValue("distance", nextDistance, { shouldValidate: true, shouldDirty: true });
-    methods.setValue("count", nextCount, { shouldValidate: true, shouldDirty: true });
-    useSearchStore.setState({
-      lastError: `世界参数变更后，已自动移除 ${removedCount} 条当前世界不可生成的喷口约束`,
-    });
-  }, [disabledGeyserKeys, methods]);
+  };
 
   const submit = methods.handleSubmit(async (values) => {
     const nextDraft = toSearchDraft(values);
-    setLastAnalysis(null);
+    setPendingWarningConfirmation(null);
     try {
       const analysis = await analyzeSearchRequest({
         jobId: `analyze-${Date.now()}`,
@@ -167,27 +122,42 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
         cpu: nextDraft.cpu,
         constraints: nextDraft.constraints,
       });
-      setLastAnalysis(analysis);
       if (analysis.errors.length > 0) {
-        useSearchStore.setState({ lastError: analysis.errors[0].message });
+        useSearchStore.setState({
+          lastError: formatAnalysisErrorMessage(
+            analysis.errors[0],
+            analysis,
+            nextDraft,
+            catalog?.mixingSlots ?? [],
+            geysers
+          ),
+        });
         return;
       }
       if (analysis.warnings.length > 0) {
-        useSearchStore.setState({ lastError: `[warning] ${analysis.warnings[0].message}` });
+        setPendingWarningConfirmation({ draft: nextDraft, analysis });
+        return;
       }
     } catch (error) {
-      setLastAnalysis(null);
       useSearchStore.setState({ lastError: formatTauriError(error) });
       return;
     }
 
-    setDraft(nextDraft);
-    clearPreview();
-    const started = await startSearchJob(nextDraft);
-    if (started) {
-      onSearchStarted?.();
-    }
+    await startSearchWithDraft(nextDraft);
   });
+
+  const handleWarningContinue = () => {
+    if (!pendingWarningConfirmation) {
+      return;
+    }
+    const nextDraft = pendingWarningConfirmation.draft;
+    setPendingWarningConfirmation(null);
+    void startSearchWithDraft(nextDraft);
+  };
+
+  const handleWarningAbandon = () => {
+    setPendingWarningConfirmation(null);
+  };
 
   const copyAsJson = async () => {
     const values = methods.getValues();
@@ -316,8 +286,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
               </div>
             </section>
 
-            <SearchAnalysisHints analysis={lastAnalysis} />
-
             <SearchActions
               isSearching={isSearching}
               isCancelling={isCancelling}
@@ -363,6 +331,13 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
           </section>
         </section>
       </form>
+      <SearchWarningConfirmModal
+        open={pendingWarningConfirmation !== null}
+        analysis={pendingWarningConfirmation?.analysis ?? null}
+        geysers={geysers}
+        onContinue={handleWarningContinue}
+        onAbandon={handleWarningAbandon}
+      />
     </FormProvider>
   );
 }

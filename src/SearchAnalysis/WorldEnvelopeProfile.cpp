@@ -13,6 +13,7 @@
 #include "Batch/FilterConfig.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "Setting/SettingsCache.hpp"
+#include "WorldGen.hpp"
 
 namespace SearchAnalysis {
 
@@ -70,6 +71,14 @@ std::string BuildRuleId(const TemplateSpawnRules &rule, int ruleIndex)
 
     const uint64_t hash = Fnv1a64(signature);
     return "sig:" + std::to_string(hash);
+}
+
+std::string BuildEnvelopeId(const std::string &ruleId)
+{
+    if (ruleId.empty()) {
+        return {};
+    }
+    return "env:" + ruleId;
 }
 
 int ComputeRuleMaxPerExecution(const TemplateSpawnRules &rule)
@@ -154,6 +163,128 @@ std::vector<const TemplateSpawnRules *> CollectTemplateRules(const World &world,
         }
     }
     return rules;
+}
+
+bool DoesCellMatchFilterForEnvelope(const Site &site,
+                                    const AllowedCellsFilter &filter,
+                                    bool *applied)
+{
+    if (applied != nullptr) {
+        *applied = true;
+    }
+    switch (filter.tagcommand) {
+    case TagCommand::AtTag:
+        return site.tags.contains(filter.tag);
+    case TagCommand::NotAtTag:
+        return !site.tags.contains(filter.tag);
+    case TagCommand::Default:
+        if (!filter.subworldNames.empty()) {
+            for (const auto &subworldName : filter.subworldNames) {
+                if (site.tags.contains(subworldName)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!filter.zoneTypes.empty()) {
+            for (const auto &zoneType : filter.zoneTypes) {
+                if (site.tags.contains(ZoneTypeToString(zoneType))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!filter.temperatureRanges.empty()) {
+            for (const auto &range : filter.temperatureRanges) {
+                if (site.tags.contains(TempRangeToString(range))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
+    case TagCommand::DistanceFromTag: {
+        if (site.parent == nullptr) {
+            if (applied != nullptr) {
+                *applied = false;
+            }
+            return true;
+        }
+        const auto itr = site.parent->minDistanceToTag.find(filter.tag);
+        if (itr != site.parent->minDistanceToTag.end()) {
+            if (itr->second >= filter.minDistance) {
+                return itr->second <= filter.maxDistance;
+            }
+            return false;
+        }
+        if (applied != nullptr) {
+            *applied = false;
+        }
+        return true;
+    }
+    default:
+        break;
+    }
+    return false;
+}
+
+bool DoesCellMatchFiltersForEnvelope(const Site &site,
+                                     const std::vector<AllowedCellsFilter> &filters)
+{
+    bool matched = false;
+    for (const auto &filter : filters) {
+        bool applied = false;
+        const bool filterMatched = DoesCellMatchFilterForEnvelope(site, filter, &applied);
+        if (!applied) {
+            continue;
+        }
+        switch (filter.command) {
+        case Command::All:
+            matched = true;
+            break;
+        case Command::Clear:
+            matched = false;
+            break;
+        case Command::Replace:
+            matched = filterMatched;
+            break;
+        case Command::ExceptWith:
+        case Command::SymmetricExceptWith:
+            if (filterMatched) {
+                matched = false;
+            }
+            break;
+        case Command::UnionWith:
+            matched = filterMatched || matched;
+            break;
+        case Command::IntersectWith:
+            matched = filterMatched && matched;
+            break;
+        }
+    }
+    return matched;
+}
+
+std::vector<const Site *> CollectLeafSites(const std::vector<Site> &sites, const Site **startSite)
+{
+    std::vector<const Site *> leafSites;
+    if (startSite != nullptr) {
+        *startSite = nullptr;
+    }
+    for (const auto &site : sites) {
+        if (!site.children) {
+            continue;
+        }
+        for (const auto &child : *site.children) {
+            leafSites.push_back(&child);
+            if (startSite != nullptr &&
+                *startSite == nullptr &&
+                child.tags.contains("StartLocation")) {
+                *startSite = &child;
+            }
+        }
+    }
+    return leafSites;
 }
 
 std::vector<std::string> ExtractTemplateGeyserIds(const SettingsCache &settings,
@@ -270,6 +401,7 @@ void BuildGeyserEnvelope(const SettingsCache &settings,
             continue;
         }
         const std::string ruleId = BuildRuleId(*rule, ruleIndex);
+        const std::string envelopeId = BuildEnvelopeId(ruleId);
         const bool containsGeneric =
             std::ranges::find(rule->names, std::string("geysers/generic")) != rule->names.end();
         if (containsGeneric) {
@@ -282,6 +414,7 @@ void BuildGeyserEnvelope(const SettingsCache &settings,
                 .upperBound = totalRuleUpper,
                 .sourceKind = "generic",
                 .poolId = "generic",
+                .envelopeId = envelopeId,
             });
         }
 
@@ -312,6 +445,7 @@ void BuildGeyserEnvelope(const SettingsCache &settings,
                     .upperBound = templateUpper,
                     .sourceKind = "exact",
                     .poolId = ruleId,
+                    .envelopeId = envelopeId,
                 });
             }
         }
@@ -344,6 +478,95 @@ void BuildGeyserEnvelope(const SettingsCache &settings,
     }
 }
 
+void BuildSpatialEnvelopes(SettingsCache &settings,
+                           World &world,
+                           WorldEnvelopeProfile *profile)
+{
+    if (profile == nullptr) {
+        return;
+    }
+
+    profile->spatialEnvelopes.clear();
+    profile->envelopeStatsById.clear();
+
+    WorldGen worldGen(world, settings);
+    std::vector<Site> generatedSites;
+    if (!worldGen.GenerateOverworld(generatedSites)) {
+        profile->spatialEnvelopes.push_back(SpatialEnvelope{
+            .envelopeId = "global",
+            .confidence = "low",
+            .method = "generation-failed",
+        });
+        return;
+    }
+
+    const Site *startSite = nullptr;
+    const auto leafSites = CollectLeafSites(generatedSites, &startSite);
+    if (leafSites.empty() || startSite == nullptr) {
+        profile->spatialEnvelopes.push_back(SpatialEnvelope{
+            .envelopeId = "global",
+            .confidence = "low",
+            .method = "candidate-sites-unavailable",
+        });
+        return;
+    }
+
+    const auto start = startSite->polygon.Centroid();
+    const auto rules = CollectTemplateRules(world, settings);
+    int ruleIndex = 0;
+    for (const auto *rule : rules) {
+        if (rule == nullptr) {
+            ++ruleIndex;
+            continue;
+        }
+        const int perExecutionMax = ComputeRuleMaxPerExecution(*rule);
+        const int executionTimes = std::max(1, rule->times);
+        const int totalRuleUpper = perExecutionMax * executionTimes;
+        if (totalRuleUpper <= 0) {
+            ++ruleIndex;
+            continue;
+        }
+
+        const std::string ruleId = BuildRuleId(*rule, ruleIndex);
+        const std::string envelopeId = BuildEnvelopeId(ruleId);
+        EnvelopeStats stats;
+        stats.confidence = "medium";
+        stats.method = "candidate-sites";
+
+        for (const auto *site : leafSites) {
+            if (site == nullptr) {
+                continue;
+            }
+            if (!DoesCellMatchFiltersForEnvelope(*site, rule->allowedCellsFilter)) {
+                continue;
+            }
+            const auto &centroid = site->polygon.Centroid();
+            const double dx = static_cast<double>(centroid.x - start.x);
+            const double dy = static_cast<double>(centroid.y - start.y);
+            stats.candidateDistances.push_back(std::sqrt(dx * dx + dy * dy));
+        }
+        stats.candidateCount = static_cast<int>(stats.candidateDistances.size());
+
+        if (stats.candidateCount > 0) {
+            profile->envelopeStatsById.emplace(envelopeId, std::move(stats));
+            profile->spatialEnvelopes.push_back(SpatialEnvelope{
+                .envelopeId = envelopeId,
+                .confidence = "medium",
+                .method = "candidate-sites",
+            });
+        }
+        ++ruleIndex;
+    }
+
+    if (profile->spatialEnvelopes.empty()) {
+        profile->spatialEnvelopes.push_back(SpatialEnvelope{
+            .envelopeId = "global",
+            .confidence = "low",
+            .method = "candidate-sites-empty",
+        });
+    }
+}
+
 } // namespace
 
 WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
@@ -351,14 +574,22 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
                                                  int mixing,
                                                  std::string *errorMessage)
 {
+    return CompileWorldEnvelopeProfile(baseSettings,
+                                       worldType,
+                                       mixing,
+                                       WorldEnvelopeCompileOptions{},
+                                       errorMessage);
+}
+
+WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
+                                                 int worldType,
+                                                 int mixing,
+                                                 const WorldEnvelopeCompileOptions &options,
+                                                 std::string *errorMessage)
+{
     WorldEnvelopeProfile profile;
     profile.worldType = worldType;
     profile.worldCode = BuildWorldCode(worldType, mixing);
-    profile.spatialEnvelopes.push_back(SpatialEnvelope{
-        .envelopeId = "global",
-        .confidence = "low",
-        .method = "placeholder",
-    });
 
     if (profile.worldCode.empty()) {
         if (errorMessage != nullptr) {
@@ -422,6 +653,15 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
     }
 
     BuildGeyserEnvelope(settings, *targetWorld, &profile);
+    if (options.includeSpatialEnvelopes) {
+        BuildSpatialEnvelopes(settings, *targetWorld, &profile);
+    } else {
+        profile.spatialEnvelopes.push_back(SpatialEnvelope{
+            .envelopeId = "global",
+            .confidence = "low",
+            .method = "placeholder",
+        });
+    }
     profile.valid = true;
     return profile;
 }

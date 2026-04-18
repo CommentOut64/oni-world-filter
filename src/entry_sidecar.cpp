@@ -499,9 +499,17 @@ void RunAnalyzeSearchCommand(const Batch::SidecarAnalyzeSearchRequest &request)
     }
     const auto catalog = SearchAnalysis::BuildSearchCatalog(*settings);
     const auto analysisRequest = BuildAnalysisRequest(request);
+    const bool hasConstraints = !request.constraints.required.empty() ||
+                                !request.constraints.forbidden.empty() ||
+                                !request.constraints.distance.empty() ||
+                                !request.constraints.count.empty();
     const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(*settings,
                                                                      request.worldType,
-                                                                     request.mixing);
+                                                                     request.mixing,
+                                                                     SearchAnalysis::WorldEnvelopeCompileOptions{
+                                                                         .includeSpatialEnvelopes =
+                                                                             hasConstraints,
+                                                                     });
     const auto result = SearchAnalysis::RunSearchAnalysis(analysisRequest, catalog, &profile);
     EmitLine(Batch::SerializeSearchAnalysisEvent(request.jobId, result));
 }

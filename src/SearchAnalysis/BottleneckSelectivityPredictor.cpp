@@ -18,7 +18,6 @@ namespace {
 
 constexpr double kProbabilityEpsilon = 1e-12;
 constexpr int kTopBottlenecks = 3;
-constexpr double kPi = 3.14159265358979323846;
 
 struct GroupPrediction {
     std::string geyserId;
@@ -26,12 +25,13 @@ struct GroupPrediction {
     int maxCount = 0;
     int exactUpper = 0;
     int genericUpper = 0;
-    double distanceUpper = 1.0;
+    double genericDistanceUpper = 0.0;
     double genericTypeUpper = 0.0;
     double probabilityUpper = 1.0;
     double score = 0.0;
     bool lowConfidenceDistance = false;
     std::set<std::string> poolIds;
+    std::set<std::string> envelopeIds;
     std::vector<double> qValues;
 };
 
@@ -56,6 +56,7 @@ double ClampProbability(double value)
 }
 
 double ComputeDistanceUpper(const ConstraintGroup &group,
+                            const std::string &envelopeId,
                             const WorldEnvelopeProfile &profile,
                             bool *lowConfidenceDistance)
 {
@@ -66,30 +67,39 @@ double ComputeDistanceUpper(const ConstraintGroup &group,
         return 1.0;
     }
 
-    if (lowConfidenceDistance != nullptr) {
-        *lowConfidenceDistance = true;
-    }
-
-    if (profile.width <= 0 || profile.height <= 0) {
+    const auto envelopeItr = profile.envelopeStatsById.find(envelopeId);
+    if (envelopeId.empty() || envelopeItr == profile.envelopeStatsById.end()) {
+        if (lowConfidenceDistance != nullptr) {
+            *lowConfidenceDistance = true;
+        }
         return 1.0;
     }
 
-    const double worldArea = static_cast<double>(profile.width) * static_cast<double>(profile.height);
-    if (worldArea <= 0.0) {
+    const auto &stats = envelopeItr->second;
+    if (stats.candidateCount <= 0 || stats.candidateDistances.empty()) {
+        if (lowConfidenceDistance != nullptr) {
+            *lowConfidenceDistance = true;
+        }
         return 1.0;
     }
 
     double upper = 1.0;
-    const double diagonal = std::max(profile.diagonal, 0.0);
     for (const auto &rule : group.distanceRules) {
         double minDist = std::max(0.0, rule.minDist);
         double maxDist = std::max(minDist, rule.maxDist);
-        if (diagonal > 0.0) {
-            minDist = std::min(minDist, diagonal);
-            maxDist = std::min(maxDist, diagonal);
+        int matchedCount = 0;
+        for (const double candidateDistance : stats.candidateDistances) {
+            if (candidateDistance + kProbabilityEpsilon < minDist) {
+                continue;
+            }
+            if (candidateDistance - kProbabilityEpsilon > maxDist) {
+                continue;
+            }
+            ++matchedCount;
         }
-        const double ringArea = kPi * (maxDist * maxDist - minDist * minDist);
-        const double ratio = ClampProbability(ringArea / worldArea);
+        const double ratio =
+            ClampProbability(static_cast<double>(matchedCount) /
+                             static_cast<double>(stats.candidateCount));
         upper = std::min(upper, ratio);
     }
     return ClampProbability(upper);
@@ -118,8 +128,6 @@ GroupPrediction PredictGroup(const ConstraintGroup &group, const WorldEnvelopePr
     GroupPrediction prediction;
     prediction.geyserId = group.geyserId;
     prediction.minCount = std::max(0, group.minCount);
-    prediction.distanceUpper =
-        ComputeDistanceUpper(group, profile, &prediction.lowConfidenceDistance);
 
     const auto genericUpperItr = profile.genericTypeUpperById.find(group.geyserId);
     if (genericUpperItr != profile.genericTypeUpperById.end()) {
@@ -133,7 +141,15 @@ GroupPrediction PredictGroup(const ConstraintGroup &group, const WorldEnvelopePr
         const int upper = std::max(0, source.upperBound);
         prediction.exactUpper += upper;
         prediction.poolIds.insert(source.poolId);
-        const double q = ClampProbability(prediction.distanceUpper);
+        if (!source.envelopeId.empty()) {
+            prediction.envelopeIds.insert(source.envelopeId);
+        }
+        bool lowConfidenceDistance = false;
+        const double sourceDistanceUpper =
+            ComputeDistanceUpper(group, source.envelopeId, profile, &lowConfidenceDistance);
+        prediction.lowConfidenceDistance =
+            prediction.lowConfidenceDistance || lowConfidenceDistance;
+        const double q = ClampProbability(sourceDistanceUpper);
         for (int i = 0; i < upper; ++i) {
             prediction.qValues.push_back(q);
         }
@@ -146,7 +162,18 @@ GroupPrediction PredictGroup(const ConstraintGroup &group, const WorldEnvelopePr
         }
         prediction.genericUpper += upper;
         prediction.poolIds.insert(source.poolId);
-        const double q = ClampProbability(prediction.genericTypeUpper * prediction.distanceUpper);
+        if (!source.envelopeId.empty()) {
+            prediction.envelopeIds.insert(source.envelopeId);
+        }
+        bool lowConfidenceDistance = false;
+        const double sourceDistanceUpper =
+            ComputeDistanceUpper(group, source.envelopeId, profile, &lowConfidenceDistance);
+        prediction.lowConfidenceDistance =
+            prediction.lowConfidenceDistance || lowConfidenceDistance;
+        prediction.genericDistanceUpper =
+            std::max(prediction.genericDistanceUpper, sourceDistanceUpper);
+        const double q =
+            ClampProbability(prediction.genericTypeUpper * sourceDistanceUpper);
         for (int i = 0; i < upper; ++i) {
             prediction.qValues.push_back(q);
         }
@@ -171,6 +198,16 @@ bool SharePool(const GroupPrediction &left, const GroupPrediction &right)
 {
     for (const auto &pool : left.poolIds) {
         if (right.poolIds.find(pool) != right.poolIds.end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ShareEnvelope(const GroupPrediction &left, const GroupPrediction &right)
+{
+    for (const auto &envelopeId : left.envelopeIds) {
+        if (right.envelopeIds.find(envelopeId) != right.envelopeIds.end()) {
             return true;
         }
     }
@@ -212,8 +249,9 @@ std::vector<std::vector<int>> BuildConnectedComponents(const std::vector<int> &s
 
     for (size_t i = 0; i < selected.size(); ++i) {
         for (size_t j = i + 1; j < selected.size(); ++j) {
-            if (SharePool(groups[static_cast<size_t>(selected[i])],
-                          groups[static_cast<size_t>(selected[j])])) {
+            const auto &left = groups[static_cast<size_t>(selected[i])];
+            const auto &right = groups[static_cast<size_t>(selected[j])];
+            if (SharePool(left, right) || ShareEnvelope(left, right)) {
                 merge(static_cast<int>(i), static_cast<int>(j));
             }
         }
@@ -263,7 +301,7 @@ double ComputeSingleGenericJointProbability(const std::vector<int> &component,
         const auto &group = groups[static_cast<size_t>(component[static_cast<size_t>(i)])];
         demands[static_cast<size_t>(i)] = std::max(0, group.minCount - group.exactUpper);
         categoryProbabilities[static_cast<size_t>(i)] =
-            ClampProbability(group.genericTypeUpper * group.distanceUpper);
+            ClampProbability(group.genericTypeUpper * group.genericDistanceUpper);
     }
 
     int totalDemand = 0;

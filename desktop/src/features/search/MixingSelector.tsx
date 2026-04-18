@@ -125,6 +125,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
             const packageMode = getPackageMode(levels, group);
             const packageEnabled = isSlotEnabled(packageLevel);
             const packageDisabled = disabledMixingSlots?.has(group.packageSlot.slot) ?? false;
+            const packageCheckboxDisabled = packageDisabled && !packageEnabled;
 
             return (
               <details
@@ -142,7 +143,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                     <input
                       type="checkbox"
                       checked={packageEnabled}
-                      disabled={packageDisabled}
+                      disabled={packageCheckboxDisabled}
                       onChange={(event) => {
                         const nextLevels = applyPackageMode(
                           levels,
@@ -178,9 +179,11 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                       const childLevel = levels[child.slot] ?? 0;
                       const childMode = levelToUiMode(childLevel);
                       const childEnabled = isSlotEnabled(childLevel);
-                      const childDisabled = (disabledMixingSlots?.has(child.slot) ?? false) || !packageEnabled;
+                      const slotDisabled = disabledMixingSlots?.has(child.slot) ?? false;
+                      const childDisabled = slotDisabled || !packageEnabled;
+                      const childCheckboxDisabled = slotDisabled ? !childEnabled : !packageEnabled;
                       const disabledReason =
-                        disabledMixingSlots?.has(child.slot) ?? false
+                        slotDisabled
                           ? "当前世界不可用"
                           : !packageEnabled
                             ? "请先启用对应 DLC 包"
@@ -192,7 +195,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                             <input
                               type="checkbox"
                               checked={childEnabled}
-                              disabled={childDisabled}
+                              disabled={childCheckboxDisabled}
                               onChange={(event) => {
                                 commitLevels(
                                   applyChildMode(

@@ -395,9 +395,9 @@ Expected:
 手工检查：
 
 - 切换到会禁用部分 mixing 的世界
-- 被禁用的 slot 显示但不可操作
-- 之前启用的禁用 slot 会被自动清零
-- 页面有明确提示，而不是静默消失
+- 被禁用的 slot 显示且默认不可开启
+- 若旧值里仍保留禁用 slot，用户仍可手动关闭，不会被自动清零
+- 搜索提交前会由 `analyze_search_request` 明确阻止，并给出前端正式名称提示
 
 - [ ] **Step 5: Verify backward-compat normalization**
 
@@ -430,6 +430,7 @@ Expected:
 - 用户能按 DLC 包理解 mixing，而不是面对 11 个匿名 slot。
 - mixing 主交互为复选框；勾选后可选 `普通/保证`。
 - 当前世界禁用的 slot 会显示并禁用，不会静默隐藏。
+- 当前世界禁用的 slot 不再被前端静默改写；用户可见、可主动关闭、提交前有明确阻止提示。
 - 提交给后端的协议仍然只有现有 `worldType` 和 `mixing`。
 - `desktop` 构建通过，关键手工路径验证通过。
 

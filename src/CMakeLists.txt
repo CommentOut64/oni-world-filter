@@ -326,14 +326,7 @@ add_test(NAME test_poisson_binomial COMMAND test_poisson_binomial)
 add_executable(test_world_envelope_profile
     "../tests/native/test_main.cpp"
     "../tests/native/test_world_envelope_profile.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/JsonDeserializeGen.hpp"
-    "SearchAnalysis/WorldEnvelopeProfile.cpp"
-    "SearchAnalysis/SearchCatalog.cpp"
-    "SearchAnalysis/TraitCatalog.cpp"
-    "Batch/FilterConfig.cpp"
-    "Setting/SettingsCache.cpp"
-    "Setting/WorldGenClasses.cpp"
-    "Utils/KRandom.cpp"
+    ${ONI_BASE_SOURCES}
 )
 target_include_directories(test_world_envelope_profile
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"

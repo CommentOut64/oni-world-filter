@@ -79,39 +79,7 @@ export async function analyzeSearchRequest(
   request: SearchAnalyzeRequest
 ): Promise<SearchAnalysisPayload> {
   if (!inTauriRuntime()) {
-    return {
-      worldProfile: {
-        valid: false,
-        worldType: request.worldType,
-        worldCode: "",
-        width: 0,
-        height: 0,
-        diagonal: 0,
-        activeMixingSlots: [],
-        disabledMixingSlots: [],
-        possibleGeyserTypes: [],
-        impossibleGeyserTypes: [],
-        possibleMaxCountByType: {},
-        genericTypeUpperById: {},
-        genericSlotUpper: 0,
-        exactSourceSummary: [],
-        genericSourceSummary: [],
-        sourcePools: [],
-        spatialEnvelopes: [],
-      },
-      normalizedRequest: {
-        worldType: request.worldType,
-        seedStart: request.seedStart,
-        seedEnd: request.seedEnd,
-        mixing: request.mixing,
-        threads: request.threads,
-        groups: [],
-      },
-      errors: [],
-      warnings: [],
-      bottlenecks: [],
-      predictedBottleneckProbability: 1,
-    };
+    throw new Error("当前不在 Tauri 运行时，无法调用 analyze_search_request。");
   }
   return invoke<SearchAnalysisPayload>("analyze_search_request", { request });
 }

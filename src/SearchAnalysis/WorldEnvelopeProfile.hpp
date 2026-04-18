@@ -15,6 +15,7 @@ struct SourceSummary {
     int upperBound = 0;
     std::string sourceKind;
     std::string poolId;
+    std::string envelopeId;
 };
 
 struct SpatialEnvelope {
@@ -23,10 +24,21 @@ struct SpatialEnvelope {
     std::string method;
 };
 
+struct EnvelopeStats {
+    int candidateCount = 0;
+    std::vector<double> candidateDistances;
+    std::string confidence;
+    std::string method;
+};
+
 struct SourcePool {
     std::string poolId;
     std::string sourceKind;
     int capacityUpper = 0;
+};
+
+struct WorldEnvelopeCompileOptions {
+    bool includeSpatialEnvelopes = false;
 };
 
 struct WorldEnvelopeProfile {
@@ -47,11 +59,18 @@ struct WorldEnvelopeProfile {
     std::vector<SourceSummary> genericSourceSummary;
     std::vector<SourcePool> sourcePools;
     std::vector<SpatialEnvelope> spatialEnvelopes;
+    std::map<std::string, EnvelopeStats> envelopeStatsById;
 };
 
 WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
                                                  int worldType,
                                                  int mixing,
+                                                 std::string *errorMessage = nullptr);
+
+WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
+                                                 int worldType,
+                                                 int mixing,
+                                                 const WorldEnvelopeCompileOptions &options,
                                                  std::string *errorMessage = nullptr);
 
 } // namespace SearchAnalysis
