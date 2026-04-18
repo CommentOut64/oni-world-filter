@@ -4,12 +4,14 @@ import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
 import PreviewCanvas, { type PreviewCanvasHandle } from "./PreviewCanvas";
 import PreviewDetails from "./PreviewDetails";
+import GeyserListOverlay from "./GeyserListOverlay";
 import PreviewLegend from "./PreviewLegend";
 import PreviewToolbar from "./PreviewToolbar";
 
 export default function PreviewPane() {
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
   const results = useSearchStore((state) => state.results);
+  const geysers = useSearchStore((state) => state.geysers);
 
   const loadByMatch = usePreviewStore((state) => state.loadByMatch);
   const preview = usePreviewStore((state) => state.activePreview);
@@ -25,8 +27,13 @@ export default function PreviewPane() {
     id: string;
     zoneType: number;
   } | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<{
+    id: string;
+    zoneType: number;
+  } | null>(null);
   const [hoverGeyserIndex, setHoverGeyserIndex] = useState<number | null>(null);
   const [selectedGeyserIndex, setSelectedGeyserIndex] = useState<number | null>(null);
+  const [showGeyserList, setShowGeyserList] = useState(false);
 
   const selectedMatch =
     selectedSeed === null
@@ -56,26 +63,39 @@ export default function PreviewPane() {
         showBoundaries={showBoundaries}
         showLabels={showLabels}
         showGeysers={showGeysers}
+        geyserCount={preview?.summary.geysers.length ?? 0}
         onToggleBoundaries={() => setShowBoundaries((current) => !current)}
         onToggleLabels={() => setShowLabels((current) => !current)}
         onToggleGeysers={() => setShowGeysers((current) => !current)}
         onResetView={() => canvasRef.current?.resetView()}
         onExportPng={() => canvasRef.current?.exportPng()}
+        onOpenGeyserList={() => setShowGeyserList(true)}
       />
-      <PreviewCanvas
-        ref={canvasRef}
-        preview={preview}
-        showBoundaries={showBoundaries}
-        showLabels={showLabels}
-        showGeysers={showGeysers}
-        onHoverRegionChange={setHoveredRegion}
-        onHoverGeyserChange={setHoverGeyserIndex}
-        onSelectedGeyserChange={setSelectedGeyserIndex}
-      />
+      <div className="preview-canvas-container">
+        <PreviewCanvas
+          ref={canvasRef}
+          preview={preview}
+          geysers={geysers}
+          showBoundaries={showBoundaries}
+          showLabels={showLabels}
+          showGeysers={showGeysers}
+          onHoverRegionChange={setHoveredRegion}
+          onSelectedRegionChange={setSelectedRegion}
+          onHoverGeyserChange={setHoverGeyserIndex}
+          onSelectedGeyserChange={setSelectedGeyserIndex}
+        />
+        {showGeyserList && preview ? (
+          <GeyserListOverlay
+            geysersData={preview.summary.geysers}
+            onClose={() => setShowGeyserList(false)}
+          />
+        ) : null}
+      </div>
       <PreviewLegend />
       <PreviewDetails
         preview={preview}
         hoveredRegion={hoveredRegion}
+        selectedRegion={selectedRegion}
         hoverGeyserIndex={hoverGeyserIndex}
         selectedGeyserIndex={selectedGeyserIndex}
       />

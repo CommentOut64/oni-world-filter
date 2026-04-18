@@ -1,4 +1,5 @@
-import type { PreviewPayload } from "../../lib/contracts";
+import { formatGeyserNameFromSummary, formatZoneTypeName } from "../../lib/displayResolvers";
+import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
 
 export interface PreviewRegion {
   id: string;
@@ -48,17 +49,48 @@ function flattenPolygon(vertices: [number, number][]): number[] {
   return points;
 }
 
+// 基于 Shoelace 公式的多边形几何质心，对不规则形状比顶点平均值准确得多
 function centroid(vertices: [number, number][]): { x: number; y: number } {
   if (!vertices.length) {
     return { x: 0, y: 0 };
   }
-  let sumX = 0;
-  let sumY = 0;
-  for (const [x, y] of vertices) {
-    sumX += x;
-    sumY += y;
+  if (vertices.length < 3) {
+    let sumX = 0;
+    let sumY = 0;
+    for (const [x, y] of vertices) {
+      sumX += x;
+      sumY += y;
+    }
+    return { x: sumX / vertices.length, y: sumY / vertices.length };
   }
-  return { x: sumX / vertices.length, y: sumY / vertices.length };
+
+  let area = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < vertices.length; i++) {
+    const [x0, y0] = vertices[i];
+    const [x1, y1] = vertices[(i + 1) % vertices.length];
+    const cross = x0 * y1 - x1 * y0;
+    area += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
+  }
+
+  if (Math.abs(area) < 1e-10) {
+    // 退化多边形，回退到顶点平均
+    let sumX = 0;
+    let sumY = 0;
+    for (const [x, y] of vertices) {
+      sumX += x;
+      sumY += y;
+    }
+    return { x: sumX / vertices.length, y: sumY / vertices.length };
+  }
+
+  area *= 0.5;
+  cx /= 6 * area;
+  cy /= 6 * area;
+  return { x: cx, y: cy };
 }
 
 function regionBounds(regionId: string, points: number[]): PreviewRegionBounds {
@@ -77,7 +109,10 @@ function regionBounds(regionId: string, points: number[]): PreviewRegionBounds {
   return { regionId, minX, maxX, minY, maxY };
 }
 
-export function toPreviewViewModel(preview: PreviewPayload): PreviewViewModel {
+export function toPreviewViewModel(
+  preview: PreviewPayload,
+  geyserOptions: readonly GeyserOption[]
+): PreviewViewModel {
   const regions: PreviewRegion[] = [];
   const bounds: PreviewRegionBounds[] = [];
   const labels: PreviewLabelCandidate[] = [];
@@ -100,7 +135,7 @@ export function toPreviewViewModel(preview: PreviewPayload): PreviewViewModel {
       id: `${id}-label`,
       x: center.x,
       y: center.y,
-      text: `zone#${polygon.zoneType}`,
+      text: formatZoneTypeName(polygon.zoneType),
       kind: "region",
     });
   });
@@ -111,7 +146,7 @@ export function toPreviewViewModel(preview: PreviewPayload): PreviewViewModel {
     const dy = item.y - start.y;
     return {
       index,
-      id: item.id ?? `type#${item.type}`,
+      id: formatGeyserNameFromSummary(item, geyserOptions),
       x: item.x,
       y: item.y,
       distanceToStart: Number(Math.sqrt(dx * dx + dy * dy).toFixed(1)),

@@ -1,4 +1,5 @@
 import type { SearchAnalysisPayload } from "../../lib/contracts";
+import { formatGeyserNameByKey } from "../../lib/displayResolvers";
 
 interface SearchAnalysisHintsProps {
   analysis: SearchAnalysisPayload | null;
@@ -41,7 +42,9 @@ export default function SearchAnalysisHints({ analysis }: SearchAnalysisHintsPro
       </header>
 
       {analysis.bottlenecks.length > 0 ? (
-        <p className="analysis-bottlenecks">主要瓶颈: {analysis.bottlenecks.join(", ")}</p>
+        <p className="analysis-bottlenecks">
+          主要瓶颈: {analysis.bottlenecks.map((item) => formatGeyserNameByKey(item)).join(", ")}
+        </p>
       ) : (
         <p className="hint">暂无瓶颈组输出</p>
       )}

@@ -25,7 +25,7 @@ export default function SearchActions({
         清空结果
       </button>
       <button type="button" onClick={onCopy}>
-        复制当前配置 JSON
+        复制协议 JSON
       </button>
     </section>
   );
