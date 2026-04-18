@@ -13,10 +13,22 @@ import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
 import SearchAnalysisHints from "./SearchAnalysisHints";
 import SearchActions from "./SearchActions";
-import { createSearchSchema, toSearchDraft, toSearchFormValues, type SearchFormValues } from "./searchSchema";
+import {
+  createSearchSchema,
+  decodeMixingToLevels,
+  encodeMixingFromLevels,
+  MIXING_SLOT_COUNT,
+  toSearchDraft,
+  toSearchFormValues,
+  type SearchFormValues,
+} from "./searchSchema";
 import WorldSelector from "./WorldSelector";
 
-export default function SearchPanel() {
+interface SearchPanelProps {
+  onSearchStarted?: () => void;
+}
+
+export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
   const worlds = useSearchStore((state) => state.worlds);
   const catalog = useSearchStore((state) => state.catalog);
   const geysers = useSearchStore((state) => state.geysers);
@@ -27,6 +39,8 @@ export default function SearchPanel() {
   const cancelSearchJob = useSearchStore((state) => state.cancelSearchJob);
   const clearResults = useSearchStore((state) => state.clearResults);
   const setDraft = useSearchStore((state) => state.setDraft);
+  const lastError = useSearchStore((state) => state.lastError);
+  const clearError = useSearchStore((state) => state.clearError);
   const clearPreview = usePreviewStore((state) => state.clear);
 
   const schema = useMemo(() => {
@@ -41,9 +55,11 @@ export default function SearchPanel() {
     defaultValues: toSearchFormValues(draft),
   });
   const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
+  const [disabledMixingSlots, setDisabledMixingSlots] = useState<Set<number>>(new Set());
   const [lastAnalysis, setLastAnalysis] = useState<SearchAnalysisPayload | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
+  const watchCpuMode = methods.watch("cpuMode");
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +81,12 @@ export default function SearchPanel() {
         });
         if (!cancelled) {
           setDisabledGeyserKeys(new Set(analysis.worldProfile.impossibleGeyserTypes));
+          setDisabledMixingSlots(new Set(analysis.worldProfile.disabledMixingSlots));
         }
       } catch {
         if (!cancelled) {
           setDisabledGeyserKeys(new Set());
+          setDisabledMixingSlots(new Set());
         }
       }
     }, 150);
@@ -78,6 +96,33 @@ export default function SearchPanel() {
       window.clearTimeout(timer);
     };
   }, [draft.mixing, draft.worldType, watchMixing, watchWorldType]);
+
+  useEffect(() => {
+    if (disabledMixingSlots.size === 0) {
+      return;
+    }
+    const slotCount = Math.max(catalog?.mixingSlots.length ?? 0, MIXING_SLOT_COUNT);
+    const currentMixing = Number.isFinite(watchMixing) ? Math.max(0, Math.trunc(watchMixing)) : 0;
+    const nextLevels = decodeMixingToLevels(currentMixing, slotCount);
+    let forcedCount = 0;
+    for (const slot of disabledMixingSlots) {
+      if (slot < 0 || slot >= nextLevels.length) {
+        continue;
+      }
+      if (nextLevels[slot] !== 0) {
+        nextLevels[slot] = 0;
+        forcedCount += 1;
+      }
+    }
+    if (forcedCount === 0) {
+      return;
+    }
+    const nextMixing = encodeMixingFromLevels(nextLevels);
+    methods.setValue("mixing", nextMixing, { shouldValidate: true, shouldDirty: true });
+    useSearchStore.setState({
+      lastError: `世界参数变更后，已自动关闭 ${forcedCount} 个当前世界禁用的 mixing slot`,
+    });
+  }, [catalog?.mixingSlots.length, disabledMixingSlots, methods, watchMixing]);
 
   useEffect(() => {
     if (disabledGeyserKeys.size === 0) {
@@ -138,7 +183,10 @@ export default function SearchPanel() {
 
     setDraft(nextDraft);
     clearPreview();
-    await startSearchJob(nextDraft);
+    const started = await startSearchJob(nextDraft);
+    if (started) {
+      onSearchStarted?.();
+    }
   });
 
   const copyAsJson = async () => {
@@ -169,56 +217,151 @@ export default function SearchPanel() {
   return (
     <FormProvider {...methods}>
       <form className="search-panel" onSubmit={submit}>
-        <h3>搜索参数</h3>
-        <WorldSelector worlds={worlds} />
-        <MixingSelector />
-        <div className="field-grid">
-          <label className="field">
-            <span>Seed Start</span>
-            <input type="number" {...methods.register("seedStart", { valueAsNumber: true })} />
-            {methods.formState.errors.seedStart ? (
-              <small className="error">{methods.formState.errors.seedStart.message}</small>
-            ) : null}
-          </label>
-          <label className="field">
-            <span>Seed End</span>
-            <input type="number" {...methods.register("seedEnd", { valueAsNumber: true })} />
-            {methods.formState.errors.seedEnd ? (
-              <small className="error">{methods.formState.errors.seedEnd.message}</small>
-            ) : null}
-          </label>
-        </div>
+        <header className="search-panel-header">
+          <div>
+            <h3>搜索参数</h3>
+            <p>参数页独占整屏，优先横向平铺常用参数与规则编辑区。</p>
+          </div>
+          {lastError ? (
+            <p className="error-inline" onClick={clearError}>
+              参数提示: {lastError}
+            </p>
+          ) : null}
+        </header>
 
-        <GeyserConstraintEditor
-          title="必须包含(required)"
-          type="required"
-          geysers={geysers}
-          disabledGeyserKeys={disabledGeyserKeys}
-        />
-        <GeyserConstraintEditor
-          title="必须排除(forbidden)"
-          type="forbidden"
-          geysers={geysers}
-          disabledGeyserKeys={disabledGeyserKeys}
-        />
-        <DistanceRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
-        <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
-        <SearchAnalysisHints analysis={lastAnalysis} />
+        <section className="search-panel-grid">
+          <section className="search-column search-column-main">
+            <section className="search-section">
+              <header className="search-section-header">
+                <h4>世界参数</h4>
+                <p>先按世界家族筛选具体世界，再按 DLC 包配置当前世界允许的混搭内容。</p>
+              </header>
+              <div className="world-parameter-layout">
+                <WorldSelector worlds={worlds} />
+                <MixingSelector
+                  mixingSlots={catalog?.mixingSlots ?? []}
+                  disabledMixingSlots={disabledMixingSlots}
+                />
+              </div>
+            </section>
 
-        <SearchActions
-          isSearching={isSearching}
-          isCancelling={isCancelling}
-          onCancel={() => {
-            void cancelSearchJob();
-          }}
-          onClear={() => {
-            clearResults();
-            clearPreview();
-          }}
-          onCopy={() => {
-            void copyAsJson();
-          }}
-        />
+            <section className="search-section">
+              <header className="search-section-header">
+                <h4>性能参数</h4>
+                <p>CPU 模式、线程数与调度策略。</p>
+              </header>
+              <div className="field-grid">
+                <label className="field">
+                  <span>CPU 模式</span>
+                  <select {...methods.register("cpuMode")}>
+                    <option value="balanced">平衡</option>
+                    <option value="turbo">极速</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                  {methods.formState.errors.cpuMode ? (
+                    <small className="error">{methods.formState.errors.cpuMode.message}</small>
+                  ) : null}
+                </label>
+                <label className="field">
+                  <span>线程数</span>
+                  <input
+                    type="number"
+                    placeholder={
+                      watchCpuMode === "custom"
+                        ? "自定义模式下必填"
+                        : "非自定义模式忽略该值"
+                    }
+                    {...methods.register("threads", { valueAsNumber: true })}
+                  />
+                  {methods.formState.errors.threads ? (
+                    <small className="error">{methods.formState.errors.threads.message}</small>
+                  ) : null}
+                </label>
+              </div>
+              <label className="field">
+                <span>调度选项</span>
+                <div className="field-inline">
+                  <label>
+                    <input type="checkbox" {...methods.register("cpuAllowSmt")} />
+                    允许 SMT
+                  </label>
+                  <label>
+                    <input type="checkbox" {...methods.register("cpuAllowLowPerf")} />
+                    允许低性能核心
+                  </label>
+                </div>
+              </label>
+            </section>
+
+            <section className="search-section">
+              <header className="search-section-header">
+                <h4>Seed 范围</h4>
+                <p>搜索的起止 seed 号。</p>
+              </header>
+              <div className="field-grid">
+                <label className="field">
+                  <span>Seed Start</span>
+                  <input type="number" {...methods.register("seedStart", { valueAsNumber: true })} />
+                  {methods.formState.errors.seedStart ? (
+                    <small className="error">{methods.formState.errors.seedStart.message}</small>
+                  ) : null}
+                </label>
+                <label className="field">
+                  <span>Seed End</span>
+                  <input type="number" {...methods.register("seedEnd", { valueAsNumber: true })} />
+                  {methods.formState.errors.seedEnd ? (
+                    <small className="error">{methods.formState.errors.seedEnd.message}</small>
+                  ) : null}
+                </label>
+              </div>
+            </section>
+
+            <SearchAnalysisHints analysis={lastAnalysis} />
+
+            <SearchActions
+              isSearching={isSearching}
+              isCancelling={isCancelling}
+              onCancel={() => {
+                void cancelSearchJob();
+              }}
+              onClear={() => {
+                clearResults();
+                clearPreview();
+              }}
+              onCopy={() => {
+                void copyAsJson();
+              }}
+            />
+          </section>
+
+          <section className="search-column search-column-rules">
+            <section className="search-section search-section-rules">
+              <header className="search-section-header">
+                <h4>喷口约束</h4>
+                <p>
+                  距离规则：第一栏为最小距离，第二栏为最大距离（从出生点到喷口的直线距离，单位：格）。
+                  数量规则：第一栏为最小数量，第二栏为最大数量。
+                </p>
+              </header>
+              <div className="search-rule-grid">
+                <GeyserConstraintEditor
+                  title="必须包含(required)"
+                  type="required"
+                  geysers={geysers}
+                  disabledGeyserKeys={disabledGeyserKeys}
+                />
+                <GeyserConstraintEditor
+                  title="必须排除(forbidden)"
+                  type="forbidden"
+                  geysers={geysers}
+                  disabledGeyserKeys={disabledGeyserKeys}
+                />
+                <DistanceRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
+                <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
+              </div>
+            </section>
+          </section>
+        </section>
       </form>
     </FormProvider>
   );

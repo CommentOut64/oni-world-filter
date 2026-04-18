@@ -5,24 +5,25 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { useDeferredValue, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useSearchStore } from "../../state/searchStore";
-import { resultColumns } from "./resultColumns";
+import { createResultColumns } from "./resultColumns";
 
 export default function ResultsTable() {
   const results = useSearchStore((state) => state.results);
+  const geysers = useSearchStore((state) => state.geysers);
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
   const selectSeed = useSearchStore((state) => state.selectSeed);
 
-  const deferredRows = useDeferredValue(results);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "seed", desc: false },
   ]);
+  const columns = useMemo(() => createResultColumns(geysers), [geysers]);
 
   const table = useReactTable({
-    data: deferredRows,
-    columns: resultColumns,
+    data: results,
+    columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -72,7 +73,7 @@ export default function ResultsTable() {
           ))}
           {table.getRowModel().rows.length === 0 ? (
             <tr>
-              <td colSpan={resultColumns.length} className="empty">
+              <td colSpan={columns.length} className="empty">
                 暂无命中结果
               </td>
             </tr>

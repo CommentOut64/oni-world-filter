@@ -62,7 +62,10 @@ exit /b 0
 
 :ensure_python
 where python >nul 2>&1
-if not errorlevel 1 exit /b 0
+if not errorlevel 1 (
+    python --version >nul 2>&1
+    if not errorlevel 1 exit /b 0
+)
 
 if defined EMSDK_PYTHON exit /b 0
 

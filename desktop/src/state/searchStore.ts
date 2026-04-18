@@ -16,9 +16,24 @@ import {
   cancelSearch,
   formatTauriError,
   getSearchCatalog,
+  listGeysers,
+  listWorlds,
   startSearch,
   subscribeSidecar,
 } from "../lib/tauri";
+import { publishHostDebugSnapshot } from "../lib/hostDebugWindow";
+import {
+  beginSidecarBinding,
+  completeSidecarBinding,
+  disposeSidecarBinding,
+  failSidecarBinding,
+} from "./searchStoreState";
+import { appendUniqueSearchResult } from "./searchResultsState";
+import { createSidecarListenerRegistry } from "./sidecarListenerRegistry";
+import {
+  persistSearchSessionSnapshot,
+  restoreSearchSessionSnapshot,
+} from "./searchStorePersistence";
 
 const DEFAULT_CONSTRAINTS: SearchConstraints = {
   required: [],
@@ -80,6 +95,7 @@ interface SearchState {
   geysers: GeyserOption[];
   bootstrapped: boolean;
   listening: boolean;
+  bindingSidecar: boolean;
   isSearching: boolean;
   isCancelling: boolean;
   activeJobId: string | null;
@@ -88,11 +104,13 @@ interface SearchState {
   results: SearchMatchSummary[];
   selectedSeed: number | null;
   draft: SearchDraft;
+  lastSubmittedRequest: SearchRequest | null;
+  lastHostDebugMessages: string[];
   stats: SearchStats;
   lastError: string | null;
   bootstrap: () => Promise<void>;
   bindSidecarEvents: () => Promise<void>;
-  startSearchJob: (draft: SearchDraft) => Promise<void>;
+  startSearchJob: (draft: SearchDraft) => Promise<boolean>;
   cancelSearchJob: () => Promise<void>;
   clearResults: () => void;
   selectSeed: (seed: number | null) => void;
@@ -102,7 +120,43 @@ interface SearchState {
   ingestSidecarEvent: (event: SidecarEvent) => void;
 }
 
-let releaseListener: (() => void) | null = null;
+const HOST_DEBUG_PREFIX = "[host-debug]";
+const sidecarListenerRegistry = createSidecarListenerRegistry();
+const restoredSession = restoreSearchSessionSnapshot(getSessionStorage());
+
+function getSessionStorage(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function createDefaultStats(totalMatches = 0): SearchStats {
+  return {
+    startedAtMs: null,
+    processedSeeds: 0,
+    totalSeeds: 0,
+    totalMatches,
+    activeWorkers: 0,
+    currentSeedsPerSecond: 0,
+    peakSeedsPerSecond: 0,
+  };
+}
+
+function isRecoverableSidecarDiagnostic(message: string): boolean {
+  const normalized = message.trim();
+  return (
+    normalized.includes("compute child node pd failed, fallback to compute node.") ||
+    normalized.includes("compute node pd failed, fallback to compute node.") ||
+    normalized.includes("compute node pd failed after convert unknown cells") ||
+    (normalized.includes("Intersect:") && normalized.includes("intersection result is empty.")) ||
+    (normalized.includes("Intersect:") && normalized.includes("subj:") && normalized.includes("clip:"))
+  );
+}
 
 function makeJobId(prefix: string): string {
   const suffix = Math.random().toString(36).slice(2, 8);
@@ -156,7 +210,7 @@ function appendMatch(state: SearchState, event: SearchMatchEvent): SearchState {
 
   return {
     ...state,
-    results: [...state.results, match],
+    results: appendUniqueSearchResult(state.results, match),
     stats: {
       ...state.stats,
       processedSeeds: event.processedSeeds,
@@ -187,58 +241,109 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   geysers: [],
   bootstrapped: false,
   listening: false,
+  bindingSidecar: false,
   isSearching: false,
   isCancelling: false,
   activeJobId: null,
-  activeWorldType: DEFAULT_SEARCH_DRAFT.worldType,
-  activeMixing: DEFAULT_SEARCH_DRAFT.mixing,
-  results: [],
-  selectedSeed: null,
-  draft: DEFAULT_SEARCH_DRAFT,
-  stats: {
-    startedAtMs: null,
-    processedSeeds: 0,
-    totalSeeds: 0,
-    totalMatches: 0,
-    activeWorkers: 0,
-    currentSeedsPerSecond: 0,
-    peakSeedsPerSecond: 0,
-  },
+  activeWorldType: restoredSession?.activeWorldType ?? DEFAULT_SEARCH_DRAFT.worldType,
+  activeMixing: restoredSession?.activeMixing ?? DEFAULT_SEARCH_DRAFT.mixing,
+  results: restoredSession?.results ?? [],
+  selectedSeed: restoredSession?.selectedSeed ?? null,
+  draft: restoredSession?.draft ?? DEFAULT_SEARCH_DRAFT,
+  lastSubmittedRequest: restoredSession?.lastSubmittedRequest ?? null,
+  lastHostDebugMessages: [],
+  stats: createDefaultStats(restoredSession?.totalMatches ?? 0),
   lastError: null,
   bootstrap: async () => {
     if (get().bootstrapped) {
       return;
     }
-    try {
-      const catalog = await getSearchCatalog();
-      set({
-        catalog,
-        worlds: catalog.worlds,
-        geysers: catalog.geysers,
-        bootstrapped: true,
-      });
-    } catch (error) {
-      set({ lastError: formatTauriError(error) });
-    }
-  },
-  bindSidecarEvents: async () => {
-    if (get().listening) {
+    const [catalogResult, worldsResult, geysersResult] = await Promise.allSettled([
+      getSearchCatalog(),
+      listWorlds(),
+      listGeysers(),
+    ]);
+
+    const catalog = catalogResult.status === "fulfilled" ? catalogResult.value : null;
+    const worlds =
+      worldsResult.status === "fulfilled" && worldsResult.value.length > 0
+        ? worldsResult.value
+        : catalog?.worlds ?? [];
+    const geysers =
+      geysersResult.status === "fulfilled" && geysersResult.value.length > 0
+        ? geysersResult.value
+        : catalog?.geysers ?? [];
+
+    if (!catalog && worlds.length === 0 && geysers.length === 0) {
+      const firstError =
+        catalogResult.status === "rejected"
+          ? catalogResult.reason
+          : worldsResult.status === "rejected"
+            ? worldsResult.reason
+            : geysersResult.status === "rejected"
+              ? geysersResult.reason
+              : "搜索目录加载失败";
+      set({ lastError: formatTauriError(firstError) });
       return;
     }
+
+    set({
+      catalog,
+      worlds,
+      geysers,
+      bootstrapped: true,
+      lastError:
+        catalogResult.status === "rejected" ? `catalog 加载失败，已退回静态目录: ${formatTauriError(catalogResult.reason)}` : null,
+    });
+  },
+  bindSidecarEvents: async () => {
+    const binding = beginSidecarBinding({
+      listening: get().listening,
+      bindingSidecar: get().bindingSidecar,
+      lastError: get().lastError,
+    });
+    if (!binding.shouldSubscribe) {
+      return;
+    }
+    set(binding.nextState);
+    const bindingId = sidecarListenerRegistry.beginBinding();
     try {
-      releaseListener = await subscribeSidecar(
+      const releaseListener = await subscribeSidecar(
         (event) => {
           useSearchStore.getState().ingestSidecarEvent(event);
         },
         (stderrEvent) => {
+          if (stderrEvent.message.startsWith(HOST_DEBUG_PREFIX)) {
+            useSearchStore.setState((current) => {
+              const nextMessages = [...current.lastHostDebugMessages, stderrEvent.message];
+              publishHostDebugSnapshot({
+                request: current.lastSubmittedRequest,
+                messages: nextMessages,
+              });
+              return {
+                lastHostDebugMessages: nextMessages,
+              };
+            });
+            return;
+          }
+          if (isRecoverableSidecarDiagnostic(stderrEvent.message)) {
+            return;
+          }
           useSearchStore.setState({
             lastError: `[${stderrEvent.jobId}] ${stderrEvent.message}`,
           });
         }
       );
-      set({ listening: true });
+      // 严格模式下首次挂载可能先卸载再等待订阅返回，过期监听必须立刻释放。
+      if (!sidecarListenerRegistry.resolveBinding(bindingId, releaseListener)) {
+        return;
+      }
+      set((current) => completeSidecarBinding(current));
     } catch (error) {
-      set({ lastError: formatTauriError(error) });
+      if (!sidecarListenerRegistry.isActiveBinding(bindingId)) {
+        return;
+      }
+      set((current) => failSidecarBinding(current, formatTauriError(error)));
     }
   },
   startSearchJob: async (draft) => {
@@ -267,25 +372,28 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       results: [],
       selectedSeed: null,
       draft,
+      lastSubmittedRequest: request,
+      lastHostDebugMessages: [],
       stats: {
+        ...createDefaultStats(),
         startedAtMs: Date.now(),
-        processedSeeds: 0,
-        totalSeeds: 0,
-        totalMatches: 0,
-        activeWorkers: 0,
-        currentSeedsPerSecond: 0,
-        peakSeedsPerSecond: 0,
       },
       lastError: null,
     });
+    publishHostDebugSnapshot({
+      request,
+      messages: [],
+    });
     try {
       await startSearch(request);
+      return true;
     } catch (error) {
       set({
         isSearching: false,
         isCancelling: false,
         lastError: formatTauriError(error),
       });
+      return false;
     }
   },
   cancelSearchJob: async () => {
@@ -306,15 +414,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     set({
       results: [],
       selectedSeed: null,
-      stats: {
-        startedAtMs: null,
-        processedSeeds: 0,
-        totalSeeds: 0,
-        totalMatches: 0,
-        activeWorkers: 0,
-        currentSeedsPerSecond: 0,
-        peakSeedsPerSecond: 0,
-      },
+      stats: createDefaultStats(),
     });
   },
   selectSeed: (seed) => {
@@ -414,10 +514,16 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   },
 }));
 
+useSearchStore.subscribe((state) => {
+  persistSearchSessionSnapshot(getSessionStorage(), {
+    draft: state.draft,
+    results: state.results,
+    selectedSeed: state.selectedSeed,
+    lastSubmittedRequest: state.lastSubmittedRequest,
+  });
+});
+
 export function disposeSidecarListener(): void {
-  if (releaseListener) {
-    releaseListener();
-    releaseListener = null;
-    useSearchStore.setState({ listening: false });
-  }
+  sidecarListenerRegistry.dispose();
+  useSearchStore.setState((current) => disposeSidecarBinding(current));
 }

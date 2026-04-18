@@ -2,6 +2,11 @@ import { create } from "zustand";
 
 import type { PreviewPayload, SearchMatchSummary } from "../lib/contracts";
 import { formatTauriError, loadPreview } from "../lib/tauri";
+import {
+  beginPreviewLoad,
+  completePreviewLoad,
+  failPreviewLoad,
+} from "./previewStoreState";
 
 interface PreviewState {
   activeKey: string | null;
@@ -26,21 +31,12 @@ export const usePreviewStore = create<PreviewState>((set, get) => ({
   lastError: null,
   loadByMatch: async (match) => {
     const key = previewKey(match);
-    const cached = get().cache[key];
-    if (cached) {
-      set({
-        activeKey: key,
-        activePreview: cached,
-        lastError: null,
-      });
+    if (get().cache[key]) {
+      set((state) => beginPreviewLoad(state, key));
       return;
     }
 
-    set({
-      activeKey: key,
-      isLoading: true,
-      lastError: null,
-    });
+    set((state) => beginPreviewLoad(state, key));
     try {
       const event = await loadPreview({
         jobId: `preview-${Date.now()}-${match.seed}`,
@@ -48,19 +44,9 @@ export const usePreviewStore = create<PreviewState>((set, get) => ({
         seed: match.seed,
         mixing: match.mixing,
       });
-      set((state) => ({
-        isLoading: false,
-        activePreview: event.preview,
-        cache: {
-          ...state.cache,
-          [key]: event.preview,
-        },
-      }));
+      set((state) => completePreviewLoad(state, key, event.preview));
     } catch (error) {
-      set({
-        isLoading: false,
-        lastError: formatTauriError(error),
-      });
+      set((state) => failPreviewLoad(state, key, formatTauriError(error)));
     }
   },
   clear: () => {

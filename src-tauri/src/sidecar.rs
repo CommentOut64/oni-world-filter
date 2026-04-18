@@ -17,6 +17,7 @@ use crate::state::{JobRegistry, JobStatus, RunningJobHandles};
 
 pub const SIDECAR_EVENT_CHANNEL: &str = "sidecar://event";
 pub const SIDECAR_STDERR_CHANNEL: &str = "sidecar://stderr";
+const HOST_DEBUG_PREFIX: &str = "[host-debug]";
 
 const WORLD_CODES: [&str; 38] = [
     "SNDST-A-",
@@ -246,6 +247,7 @@ pub struct TraitMeta {
     pub trait_tags: Vec<String>,
     pub exclusive_with: Vec<String>,
     pub exclusive_with_tags: Vec<String>,
+    #[serde(default, alias = "forbiddenDLCIds")]
     pub forbidden_dlc_ids: Vec<String>,
     pub effect_summary: Vec<String>,
     pub searchable: bool,
@@ -437,6 +439,20 @@ pub fn start_search_streaming(
         .ok_or_else(|| HostError::InvalidRequest("sidecar stderr 不可用".to_string()))?;
 
     let payload = build_search_command(&request);
+    emit_host_debug(
+        &app,
+        &request.job_id,
+        format!(
+            "{} resolved sidecar path: {}",
+            HOST_DEBUG_PREFIX,
+            sidecar_path.display()
+        ),
+    );
+    emit_host_debug(
+        &app,
+        &request.job_id,
+        format!("{} payload: {}", HOST_DEBUG_PREFIX, payload),
+    );
     write_json_line(&mut stdin, &payload)?;
 
     let child_handle = Arc::new(Mutex::new(Some(child)));
@@ -579,13 +595,19 @@ pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayloa
             let catalog = event.get("catalog").cloned().ok_or_else(|| {
                 HostError::InvalidRequest("search_catalog 缺少 catalog 字段".to_string())
             })?;
-            return serde_json::from_value(catalog).map_err(HostError::from);
+            return deserialize_search_catalog_payload(catalog);
         }
     }
 
     Err(HostError::InvalidRequest(
         "未收到 search_catalog 事件".to_string(),
     ))
+}
+
+fn deserialize_search_catalog_payload(catalog: Value) -> Result<SearchCatalogPayload, HostError> {
+    serde_json::from_value(catalog).map_err(|error| {
+        HostError::InvalidRequest(format!("search_catalog 反序列化失败: {}", error))
+    })
 }
 
 pub fn analyze_search_request(
@@ -620,6 +642,48 @@ pub fn analyze_search_request(
     ))
 }
 
+fn collect_sidecar_candidates(manifest_dir: &Path, resource_dir: Option<&Path>) -> Vec<PathBuf> {
+    let repo_root = manifest_dir
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| manifest_dir.to_path_buf());
+    let mut candidates = Vec::new();
+
+    candidates.push(manifest_dir.join("binaries/oni-sidecar.exe"));
+
+    if let Some(resource_dir) = resource_dir {
+        candidates.push(resource_dir.join("oni-sidecar.exe"));
+        candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-msvc.exe"));
+        candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-gnu.exe"));
+    }
+
+    candidates.push(repo_root.join("out/build/mingw-release/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/mingw-release/src/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/mingw-debug/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/mingw-debug/src/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/x64-release/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/x64-release/src/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/x64-debug/oni-sidecar.exe"));
+    candidates.push(repo_root.join("out/build/x64-debug/src/oni-sidecar.exe"));
+
+    candidates
+}
+
+fn first_existing_sidecar_path(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates.iter().find_map(|path| {
+        let exists = path.is_file()
+            && path
+                .metadata()
+                .map(|metadata| metadata.len() > 0)
+                .unwrap_or(false);
+        if exists {
+            Some(path.to_path_buf())
+        } else {
+            None
+        }
+    })
+}
+
 pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostError> {
     if let Some(path) = env::var_os("ONI_SIDECAR_PATH") {
         let candidate = PathBuf::from(path);
@@ -628,39 +692,12 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
         }
     }
 
-    let mut candidates = Vec::new();
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let repo_root = manifest_dir
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| manifest_dir.clone());
+    let resource_dir = app.and_then(|app_handle| app_handle.path().resource_dir().ok());
+    let candidates = collect_sidecar_candidates(&manifest_dir, resource_dir.as_deref());
 
-    candidates.push(repo_root.join("out/build/x64-release/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-release/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-debug/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-debug/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-release/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-release/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-debug/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-debug/src/oni-sidecar.exe"));
-    candidates.push(manifest_dir.join("binaries/oni-sidecar.exe"));
-
-    if let Some(app_handle) = app {
-        if let Ok(resource_dir) = app_handle.path().resource_dir() {
-            candidates.push(resource_dir.join("oni-sidecar.exe"));
-            candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-msvc.exe"));
-            candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-gnu.exe"));
-        }
-    }
-
-    if let Some(existing) = candidates.iter().find(|path| {
-        path.is_file()
-            && path
-                .metadata()
-                .map(|metadata| metadata.len() > 0)
-                .unwrap_or(false)
-    }) {
-        return Ok(existing.to_path_buf());
+    if let Some(existing) = first_existing_sidecar_path(&candidates) {
+        return Ok(existing);
     }
 
     Err(HostError::SidecarNotFound { candidates })
@@ -826,6 +863,17 @@ fn drain_stderr(stderr: ChildStderr) -> String {
     lines.join("\n")
 }
 
+fn emit_host_debug(app: &AppHandle, job_id: &str, message: String) {
+    eprintln!("[host:{}] {}", job_id, message);
+    let _ = app.emit(
+        SIDECAR_STDERR_CHANNEL,
+        json!({
+            "jobId": job_id,
+            "message": message
+        }),
+    );
+}
+
 fn spawn_stderr_logger(app: AppHandle, job_id: String, stderr: ChildStderr) {
     thread::spawn(move || {
         let reader = BufReader::new(stderr);
@@ -964,11 +1012,60 @@ fn spawn_waiter(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use serde_json::json;
 
     use super::{
-        list_geyser_options, list_world_options, resolve_sidecar_path, run_sidecar_request_collect,
+        collect_sidecar_candidates, first_existing_sidecar_path, list_geyser_options,
+        list_world_options, resolve_sidecar_path, run_sidecar_request_collect,
+        SearchCatalogPayload,
     };
+
+    fn create_temp_root(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be valid")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "oni-sidecar-tests-{}-{}-{}",
+            name,
+            std::process::id(),
+            nonce
+        ));
+        fs::create_dir_all(&root).expect("temp root should be created");
+        root
+    }
+
+    fn write_dummy_sidecar(path: &Path) {
+        let parent = path.parent().expect("sidecar path should have parent");
+        fs::create_dir_all(parent).expect("sidecar parent should be created");
+        fs::write(path, b"ok").expect("dummy sidecar should be written");
+    }
+
+    fn build_catalog_with_trait_field(field_name: &str) -> serde_json::Value {
+        json!({
+            "worlds": [],
+            "geysers": [],
+            "mixingSlots": [],
+            "parameterSpecs": [],
+            "traits": [
+                {
+                    "id": "traits/Volcanoes",
+                    "name": "Volcanoes",
+                    "description": "desc",
+                    "traitTags": [],
+                    "exclusiveWith": [],
+                    "exclusiveWithTags": [],
+                    field_name: ["EXPANSION1_ID"],
+                    "effectSummary": [],
+                    "searchable": false
+                }
+            ]
+        })
+    }
 
     #[test]
     fn world_and_geyser_lists_should_be_non_empty() {
@@ -976,6 +1073,62 @@ mod tests {
         let geysers = list_geyser_options();
         assert!(worlds.len() >= 30);
         assert!(geysers.len() >= 30);
+    }
+
+    #[test]
+    fn resolve_candidates_should_prefer_synced_binary_over_build_outputs() {
+        let root = create_temp_root("prefer-binaries");
+        let manifest_dir = root.join("src-tauri");
+        let binaries = manifest_dir.join("binaries/oni-sidecar.exe");
+        let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
+
+        write_dummy_sidecar(&binaries);
+        write_dummy_sidecar(&x64);
+
+        let candidates = collect_sidecar_candidates(&manifest_dir, None);
+        let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
+        assert_eq!(resolved, binaries);
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn resolve_candidates_should_prefer_mingw_release_over_x64_release() {
+        let root = create_temp_root("prefer-mingw");
+        let manifest_dir = root.join("src-tauri");
+        let mingw = root.join("out/build/mingw-release/src/oni-sidecar.exe");
+        let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
+
+        write_dummy_sidecar(&mingw);
+        write_dummy_sidecar(&x64);
+
+        let candidates = collect_sidecar_candidates(&manifest_dir, None);
+        let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
+        assert_eq!(resolved, mingw);
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn search_catalog_should_accept_trait_forbidden_dlc_ids_uppercase_alias() {
+        let catalog = build_catalog_with_trait_field("forbiddenDLCIds");
+
+        let payload = serde_json::from_value::<SearchCatalogPayload>(catalog)
+            .expect("search catalog should deserialize forbiddenDLCIds");
+
+        assert_eq!(payload.traits.len(), 1);
+        assert_eq!(payload.traits[0].forbidden_dlc_ids, vec!["EXPANSION1_ID"]);
+    }
+
+    #[test]
+    fn search_catalog_should_accept_trait_forbidden_dlc_ids_camel_case() {
+        let catalog = build_catalog_with_trait_field("forbiddenDlcIds");
+
+        let payload = serde_json::from_value::<SearchCatalogPayload>(catalog)
+            .expect("search catalog should deserialize forbiddenDlcIds");
+
+        assert_eq!(payload.traits.len(), 1);
+        assert_eq!(payload.traits[0].forbidden_dlc_ids, vec!["EXPANSION1_ID"]);
     }
 
     #[test]

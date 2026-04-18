@@ -4,8 +4,44 @@ import type { SearchDraft } from "../../state/searchStore";
 
 const nonNegativeInt = z.coerce.number().int().min(0);
 const cpuModeSchema = z.enum(["balanced", "turbo", "custom"]);
-const DEFAULT_WORLD_TYPE_MAX = 1024;
-const DEFAULT_MIXING_MAX = 48_828_124;
+export const MIXING_SLOT_COUNT = 11;
+export const MIXING_LEVEL_MIN = 0;
+export const MIXING_LEVEL_MAX = 4;
+
+function clampMixingLevel(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const normalized = Math.trunc(value);
+  if (normalized < MIXING_LEVEL_MIN) {
+    return MIXING_LEVEL_MIN;
+  }
+  if (normalized > MIXING_LEVEL_MAX) {
+    return MIXING_LEVEL_MAX;
+  }
+  return normalized;
+}
+
+export function decodeMixingToLevels(mixing: number, slotCount = MIXING_SLOT_COUNT): number[] {
+  if (slotCount <= 0) {
+    return [];
+  }
+  const levels = new Array<number>(slotCount).fill(0);
+  let value = Number.isFinite(mixing) ? Math.max(0, Math.trunc(mixing)) : 0;
+  for (let slot = slotCount - 1; slot >= 0; slot -= 1) {
+    levels[slot] = clampMixingLevel(value % 5);
+    value = Math.floor(value / 5);
+  }
+  return levels;
+}
+
+export function encodeMixingFromLevels(levels: readonly number[]): number {
+  let value = 0;
+  for (const level of levels) {
+    value = value * 5 + clampMixingLevel(level);
+  }
+  return value;
+}
 
 const geyserItemSchema = z.object({
   geyser: z.string().min(1, "请选择喷口类型"),
@@ -29,12 +65,31 @@ export interface SearchSchemaOptions {
 }
 
 export function createSearchSchema(options?: SearchSchemaOptions) {
-  const worldTypeMax = options?.worldTypeMax ?? DEFAULT_WORLD_TYPE_MAX;
-  const mixingMax = options?.mixingMax ?? DEFAULT_MIXING_MAX;
+  const hasWorldTypeMax =
+    typeof options?.worldTypeMax === "number" &&
+    Number.isFinite(options.worldTypeMax) &&
+    options.worldTypeMax >= 0;
+  const hasMixingMax =
+    typeof options?.mixingMax === "number" &&
+    Number.isFinite(options.mixingMax) &&
+    options.mixingMax >= 0;
+  const worldTypeMax = hasWorldTypeMax ? (options?.worldTypeMax ?? 0) : 0;
+  const mixingMax = hasMixingMax ? (options?.mixingMax ?? 0) : 0;
+  const worldTypeSchema = hasWorldTypeMax
+    ? z
+        .coerce.number()
+        .int()
+        .min(0)
+        .max(worldTypeMax, `worldType 不能超过 ${worldTypeMax}`)
+    : z.coerce.number().int().min(0);
+  const mixingSchema = hasMixingMax
+    ? nonNegativeInt.max(mixingMax, `mixing 不能超过 ${mixingMax}`)
+    : nonNegativeInt;
+
   return z
     .object({
-      worldType: z.coerce.number().int().min(0).max(worldTypeMax, `worldType 不能超过 ${worldTypeMax}`),
-      mixing: nonNegativeInt.max(mixingMax, `mixing 不能超过 ${mixingMax}`),
+      worldType: worldTypeSchema,
+      mixing: mixingSchema,
       seedStart: nonNegativeInt,
       seedEnd: nonNegativeInt,
       threads: nonNegativeInt.max(512, "线程数不能超过 512"),
@@ -106,6 +161,30 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
       checkUnique(value.forbidden, "forbidden", "forbidden 约束中存在重复喷口");
       checkUnique(value.distance, "distance", "distance 规则中存在重复喷口");
       checkUnique(value.count, "count", "count 规则中存在重复喷口");
+
+      const requiredSet = new Set(value.required.map((item) => item.geyser));
+      value.forbidden.forEach((item, index) => {
+        if (!requiredSet.has(item.geyser)) {
+          return;
+        }
+        ctx.addIssue({
+          path: ["forbidden", index, "geyser"],
+          code: z.ZodIssueCode.custom,
+          message: "同一喷口不能同时设置为 required 和 forbidden",
+        });
+      });
+
+      const forbiddenSet = new Set(value.forbidden.map((item) => item.geyser));
+      value.distance.forEach((item, index) => {
+        if (!forbiddenSet.has(item.geyser)) {
+          return;
+        }
+        ctx.addIssue({
+          path: ["distance", index, "geyser"],
+          code: z.ZodIssueCode.custom,
+          message: "forbidden 喷口不能同时设置距离规则",
+        });
+      });
     });
 }
 

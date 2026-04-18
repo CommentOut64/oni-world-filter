@@ -11,7 +11,7 @@
 #include <tuple>
 #include <unordered_set>
 
-#if defined(_WIN32) && !defined(EMSCRIPTEN)
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -165,7 +165,7 @@ ThreadPolicy BuildPolicy(const std::string &name,
 
 CpuTopology CpuTopologyDetector::Detect()
 {
-#if defined(_WIN32) && !defined(EMSCRIPTEN)
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
     using GetSystemCpuSetInformationFn = BOOL (WINAPI *)(
         PSYSTEM_CPU_SET_INFORMATION, ULONG, PULONG, HANDLE, ULONG);
 
@@ -697,7 +697,7 @@ bool ApplyThreadPlacement(const ThreadPolicy &policy,
         policy.targetLogicalProcessors.empty()) {
         return true;
     }
-#if defined(_WIN32) && !defined(EMSCRIPTEN)
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
     const uint32_t logicalIndex = policy.targetLogicalProcessors[
         workerIndex % policy.targetLogicalProcessors.size()];
     if (logicalIndex >= sizeof(DWORD_PTR) * 8) {

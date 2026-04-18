@@ -1,4 +1,4 @@
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
 
 #include <algorithm>
 #include <atomic>
@@ -256,6 +256,10 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
         Batch::SearchSeedEvaluation evaluation;
 
         auto *runtime = AppRuntime::Instance();
+        runtime->SetResultSink(&g_batchSink);
+        runtime->SetSkipPolygons(true);
+        g_batchSink.SetActive(true);
+        runtime->Initialize(0);
         g_batchSink.Reset();
 
         std::string code;

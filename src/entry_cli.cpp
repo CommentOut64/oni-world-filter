@@ -1,4 +1,4 @@
-#ifdef EMSCRIPTEN
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #else
 #include <iostream>
@@ -85,7 +85,7 @@ extern "C" void EMSCRIPTEN_KEEPALIVE app_init(int seed)
     GetRuntime()->Initialize(seed);
 }
 
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
 static bool g_batchMode = false;
 #endif
 
@@ -112,14 +112,14 @@ extern "C" bool EMSCRIPTEN_KEEPALIVE app_generate(int type, int seed, int mix)
     code += std::to_string(seed);
     code += "-0-D3-";
     code += SettingsCache::BinaryToBase36(mix);
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
     if (!g_batchMode)
 #endif
         LogI("generate with code: %s", code.c_str());
     return GetRuntime()->Generate(code, traits);
 }
 
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
 
 static const auto &g_geyserIds = Batch::GetGeyserIds();
 
@@ -302,6 +302,11 @@ static Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
         };
     request.evaluateSeed = [&cfg](int seed) {
         Batch::SearchSeedEvaluation evaluation;
+        auto *runtime = AppRuntime::Instance();
+        runtime->SetResultSink(&g_batchSink);
+        runtime->SetSkipPolygons(true);
+        g_batchSink.SetActive(true);
+        runtime->Initialize(0);
         g_batchSink.Reset();
         evaluation.generated = app_generate(cfg.worldType, seed, cfg.mixing);
         if (!evaluation.generated) {

@@ -1,0 +1,130 @@
+export interface DisplayName {
+  zh: string;
+  en: string;
+}
+
+export interface WorldDisplayName extends DisplayName {}
+
+export interface GeyserDisplayName extends DisplayName {}
+
+export interface MixingSlotDisplayName extends DisplayName {}
+
+export const WORLD_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
+  "SNDST-A-": { zh: "Terra", en: "Terra" },
+  "OCAN-A-": { zh: "海洋星体", en: "Oceania" },
+  "S-FRZ-": { zh: "冰霜星体", en: "Rime" },
+  "LUSH-A-": { zh: "翠绿星体", en: "Verdante" },
+  "FRST-A-": { zh: "乔木星体", en: "Arboria" },
+  "VOLCA-": { zh: "火山星体", en: "Volcanea" },
+  "BAD-A-": { zh: "荒芜之地", en: "The Badlands" },
+  "HTFST-A-": { zh: "干热星体", en: "Aridio" },
+  "OASIS-A-": { zh: "绿洲星体", en: "Oasisse" },
+  "CER-A-": { zh: "谷神星", en: "Ceres" },
+  "CERS-A-": { zh: "炸裂的谷神星", en: "Blasted Ceres" },
+  "PRE-A-": { zh: "古迹星", en: "Relica" },
+  "PRES-A-": { zh: "古迹啊啊啊嗷星", en: "RelicAAAAGH" },
+  "V-SNDST-C-": { zh: "类地星群", en: "Terra Cluster" },
+  "V-OCAN-C-": { zh: "海洋星群", en: "Oceania Cluster" },
+  "V-SWMP-C-": { zh: "泥泞星群", en: "Squelchy Cluster" },
+  "V-SFRZ-C-": { zh: "冰霜星群", en: "Rime Cluster" },
+  "V-LUSH-C-": { zh: "翠绿星群", en: "Verdante Cluster" },
+  "V-FRST-C-": { zh: "乔木星群", en: "Arboria Cluster" },
+  "V-VOLCA-C-": { zh: "火山星群", en: "Volcanea Cluster" },
+  "V-BAD-C-": { zh: "荒芜星群", en: "The Badlands Cluster" },
+  "V-HTFST-C-": { zh: "干热星群", en: "Aridio Cluster" },
+  "V-OASIS-C-": { zh: "绿洲星群", en: "Oasisse Cluster" },
+  "V-CER-C-": { zh: "谷神星星群", en: "Ceres Cluster" },
+  "V-CERS-C-": { zh: "炸裂的谷神星星群", en: "Blasted Ceres Cluster" },
+  "V-PRE-C-": { zh: "古迹星星群", en: "Relica Cluster" },
+  "V-PRES-C-": { zh: "古迹啊啊啊嗷星星群", en: "RelicAAAAGH Cluster" },
+  "SNDST-C-": { zh: "砂土星群", en: "Terrania Cluster" },
+  "PRE-C-": { zh: "小古迹星星群", en: "Relica Minor Cluster" },
+  "CER-C-": { zh: "小谷神星星群", en: "Ceres Minor Cluster" },
+  "FRST-C-": { zh: "绿叶星群", en: "Folia Cluster" },
+  "SWMP-C-": { zh: "泥潭星群", en: "Quagmiris Cluster" },
+  "M-SWMP-C-": { zh: "卫星星群 - 金属沼泽", en: "Moonlet Cluster - Metallic Swampy" },
+  "M-BAD-C-": { zh: "卫星星群 - 荒凉", en: "Moonlet Cluster - The Desolands" },
+  "M-FRZ-C-": { zh: "卫星星群 - 冰冻森林", en: "Moonlet Cluster - Frozen Forest" },
+  "M-FLIP-C-": { zh: "卫星星群 - 倒置", en: "Moonlet Cluster - Flipped" },
+  "M-RAD-C-": { zh: "卫星星群 - 放射性海洋", en: "Moonlet Cluster - Radioactive Ocean" },
+  "M-CERS-C-": { zh: "卫星星群 - 谷神星地幔", en: "Moonlet Cluster - Ceres Mantle" },
+};
+
+export const GEYSER_DISPLAY_NAMES: Record<string, GeyserDisplayName> = {
+  steam: { zh: "低温蒸汽喷孔", en: "Cool Steam Vent" },
+  hot_steam: { zh: "蒸汽喷孔", en: "Steam Vent" },
+  hot_water: { zh: "清水泉", en: "Water Geyser" },
+  slush_water: { zh: "低温泥浆泉", en: "Cool Slush Geyser" },
+  filthy_water: { zh: "污水泉", en: "Polluted Water Vent" },
+  slush_salt_water: { zh: "低温盐泥泉", en: "Cool Salt Slush Geyser" },
+  salt_water: { zh: "盐水泉", en: "Salt Water Geyser" },
+  small_volcano: { zh: "小型火山", en: "Minor Volcano" },
+  big_volcano: { zh: "火山", en: "Volcano" },
+  liquid_co2: { zh: "二氧化碳泉", en: "Carbon Dioxide Geyser" },
+  hot_co2: { zh: "二氧化碳喷孔", en: "Carbon Dioxide Vent" },
+  hot_hydrogen: { zh: "氢气喷孔", en: "Hydrogen Vent" },
+  hot_po2: { zh: "高温污氧喷孔", en: "Hot Polluted Oxygen Vent" },
+  slimy_po2: { zh: "含菌污氧喷孔", en: "InFectious Polluted Oxygen Vent" },
+  chlorine_gas: { zh: "氯气喷孔", en: "Chlorine Gas Vent" },
+  methane: { zh: "天然气喷孔", en: "Natural Gas Geyser" },
+  molten_copper: { zh: "铜火山", en: "Copper Volcano" },
+  molten_iron: { zh: "铁火山", en: "Iron Volcano" },
+  molten_gold: { zh: "金火山", en: "Gold Volcano" },
+  molten_aluminum: { zh: "铝火山", en: "Aluminum Volcano" },
+  molten_cobalt: { zh: "钴火山", en: "Cobalt Volcano" },
+  oil_drip: { zh: "渗油裂缝", en: "Leaky Oil Fissure" },
+  liquid_sulfur: { zh: "液硫泉", en: "Liquid Sulfur Geyser" },
+  chlorine_gas_cool: { zh: "低温氯气喷孔", en: "Cool Chlorine Gas Vent" },
+  molten_tungsten: { zh: "钨火山", en: "Tungsten Volcano" },
+  molten_niobium: { zh: "铌火山", en: "Niobium Volcano" },
+  printing_pod: { zh: "打印舱", en: "Printing Pod" },
+  oil_reservoir: { zh: "储油石", en: "Oil Reservoir" },
+  warp_sender: { zh: "供给传送器输出端", en: "Supply Teleporter Output" },
+  warp_receiver: { zh: "供给传送器输入端", en: "Supply Teleporter Input" },
+  warp_portal: { zh: "传送发射/接收器", en: "Teleporter Transmitter" },
+  cryo_tank: { zh: "低温箱3000", en: "Cryotank 3000" },
+};
+
+export const MIXING_SLOT_DISPLAY_NAMES: Record<string, MixingSlotDisplayName> = {
+  DLC2_ID: { zh: "寒霜行星包", en: "The Frosty Planet Pack" },
+  "dlc2::subworldMixing/IceCavesMixingSettings": { zh: "冰窟生态", en: "Ice Cave Biome" },
+  "dlc2::subworldMixing/CarrotQuarryMixingSettings": { zh: "冷池生态", en: "Cool Pool Biome" },
+  "dlc2::subworldMixing/SugarWoodsMixingSettings": { zh: "花蜜生态", en: "Nectar Biome" },
+  "dlc2::worldMixing/CeresMixingSettings": { zh: "谷神星碎片", en: "Ceres Fragment" },
+  DLC3_ID: { zh: "仿生增幅包", en: "The Bionic Booster Pack" },
+  DLC4_ID: { zh: "史前行星包", en: "The Prehistoric Planet Pack" },
+  "dlc4::subworldMixing/GardenMixingSettings": { zh: "花园生态", en: "Garden Biome" },
+  "dlc4::subworldMixing/RaptorMixingSettings": { zh: "寒羽生态", en: "Feather Biome" },
+  "dlc4::subworldMixing/WetlandsMixingSettings": { zh: "险沼生态", en: "Wetlands Biome" },
+  "dlc4::worldMixing/PrehistoricMixingSettings": { zh: "古迹星碎片", en: "Relica Fragment" },
+};
+
+export const FALLBACK_MIXING_SLOT_PATHS = Object.keys(MIXING_SLOT_DISPLAY_NAMES);
+
+// 区域类型名称，索引对应 C++ ZoneType 枚举值
+export const ZONE_TYPE_DISPLAY_NAMES: DisplayName[] = [
+  { zh: "苔原生态", en: "Tundra Biome" },
+  { zh: "水晶洞穴", en: "Crystal Caverns" },
+  { zh: "湿地生态", en: "Marsh Biome" },
+  { zh: "砂岩生态", en: "Sandstone Biome" },
+  { zh: "丛林生态", en: "Jungle Biome" },
+  { zh: "岩浆生态", en: "Magma Biome" },
+  { zh: "油质生态", en: "Oily Biome" },
+  { zh: "太空生态", en: "Space Biome" },
+  { zh: "海洋生态", en: "Ocean Biome" },
+  { zh: "铁锈生态", en: "Rust Biome" },
+  { zh: "森林生态", en: "Forest Biome" },
+  { zh: "辐射生态", en: "Radioactive Biome" },
+  { zh: "沼泽生态", en: "Swampy Biome" },
+  { zh: "荒地生态", en: "Wasteland Biome" },
+  { zh: "火箭内部", en: "Rocket Interior" },
+  { zh: "金属生态", en: "Metallic Biome" },
+  { zh: "岩漠生态", en: "Barren Biome" },
+  { zh: "海牛生态", en: "Moo Biome" },
+  { zh: "冰窟生态", en: "Ice Cave Biome" },
+  { zh: "冷池生态", en: "Cool Pool Biome" },
+  { zh: "花蜜生态", en: "Nectar Biome" },
+  { zh: "花园生态", en: "Garden Biome" },
+  { zh: "寒羽生态", en: "Feather Biome" },
+  { zh: "险沼生态", en: "Wetlands Biome" },
+];

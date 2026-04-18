@@ -1,6 +1,4 @@
-#ifdef EMSCRIPTEN
 #include <emscripten.h>
-#define EMSCRIPTEN_KEEPALIVE
 
 #include <string>
 
@@ -53,5 +51,3 @@ extern "C" bool EMSCRIPTEN_KEEPALIVE app_generate(int type, int seed, int mix)
     code += SettingsCache::BinaryToBase36(mix);
     return GetRuntime()->Generate(code, traits);
 }
-
-#endif

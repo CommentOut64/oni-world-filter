@@ -19,6 +19,9 @@ namespace SearchAnalysis {
 namespace {
 
 constexpr int kMixingMax = 48828124;
+// 11 个 mixing 槽位全部设为 level 1 (Enabled) 的编码值:
+// sum(1 * 5^i, i=0..10) = (5^11 - 1) / 4 = 12207031
+constexpr int kMixingProbeAllEnabled = 12207031;
 
 std::string BuildWorldCode(int worldType, int mixing)
 {
@@ -399,10 +402,22 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
     profile.disabledMixingSlots.clear();
     for (size_t slot = 0; slot < settings.mixConfigs.size(); ++slot) {
         const auto level = settings.mixConfigs[slot].level;
-        if (level == MixingLevel::Disabled) {
-            profile.disabledMixingSlots.push_back(static_cast<int>(slot));
-        } else {
+        if (level != MixingLevel::Disabled) {
             profile.activeMixingSlots.push_back(static_cast<int>(slot));
+        }
+    }
+
+    // 用全启用 probe 值探测世界结构性禁用槽位（CER/PRE 约束），
+    // 而非把用户未开启的槽位也标记为 disabled
+    {
+        std::string probeCode = BuildWorldCode(worldType, kMixingProbeAllEnabled);
+        SettingsCache probeSettings = baseSettings;
+        if (probeSettings.CoordinateChanged(probeCode, probeSettings)) {
+            for (size_t slot = 0; slot < probeSettings.mixConfigs.size(); ++slot) {
+                if (probeSettings.mixConfigs[slot].level == MixingLevel::Disabled) {
+                    profile.disabledMixingSlots.push_back(static_cast<int>(slot));
+                }
+            }
         }
     }
 

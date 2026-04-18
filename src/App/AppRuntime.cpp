@@ -12,7 +12,7 @@
 
 #include "config.h"
 
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
 static bool LoadSharedResourceBlob(std::vector<char> &data, std::string *errorMessage)
 {
     std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
@@ -44,7 +44,7 @@ static bool LoadSharedResourceBlob(std::vector<char> &data, std::string *errorMe
 
 AppRuntime *AppRuntime::Instance()
 {
-#ifdef EMSCRIPTEN
+#ifdef __EMSCRIPTEN__
     static AppRuntime inst;
 #else
     thread_local AppRuntime inst;
@@ -74,7 +74,7 @@ bool AppRuntime::IsSkippingPolygons() const
 
 void AppRuntime::Initialize(int seed)
 {
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
     std::string sharedError;
     const auto shared = SharedSettingsCache::GetOrCreate(LoadSharedResourceBlob, &sharedError);
     if (shared != nullptr) {

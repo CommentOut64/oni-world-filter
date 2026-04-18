@@ -20,11 +20,11 @@ ConstraintGroup &GetOrCreateGroup(std::vector<ConstraintGroup> *groups,
 
     const size_t index = groups->size();
     indexById->emplace(geyserId, index);
-    groups->push_back(ConstraintGroup{
-        .geyserId = geyserId,
-        .geyserIndex = Batch::GeyserIdToIndex(geyserId),
-    });
-    return groups->back();
+    groups->push_back(ConstraintGroup{});
+    auto &group = groups->back();
+    group.geyserId = geyserId;
+    group.geyserIndex = Batch::GeyserIdToIndex(geyserId);
+    return group;
 }
 
 } // namespace

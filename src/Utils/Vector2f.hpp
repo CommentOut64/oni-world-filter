@@ -235,7 +235,7 @@ typedef Vector3<int> Vector3i;
 typedef Vector3<float> Vector3f;
 typedef Vector3<double> Vector3d;
 
-#if defined(EMSCRIPTEN) && defined(NDEBUG)
+#if defined(__EMSCRIPTEN__) && defined(NDEBUG)
 #define LogI(format, ...)
 #define LogE(format, ...)
 #else

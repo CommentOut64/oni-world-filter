@@ -1,6 +1,6 @@
 #include "App/ResultSink.hpp"
 
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
 #include <fstream>
 
 #include "config.h"
@@ -23,7 +23,7 @@ const BatchCaptureRecord &BatchCaptureSink::Data() const
 
 bool BatchCaptureSink::RequestResource(uint32_t expectedSize, std::vector<char> &data)
 {
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
     data.assign(expectedSize, 0);
     std::ifstream fstm(SETTING_ASSET_FILEPATH, std::ios::binary);
     if (!fstm.is_open()) {

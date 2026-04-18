@@ -20,8 +20,9 @@ export function fitToWorld(input: FitViewportInput): ViewportState {
   const stageWidth = Math.max(1, input.stageWidth);
   const stageHeight = Math.max(1, input.stageHeight);
   const padding = input.padding ?? 24;
+  // 水平方向留 padding，垂直方向不留白
   const scaleX = (stageWidth - padding * 2) / worldWidth;
-  const scaleY = (stageHeight - padding * 2) / worldHeight;
+  const scaleY = stageHeight / worldHeight;
   const scale = clampScale(Math.min(scaleX, scaleY));
   const contentWidth = worldWidth * scale;
   const contentHeight = worldHeight * scale;
