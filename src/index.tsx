@@ -150,10 +150,7 @@ const App = ({ onSetLanguage, onSetTheme }: AppProps) => {
             const response = await fetch(url, { credentials: "same-origin" });
             return response.arrayBuffer();
         };
-        (process.env.NODE_ENV === "development"
-            ? import("../out/build/wasm-debug/src/WasmFiles")
-            : import("../out/build/wasm-release/src/WasmFiles")
-        ).then((module) => {
+        import("@generated-wasm-files").then((module) => {
             Promise.all([
                 load(module.WasmFiles.data),
                 load(module.WasmFiles.wasm),

@@ -1,0 +1,139 @@
+import type { SearchMatchSummary, SearchRequest } from "../lib/contracts";
+import type { SearchDraft } from "./searchStore";
+
+export const SEARCH_SESSION_STORAGE_KEY = "oni-search-session/v1";
+
+const SEARCH_SESSION_VERSION = 1;
+
+export interface SearchSessionStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export interface SearchSessionStateSnapshot {
+  draft: SearchDraft;
+  results: SearchMatchSummary[];
+  selectedSeed: number | null;
+  lastSubmittedRequest: SearchRequest | null;
+}
+
+interface SerializedSearchSessionSnapshot extends SearchSessionStateSnapshot {
+  version: typeof SEARCH_SESSION_VERSION;
+}
+
+export interface RestoredSearchSessionState extends SearchSessionStateSnapshot {
+  activeWorldType: number;
+  activeMixing: number;
+  totalMatches: number;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function sanitizeSelectedSeed(results: SearchMatchSummary[], selectedSeed: number | null): number | null {
+  if (selectedSeed === null) {
+    return null;
+  }
+  return results.some((item) => item.seed === selectedSeed) ? selectedSeed : null;
+}
+
+function toSerializableSnapshot(
+  state: SearchSessionStateSnapshot
+): SerializedSearchSessionSnapshot {
+  return {
+    version: SEARCH_SESSION_VERSION,
+    draft: cloneValue(state.draft),
+    results: cloneValue(state.results),
+    selectedSeed: state.selectedSeed,
+    lastSubmittedRequest: state.lastSubmittedRequest ? cloneValue(state.lastSubmittedRequest) : null,
+  };
+}
+
+function parseSerializedSnapshot(raw: string): SerializedSearchSessionSnapshot | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed) || parsed.version !== SEARCH_SESSION_VERSION) {
+    return null;
+  }
+  if (!isRecord(parsed.draft) || !Array.isArray(parsed.results)) {
+    return null;
+  }
+  if (!(parsed.selectedSeed === null || typeof parsed.selectedSeed === "number")) {
+    return null;
+  }
+  if (!(parsed.lastSubmittedRequest === null || isRecord(parsed.lastSubmittedRequest))) {
+    return null;
+  }
+  return {
+    version: SEARCH_SESSION_VERSION,
+    draft: cloneValue(parsed.draft as unknown as SearchDraft),
+    results: cloneValue(parsed.results as unknown as SearchMatchSummary[]),
+    selectedSeed: parsed.selectedSeed,
+    lastSubmittedRequest:
+      parsed.lastSubmittedRequest === null
+        ? null
+        : cloneValue(parsed.lastSubmittedRequest as unknown as SearchRequest),
+  };
+}
+
+export function persistSearchSessionSnapshot(
+  storage: SearchSessionStorage | null | undefined,
+  state: SearchSessionStateSnapshot
+): void {
+  if (!storage) {
+    return;
+  }
+  storage.setItem(
+    SEARCH_SESSION_STORAGE_KEY,
+    JSON.stringify(toSerializableSnapshot(state))
+  );
+}
+
+export function restoreSearchSessionSnapshot(
+  storage: SearchSessionStorage | null | undefined
+): RestoredSearchSessionState | null {
+  if (!storage) {
+    return null;
+  }
+  const raw = storage.getItem(SEARCH_SESSION_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const snapshot = parseSerializedSnapshot(raw);
+    if (!snapshot) {
+      storage.removeItem(SEARCH_SESSION_STORAGE_KEY);
+      return null;
+    }
+    const results = cloneValue(snapshot.results);
+    const draft = cloneValue(snapshot.draft);
+    return {
+      draft,
+      results,
+      selectedSeed: sanitizeSelectedSeed(results, snapshot.selectedSeed),
+      lastSubmittedRequest: snapshot.lastSubmittedRequest
+        ? cloneValue(snapshot.lastSubmittedRequest)
+        : null,
+      activeWorldType: draft.worldType,
+      activeMixing: draft.mixing,
+      totalMatches: results.length,
+    };
+  } catch {
+    storage.removeItem(SEARCH_SESSION_STORAGE_KEY);
+    return null;
+  }
+}
+
+export function clearSearchSessionSnapshot(
+  storage: SearchSessionStorage | null | undefined
+): void {
+  if (!storage) {
+    return;
+  }
+  storage.removeItem(SEARCH_SESSION_STORAGE_KEY);
+}

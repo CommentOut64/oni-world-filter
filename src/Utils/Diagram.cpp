@@ -1,30 +1,57 @@
 #include "Diagram.hpp"
 
-#include <numbers>
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <numbers>
 
 #include "Voronoi.hpp"
 #include "ConvexHull.hpp"
 
 constexpr float EPSILON = std::numeric_limits<float>::denorm_min();
+constexpr double kDeterminantEpsilon = 1e-10;
+constexpr float kCoordinateAbsLimit = 1000000.0f;
 
-static Vector2f GetDualPoint(ConvexFace<Site> &face)
+static bool IsFinitePoint(const Vector2f &point)
 {
-    if (!face.dualPoint.has_value()) {
-        auto &Vertices = face.Vertices;
-        Vector3d vec1(Vertices[0]->x, Vertices[0]->y, Vertices[0]->z);
-        Vector3d vec2(Vertices[1]->x, Vertices[1]->y, Vertices[1]->z);
-        Vector3d vec3(Vertices[2]->x, Vertices[2]->y, Vertices[2]->z);
-        double num1 = vec1.y * (vec2.z - vec3.z) + vec2.y * (vec3.z - vec1.z) +
-                      vec3.y * (vec1.z - vec2.z);
-        double num2 = vec1.z * (vec2.x - vec3.x) + vec2.z * (vec3.x - vec1.x) +
-                      vec3.z * (vec1.x - vec2.x);
-        double num3 = vec1.x * (vec2.y - vec3.y) + vec2.x * (vec3.y - vec1.y) +
-                      vec3.x * (vec1.y - vec2.y);
-        num3 = -0.5 / num3;
-        face.dualPoint.emplace((float)(num1 * num3), (float)(num2 * num3));
+    return std::isfinite(point.x) && std::isfinite(point.y) &&
+           std::abs(point.x) <= kCoordinateAbsLimit &&
+           std::abs(point.y) <= kCoordinateAbsLimit;
+}
+
+static bool TryGetDualPoint(ConvexFace<Site> &face, Vector2f *outPoint)
+{
+    if (outPoint == nullptr) {
+        return false;
     }
-    return face.dualPoint.value();
+    if (!face.dualPoint.has_value()) {
+        auto &vertices = face.Vertices;
+        Vector3d vec1(vertices[0]->x, vertices[0]->y, vertices[0]->z);
+        Vector3d vec2(vertices[1]->x, vertices[1]->y, vertices[1]->z);
+        Vector3d vec3(vertices[2]->x, vertices[2]->y, vertices[2]->z);
+        const double num1 =
+            vec1.y * (vec2.z - vec3.z) + vec2.y * (vec3.z - vec1.z) +
+            vec3.y * (vec1.z - vec2.z);
+        const double num2 =
+            vec1.z * (vec2.x - vec3.x) + vec2.z * (vec3.x - vec1.x) +
+            vec3.z * (vec1.x - vec2.x);
+        const double denominator =
+            vec1.x * (vec2.y - vec3.y) + vec2.x * (vec3.y - vec1.y) +
+            vec3.x * (vec1.y - vec2.y);
+        if (!std::isfinite(denominator) ||
+            std::abs(denominator) <= kDeterminantEpsilon) {
+            return false;
+        }
+
+        const double ratio = -0.5 / denominator;
+        Vector2f point((float)(num1 * ratio), (float)(num2 * ratio));
+        if (!IsFinitePoint(point)) {
+            return false;
+        }
+        face.dualPoint.emplace(point);
+    }
+    *outPoint = face.dualPoint.value();
+    return true;
 }
 
 inline static double Det(Vector3d *m)
@@ -36,39 +63,59 @@ inline static double Det(Vector3d *m)
 
 inline static double LengthSquared(double x, double y) { return x * x + y * y; }
 
-static Vector2f GetCircumcenter(ConvexFace<Site> &face)
+static bool TryGetCircumcenter(ConvexFace<Site> &face, Vector2f *outPoint)
 {
+    if (outPoint == nullptr) {
+        return false;
+    }
     if (!face.circumcenter.has_value()) {
-        auto &Vertices = face.Vertices;
+        auto &vertices = face.Vertices;
         Vector3d data[3];
         for (int i = 0; i < 3; i++) {
-            data[i].x = Vertices[i]->x;
-            data[i].y = Vertices[i]->y;
+            data[i].x = vertices[i]->x;
+            data[i].y = vertices[i]->y;
             data[i].z = 1.0;
         }
-        double num = Det(data);
-        double num2 = -1.0 / (2.0 * num);
+        const double determinant = Det(data);
+        if (!std::isfinite(determinant) ||
+            std::abs(determinant) <= kDeterminantEpsilon) {
+            return false;
+        }
+        const double ratio = -1.0 / (2.0 * determinant);
         for (int j = 0; j < 3; j++) {
-            data[j].x = LengthSquared(Vertices[j]->x, Vertices[j]->y);
+            data[j].x = LengthSquared(vertices[j]->x, vertices[j]->y);
         }
-        double num3 = 0.0 - Det(data);
+        const double num3 = 0.0 - Det(data);
         for (int k = 0; k < 3; k++) {
-            data[k].y = Vertices[k]->x;
+            data[k].y = vertices[k]->x;
         }
-        double num4 = Det(data);
-        face.circumcenter.emplace((float)(num2 * num3), (float)(num2 * num4));
+        const double num4 = Det(data);
+        Vector2f point((float)(ratio * num3), (float)(ratio * num4));
+        if (!IsFinitePoint(point)) {
+            return false;
+        }
+        face.circumcenter.emplace(point);
     }
-    return face.circumcenter.value();
+    *outPoint = face.circumcenter.value();
+    return true;
 }
 
-static void PolyForRandomPoints(std::vector<Vector2f> &verts)
+static bool PolyForRandomPoints(std::vector<Vector2f> &verts)
 {
-    if (verts.empty()) {
-        return;
+    if (verts.size() < 3) {
+        return false;
+    }
+    if (!std::ranges::all_of(verts, [](const Vector2f &point) {
+            return IsFinitePoint(point);
+        })) {
+        return false;
     }
     ConvexHull hull;
     auto hullResult = hull.Create2D(verts);
     auto &Points = hullResult.Points;
+    if (Points.size() < 3) {
+        return false;
+    }
     double area = 0.0;
     int count = Points.size();
     for (int i = 0; i < count; i++) {
@@ -77,6 +124,10 @@ static void PolyForRandomPoints(std::vector<Vector2f> &verts)
         auto &vector2 = *Points[index];
         area += vector1.x * vector2.y - vector2.x * vector1.y;
     }
+    if (!std::isfinite(area) || std::abs(area) <= kDeterminantEpsilon) {
+        return false;
+    }
+
     std::vector<Vector2f> result;
     if (area < 0.0) {
         for (auto itr = Points.rbegin(); itr != Points.rend(); ++itr) {
@@ -87,7 +138,13 @@ static void PolyForRandomPoints(std::vector<Vector2f> &verts)
             result.emplace_back(**itr);
         }
     }
+    if (result.size() < 3 || !std::ranges::all_of(result, [](const Vector2f &point) {
+            return IsFinitePoint(point);
+        })) {
+        return false;
+    }
     verts.swap(result);
+    return true;
 }
 
 static bool ContainsVert(const ConvexFace<Site> *face, const Site *target)
@@ -199,6 +256,12 @@ bool Diagram::MakeVD(const Rect &bounds)
         voronoi.BuildRegion(site);
         voronoi.FindNeighborSites(site);
         site.polygon.Intersect(m_bounds);
+        if (site.polygon.Vertices.size() < 3 ||
+            !std::ranges::all_of(site.polygon.Vertices, [](const Vector2f &point) {
+                return IsFinitePoint(point);
+            })) {
+            return false;
+        }
     }
     for (auto &site : m_sites) {
         site.UpdatePosition();
@@ -231,7 +294,10 @@ bool Diagram::ComputeNode()
     bounds.y -= 500.0f;
     bounds.width += 500.0f;
     bounds.height += 500.0f;
-    MakeVD(bounds);
+    if (!MakeVD(bounds)) {
+        m_sites.resize(originSize);
+        return false;
+    }
     m_sites.resize(originSize);
     for (auto &site : m_sites) {
         FilterNeighbours(site);
@@ -243,9 +309,15 @@ bool Diagram::ComputeVD()
 {
     ConvexHull hull;
     auto hullResult = hull.CreateDelaunay(m_sites);
+    if (hullResult.Faces.empty()) {
+        return false;
+    }
     std::vector<ConvexFace<Site> *> roundFaces;
     for (auto &cell : hullResult.Faces) {
-        GetCircumcenter(cell);
+        Vector2f cellCenter;
+        if (!TryGetCircumcenter(cell, &cellCenter)) {
+            return false;
+        }
         for (auto site : cell.Vertices) {
             if (site->dummy || site->visited) {
                 continue;
@@ -254,11 +326,23 @@ bool Diagram::ComputeVD()
             site->polygon.Clear();
             TouchingFaces(site, cell, roundFaces);
             for (auto item : roundFaces) {
-                auto center = GetCircumcenter(*item);
+                Vector2f center;
+                if (!TryGetCircumcenter(*item, &center)) {
+                    return false;
+                }
                 site->polygon.Vertices.emplace_back(center);
             }
-            PolyForRandomPoints(site->polygon.Vertices);
+            if (!PolyForRandomPoints(site->polygon.Vertices)) {
+                return false;
+            }
             site->polygon.Intersect(m_bounds);
+            if (site->polygon.Vertices.size() < 3 ||
+                !std::ranges::all_of(site->polygon.Vertices,
+                                     [](const Vector2f &point) {
+                                         return IsFinitePoint(point);
+                                     })) {
+                return false;
+            }
         }
     }
     for (auto &site : m_sites) {
@@ -271,7 +355,10 @@ bool Diagram::ComputeVD()
 bool Diagram::ComputePD()
 {
     ConvexHull hull;
-    auto hullResult= hull.Create(m_sites);
+    auto hullResult = hull.Create(m_sites);
+    if (hullResult.Faces.empty()) {
+        return false;
+    }
     std::vector<ConvexFace<Site> *> roundFaces;
     for (auto &face : hullResult.Faces) {
         if (face.Normal[2] >= -EPSILON) {
@@ -287,11 +374,23 @@ bool Diagram::ComputePD()
             TouchingFaces(site, face, roundFaces);
             site->neighbours = GenerateNeighbors(site, face);
             for (auto item : roundFaces) {
-                auto center = GetDualPoint(*item);
+                Vector2f center;
+                if (!TryGetDualPoint(*item, &center)) {
+                    return false;
+                }
                 site->polygon.Vertices.emplace_back(center);
             }
-            PolyForRandomPoints(site->polygon.Vertices);
+            if (!PolyForRandomPoints(site->polygon.Vertices)) {
+                return false;
+            }
             site->polygon.Intersect(m_bounds);
+            if (site->polygon.Vertices.size() < 3 ||
+                !std::ranges::all_of(site->polygon.Vertices,
+                                     [](const Vector2f &point) {
+                                         return IsFinitePoint(point);
+                                     })) {
+                return false;
+            }
         }
     }
     for (auto &site : m_sites) {
@@ -303,14 +402,25 @@ bool Diagram::ComputePD()
 bool Diagram::ComputePowerDiagram()
 {
     for (int i = 0; i <= 500; i++) {
-        UpdateWeights();
-        ComputePD();
+        if (!UpdateWeights()) {
+            return false;
+        }
+        if (!ComputePD()) {
+            return false;
+        }
         float max = 0.0f;
         for (auto &site : m_sites) {
             if (!site.dummy) {
                 float area1 = site.polygon.Area();
                 float area2 = site.weight / m_weightSum * m_bounds.Area();
+                if (!std::isfinite(area1) || !std::isfinite(area2) ||
+                    area1 <= EPSILON || area2 <= EPSILON) {
+                    return false;
+                }
                 float ratio = std::abs(area1 - area2) / area2;
+                if (!std::isfinite(ratio)) {
+                    return false;
+                }
                 if (max < ratio) {
                     max = ratio;
                 }
@@ -323,7 +433,7 @@ bool Diagram::ComputePowerDiagram()
     return true;
 }
 
-void Diagram::UpdateWeights()
+bool Diagram::UpdateWeights()
 {
     float min = 0.0f;
     int externCount = m_bounds.Vertices.size() * 2;
@@ -335,7 +445,14 @@ void Diagram::UpdateWeights()
         }
         float area1 = site.polygon.Area();
         float area2 = site.weight / (double)m_weightSum * m_bounds.Area();
+        if (!std::isfinite(area1) || !std::isfinite(area2) || area1 <= EPSILON ||
+            area2 <= EPSILON) {
+            return false;
+        }
         float ratio = area2 / area1;
+        if (!std::isfinite(ratio) || ratio <= 0.0f) {
+            return false;
+        }
         if ((ratio > 1.1f && site.previousWeightAdaption < 0.9f) ||
             (ratio < 0.9f && site.previousWeightAdaption > 1.1f)) {
             ratio = std::sqrt(ratio);
@@ -374,6 +491,9 @@ void Diagram::UpdateWeights()
         if (site.neighbours.empty()) {
             float dist = site.x * site.x + site.y * site.y;
             float factor = dist / (std::abs(site.currentWeight) + 1.0f);
+            if (!std::isfinite(factor)) {
+                return false;
+            }
             if (factor < min) {
                 min = factor;
             }
@@ -382,6 +502,9 @@ void Diagram::UpdateWeights()
             float diff = site.currentWeight - neighbour->currentWeight;
             float dist = site.DistanceSquared(*neighbour);
             float factor = dist / (std::abs(diff) + 1.0f);
+            if (!std::isfinite(factor)) {
+                return false;
+            }
             if (factor < min) {
                 min = factor;
             }
@@ -391,11 +514,15 @@ void Diagram::UpdateWeights()
         site.currentWeight *= min;
         site.UpdatePosition();
     }
+    return true;
 }
 
 bool Diagram::ComputeNodePD()
 {
     size_t originSize = m_sites.size();
+    auto cleanup = [&]() {
+        m_sites.resize(originSize);
+    };
     auto &centroid = m_bounds.Centroid();
     auto index = (uint16_t)(originSize + 1);
     m_weightSum = 0.0f;
@@ -419,9 +546,15 @@ bool Diagram::ComputeNodePD()
         m_sites.emplace_back(index++, extPoint2, EPSILON);
         m_sites.back().dummy = true;
     }
-    ComputeVD();
-    ComputePowerDiagram();
-    m_sites.resize(originSize);
+    if (!ComputeVD()) {
+        cleanup();
+        return false;
+    }
+    if (!ComputePowerDiagram()) {
+        cleanup();
+        return false;
+    }
+    cleanup();
     for (auto &site : m_sites) {
         FilterNeighbours(site);
     }

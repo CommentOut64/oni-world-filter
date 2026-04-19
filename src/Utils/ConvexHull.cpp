@@ -4,6 +4,14 @@ ConvexHullResult<Vector2f> ConvexHull::Create2D(std::vector<Vector2f> &vertices)
 {
     int NumOfDimensions = 2;
     int NumberOfVertices = (int)vertices.size();
+    ConvexHullResult<Vector2f> result;
+    if (NumberOfVertices < 3) {
+        result.Points.reserve(vertices.size());
+        for (auto &vertex : vertices) {
+            result.Points.push_back(&vertex);
+        }
+        return result;
+    }
     Positions.resize(NumberOfVertices * NumOfDimensions);
     size_t index = 0;
     for (auto &v : vertices) {
@@ -12,7 +20,6 @@ ConvexHullResult<Vector2f> ConvexHull::Create2D(std::vector<Vector2f> &vertices)
     }
     chAlgo.Initialize(Positions.data(), NumberOfVertices, NumOfDimensions);
     chAlgo.GetConvexHull();
-    ConvexHullResult<Vector2f> result;
     Get2DResultInOrder(vertices, result);
     return result;
 }
@@ -99,11 +106,17 @@ void ConvexHull::GetConvexFaces(std::vector<T> &vertices, bool lift, int dim,
         auto &face = FacePool[faces[i]];
         auto &cell = Faces[i];
         for (auto j = 0; j < NumOfDimensions; j++) {
-            if (face.AdjacentFaces[j] < 0) {
+            const auto adjacentIndex = face.AdjacentFaces[j];
+            if (adjacentIndex < 0 || adjacentIndex >= (int)FacePool.size()) {
                 cell.Adjacency[j] = nullptr;
                 continue;
             }
-            cell.Adjacency[j] = &Faces[FacePool[face.AdjacentFaces[j]].Tag];
+            const auto mappedIndex = FacePool[adjacentIndex].Tag;
+            if (mappedIndex < 0 || mappedIndex >= cellCount) {
+                cell.Adjacency[j] = nullptr;
+                continue;
+            }
+            cell.Adjacency[j] = &Faces[mappedIndex];
         }
 
         // Fix the vertex orientation.
@@ -124,6 +137,13 @@ void ConvexHull::Get2DResultInOrder(std::vector<Vector2f> &data,
 {
     std::vector<ConvexFace<Vector2f>> Faces;
     GetConvexFaces<Vector2f>(data, true, 2, Faces);
+    if (Faces.empty()) {
+        result.Points.reserve(data.size());
+        for (auto &vertex : data) {
+            result.Points.push_back(&vertex);
+        }
+        return;
+    }
     int num = Faces.size();
     std::map<Vector2f *, ConvexFace<Vector2f> *> dictionary;
     for (auto &val : Faces) {
@@ -136,9 +156,14 @@ void ConvexHull::Get2DResultInOrder(std::vector<Vector2f> &data,
     list.push_back(val2);
     int num2 = 0;
     int num3 = 0;
-    while (val3 != val2) {
+    int safetyCounter = 0;
+    while (val3 != val2 && safetyCounter++ <= num + 1) {
         list.push_back(val3);
-        auto val4 = dictionary[val3];
+        auto itr = dictionary.find(val3);
+        if (itr == dictionary.end() || itr->second == nullptr) {
+            break;
+        }
+        auto val4 = itr->second;
         if (val3->x < list[num2]->x ||
             (val3->x == list[num2]->x && val3->y <= list[num2]->y)) {
             num2 = num3;
@@ -146,9 +171,13 @@ void ConvexHull::Get2DResultInOrder(std::vector<Vector2f> &data,
         num3++;
         val3 = val4->Vertices[0];
     }
-    result.Points.resize(num);
-    for (int j = 0; j < num; j++) {
-        int index = (j + num2) % num;
+    if (list.empty()) {
+        return;
+    }
+    const int orderedCount = (int)list.size();
+    result.Points.resize(orderedCount);
+    for (int j = 0; j < orderedCount; j++) {
+        int index = (j + num2) % orderedCount;
         result.Points[j] = list[index];
     }
 }

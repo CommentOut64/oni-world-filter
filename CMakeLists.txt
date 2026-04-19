@@ -5,6 +5,8 @@ project("oniWorldApp")
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+option(ONI_BUILD_SIDECAR "Build native sidecar executable" ON)
+enable_testing()
 
 if(EMSCRIPTEN)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")

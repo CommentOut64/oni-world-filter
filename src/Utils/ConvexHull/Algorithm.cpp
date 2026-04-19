@@ -1,6 +1,7 @@
 #include "Algorithm.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <numeric>
 #include <ranges>
 
@@ -268,6 +269,16 @@ void ConvexHullAlgorithm::ShiftAndScalePositions()
 void ConvexHullAlgorithm::CreateInitialSimplex()
 {
     auto initialPoints = FindInitialPoints();
+    if ((int)initialPoints.size() <= NumOfDimensions) {
+        std::fprintf(stderr,
+                     "error %s:%d initial simplex points are insufficient, dim=%d points=%zu vertices=%d\n",
+                     __func__,
+                     __LINE__,
+                     NumOfDimensions,
+                     initialPoints.size(),
+                     NumberOfVertices);
+        return;
+    }
     // region Create the first faces from(dimension + 1) vertices.
 
     int faces[MaxDimension + 1] = {0};
@@ -281,7 +292,15 @@ void ConvexHullAlgorithm::CreateInitialSimplex()
         std::sort(vertices.begin(), vertices.begin() + NumOfDimensions);
         auto &newFace = FacePool[GetFaceFromPool()];
         newFace.Vertices = vertices;
-        mathHelper.CalculateFacePlane(newFace, InsidePoint.data());
+        if (!mathHelper.CalculateFacePlane(newFace, InsidePoint.data())) {
+            std::fprintf(stderr,
+                         "error %s:%d calculate initial face plane failed, dim=%d face=%d\n",
+                         __func__,
+                         __LINE__,
+                         NumOfDimensions,
+                         newFace.Index);
+            return;
+        }
         faces[i] = newFace.Index;
     }
     // update the adjacency (check all pairs of faces)
@@ -372,7 +391,7 @@ std::vector<int> ConvexHullAlgorithm::FindInitialPoints()
     // unique points, we start again with ALL the vertices. The following is a
     // near replica of the code above, but instead of extremes, we consider
     // "allVertices".
-    if ((int)initialPoints.size() <= NumOfDimensions && !IsLifted) {
+    if ((int)initialPoints.size() <= NumOfDimensions) {
         std::vector<int> allVertices(NumberOfVertices);
         std::iota(allVertices.begin(), allVertices.end(), 0);
         while (index < NumOfDimensions && !allVertices.empty()) {
@@ -405,43 +424,6 @@ std::vector<int> ConvexHullAlgorithm::FindInitialPoints()
             CurrentVertex = bestVertex;
             UpdateCenter();
         }
-    }
-    if ((int)initialPoints.size() <= NumOfDimensions && IsLifted) {
-        /*
-        std::vector<int> allVertices(NumberOfVertices);
-        std::iota(allVertices.begin(), allVertices.end(), 0);
-        while (index < NumOfDimensions && !allVertices.empty()) {
-            int bestVertex = -1;
-            std::array<double, MaxDimension> bestEdgeVector;
-            double maxVolume = 0.0;
-            for (int i = allVertices.size() - 1; i >= 0; i--) {
-                // count backwards in order to remove potential duplicates
-                int vIndex = allVertices[i];
-                if (std::ranges::contains(initialPoints, vIndex))
-                    allVertices.erase(allVertices.begin() + i);
-                else {
-                    mathHelper.RandomOffsetToLift(vIndex, maxima.Last() -
-                                                              minima.Last());
-                    edgeVectors[index] =
-                        mathHelper.VectorBetweenVertices(vIndex, vertex1);
-                    var volume = mathHelper.GetSimplexVolume(edgeVectors, index,
-                                                             bigNumber);
-                    if (maxVolume < volume) {
-                        maxVolume = volume;
-                        bestVertex = vIndex;
-                        bestEdgeVector = edgeVectors[index];
-                    }
-                }
-            }
-            allVertices.Remove(bestVertex);
-            if (bestVertex == -1)
-                break;
-            initialPoints.Add(bestVertex);
-            edgeVectors[index++] = bestEdgeVector;
-            CurrentVertex = bestVertex;
-            UpdateCenter();
-        }
-        */
     }
     return initialPoints;
 }
@@ -523,6 +505,9 @@ void ConvexHullAlgorithm::TraverseAffectedFaces(int currentFace)
         auto &top = FacePool[topIndex];
         for (auto i = 0; i < NumOfDimensions; i++) {
             auto adjFace = top.AdjacentFaces[i];
+            if (adjFace < 0 || adjFace >= (int)FacePool.size()) {
+                continue;
+            }
             if (AffectedFaceFlags[adjFace])
                 continue;
             auto distance =
@@ -559,6 +544,9 @@ bool ConvexHullAlgorithm::CreateCone()
         auto updateCount = 0;
         for (auto i = 0; i < NumOfDimensions; i++) {
             auto af = oldFace.AdjacentFaces[i];
+            if (af < 0 || af >= (int)FacePool.size()) {
+                continue;
+            }
             // Tag == false when oldFaces does not contain af
             if (!AffectedFaceFlags[af]) {
                 UpdateBuffer[updateCount] = af;

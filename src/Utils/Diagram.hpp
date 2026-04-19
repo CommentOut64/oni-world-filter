@@ -22,6 +22,6 @@ private:
     bool MakeVD(const Rect &bounds);
     bool ComputeVD();
     bool ComputePD();
-    void UpdateWeights();
+    bool UpdateWeights();
     bool ComputePowerDiagram();
 };

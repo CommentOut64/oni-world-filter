@@ -18,7 +18,12 @@ export default (
             rules: [
                 {
                     test: /\.ts(x)?$/,
-                    use: "ts-loader",
+                    use: {
+                        loader: "ts-loader",
+                        options: {
+                            configFile: "tsconfig.web.json",
+                        },
+                    },
                     exclude: /node_modules/,
                 },
                 {
@@ -38,6 +43,13 @@ export default (
         },
         resolve: {
             extensions: [".tsx", ".ts", ".js"],
+            alias: {
+                "@generated-wasm-files$": path.resolve(
+                    __dirname,
+                    wasmpath,
+                    "WasmFiles.ts"
+                ),
+            },
         },
         performance: {
             hints: false,

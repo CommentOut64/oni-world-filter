@@ -138,7 +138,33 @@ private:
     uint32_t m_initialWorkers = 1;
     uint32_t m_reductionCount = 0;
     double m_peakSeedsPerSecond = 0.0;
+    double m_stagePeakSeedsPerSecond = 0.0;
     int m_consecutiveDrops = 0;
+    std::chrono::steady_clock::time_point m_lastAdjustment{};
+};
+
+struct RecoveryConfig {
+    bool enabled = true;
+    int stableWindows = 4;
+    double retentionRatio = 0.97;
+    std::chrono::milliseconds cooldown{12000};
+};
+
+class BoundedRecoveryController
+{
+public:
+    BoundedRecoveryController(RecoveryConfig config, uint32_t initialWorkers);
+
+    std::optional<uint32_t> Observe(double currentSeedsPerSecond,
+                                    uint32_t currentWorkers,
+                                    std::chrono::steady_clock::time_point now);
+
+private:
+    RecoveryConfig m_config{};
+    uint32_t m_initialWorkers = 1;
+    uint32_t m_lastObservedWorkers = 1;
+    double m_stageBaselineSeedsPerSecond = 0.0;
+    int m_consecutiveStableWindows = 0;
     std::chrono::steady_clock::time_point m_lastAdjustment{};
 };
 
