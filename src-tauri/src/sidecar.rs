@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 use std::env;
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -570,11 +571,8 @@ pub fn load_preview(
     }
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_preview_command(request);
-    let events = run_sidecar_request_collect(
-        &sidecar_path,
-        &payload,
-        sidecar_request_priority(&payload),
-    )?;
+    let events =
+        run_sidecar_request_collect(&sidecar_path, &payload, sidecar_request_priority(&payload))?;
 
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
@@ -639,11 +637,8 @@ pub fn analyze_search_request(
     }
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_analyze_search_command(request);
-    let events = run_sidecar_request_collect(
-        &sidecar_path,
-        &payload,
-        sidecar_request_priority(&payload),
-    )?;
+    let events =
+        run_sidecar_request_collect(&sidecar_path, &payload, sidecar_request_priority(&payload))?;
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
             let message = event
@@ -693,19 +688,102 @@ fn collect_sidecar_candidates(manifest_dir: &Path, resource_dir: Option<&Path>) 
     candidates
 }
 
+#[derive(Debug)]
+struct ExistingSidecarCandidate {
+    path: PathBuf,
+    modified_at: SystemTime,
+    preference_index: usize,
+}
+
+fn collect_existing_sidecar_candidates(candidates: &[PathBuf]) -> Vec<ExistingSidecarCandidate> {
+    candidates
+        .iter()
+        .enumerate()
+        .filter_map(|(preference_index, path)| {
+            let metadata = path.metadata().ok()?;
+            if !metadata.is_file() || metadata.len() == 0 {
+                return None;
+            }
+            let modified_at = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+            Some(ExistingSidecarCandidate {
+                path: path.to_path_buf(),
+                modified_at,
+                preference_index,
+            })
+        })
+        .collect()
+}
+
 fn first_existing_sidecar_path(candidates: &[PathBuf]) -> Option<PathBuf> {
-    candidates.iter().find_map(|path| {
-        let exists = path.is_file()
-            && path
-                .metadata()
-                .map(|metadata| metadata.len() > 0)
-                .unwrap_or(false);
-        if exists {
-            Some(path.to_path_buf())
-        } else {
-            None
+    collect_existing_sidecar_candidates(candidates)
+        .into_iter()
+        .max_by(|left, right| {
+            left.modified_at
+                .cmp(&right.modified_at)
+                .then_with(|| right.preference_index.cmp(&left.preference_index))
+        })
+        .map(|candidate| candidate.path)
+}
+
+fn runtime_sidecar_dir(app: &AppHandle) -> Result<PathBuf, HostError> {
+    let base_dir = app.path().app_local_data_dir().map_err(|error| {
+        HostError::InvalidRequest(format!("无法解析 sidecar 运行目录: {}", error))
+    })?;
+    Ok(base_dir.join("sidecars"))
+}
+
+fn runtime_sidecar_file_name(source_path: &Path) -> Result<String, HostError> {
+    let metadata = source_path.metadata()?;
+    let modified = metadata
+        .modified()
+        .unwrap_or(SystemTime::UNIX_EPOCH)
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    Ok(format!("oni-sidecar-{}-{}.exe", modified, metadata.len()))
+}
+
+fn cleanup_runtime_sidecar_dir(runtime_dir: &Path, active_path: &Path) -> Result<(), HostError> {
+    if !runtime_dir.is_dir() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(runtime_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path == active_path {
+            continue;
         }
-    })
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !file_name.starts_with("oni-sidecar-") || !file_name.ends_with(".exe") {
+            continue;
+        }
+        if let Err(error) = fs::remove_file(&path) {
+            if error.kind() != std::io::ErrorKind::NotFound
+                && error.kind() != std::io::ErrorKind::PermissionDenied
+                && error.kind() != std::io::ErrorKind::Other
+            {
+                return Err(HostError::Io(error));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn prepare_runtime_sidecar_copy(
+    runtime_dir: &Path,
+    source_path: &Path,
+) -> Result<PathBuf, HostError> {
+    fs::create_dir_all(runtime_dir)?;
+    let runtime_path = runtime_dir.join(runtime_sidecar_file_name(source_path)?);
+    if !runtime_path.is_file() {
+        fs::copy(source_path, &runtime_path)?;
+    }
+    cleanup_runtime_sidecar_dir(runtime_dir, &runtime_path)?;
+    Ok(runtime_path)
 }
 
 pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostError> {
@@ -721,6 +799,9 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
     let candidates = collect_sidecar_candidates(&manifest_dir, resource_dir.as_deref());
 
     if let Some(existing) = first_existing_sidecar_path(&candidates) {
+        if let Some(app_handle) = app {
+            return prepare_runtime_sidecar_copy(&runtime_sidecar_dir(app_handle)?, &existing);
+        }
         return Ok(existing);
     }
 
@@ -733,7 +814,10 @@ fn run_sidecar_request_collect(
     priority: SidecarProcessPriority,
 ) -> Result<Vec<Value>, HostError> {
     let mut command = Command::new(sidecar_path);
-    command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     let mut child = command.spawn()?;
     apply_process_priority(&child, priority);
 
@@ -847,8 +931,7 @@ fn detect_preview_affinity_mask() -> Option<usize> {
     let mut cpu_sets = Vec::new();
     let mut offset = 0usize;
     while offset + size_of::<SYSTEM_CPU_SET_INFORMATION>() <= bytes_needed as usize {
-        let raw =
-            unsafe { &*(buffer.as_ptr().add(offset) as *const SYSTEM_CPU_SET_INFORMATION) };
+        let raw = unsafe { &*(buffer.as_ptr().add(offset) as *const SYSTEM_CPU_SET_INFORMATION) };
         if raw.Size == 0 {
             break;
         }
@@ -1158,10 +1241,11 @@ mod tests {
     use crate::state::RunningJobHandles;
 
     use super::{
-        collect_sidecar_candidates, first_existing_sidecar_path, list_geyser_options,
-        list_world_options, preview_affinity_mask_for_cpu_sets, request_search_cancel,
-        force_stop_child_process, resolve_sidecar_path, run_sidecar_request_collect,
-        PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
+        collect_sidecar_candidates, first_existing_sidecar_path, force_stop_child_process,
+        list_geyser_options, list_world_options, prepare_runtime_sidecar_copy,
+        preview_affinity_mask_for_cpu_sets, request_search_cancel, resolve_sidecar_path,
+        run_sidecar_request_collect, PreviewCpuSetInfo, SearchCatalogPayload,
+        SidecarProcessPriority,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -1226,18 +1310,19 @@ mod tests {
     }
 
     #[test]
-    fn resolve_candidates_should_prefer_synced_binary_over_build_outputs() {
-        let root = create_temp_root("prefer-binaries");
+    fn resolve_candidates_should_choose_latest_modified_sidecar() {
+        let root = create_temp_root("prefer-latest");
         let manifest_dir = root.join("src-tauri");
         let binaries = manifest_dir.join("binaries/oni-sidecar.exe");
         let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
 
         write_dummy_sidecar(&binaries);
+        std::thread::sleep(Duration::from_millis(20));
         write_dummy_sidecar(&x64);
 
         let candidates = collect_sidecar_candidates(&manifest_dir, None);
         let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
-        assert_eq!(resolved, binaries);
+        assert_eq!(resolved, x64);
 
         fs::remove_dir_all(root).expect("temp root should be removed");
     }
@@ -1249,12 +1334,43 @@ mod tests {
         let mingw = root.join("out/build/mingw-release/src/oni-sidecar.exe");
         let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
 
-        write_dummy_sidecar(&mingw);
         write_dummy_sidecar(&x64);
+        std::thread::sleep(Duration::from_millis(20));
+        write_dummy_sidecar(&mingw);
 
         let candidates = collect_sidecar_candidates(&manifest_dir, None);
         let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
         assert_eq!(resolved, mingw);
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn prepare_runtime_sidecar_copy_should_keep_only_latest_runtime_copy() {
+        let root = create_temp_root("runtime-sidecar-copy");
+        let runtime_dir = root.join("runtime");
+        let source_a = root.join("out/build/mingw-release/src/oni-sidecar.exe");
+        let source_b = root.join("out/build/mingw-debug/src/oni-sidecar.exe");
+
+        write_dummy_sidecar(&source_a);
+        std::thread::sleep(Duration::from_millis(20));
+        write_dummy_sidecar(&source_b);
+
+        let first_copy =
+            prepare_runtime_sidecar_copy(&runtime_dir, &source_a).expect("first runtime copy");
+        assert!(first_copy.is_file(), "first runtime copy should exist");
+
+        let second_copy =
+            prepare_runtime_sidecar_copy(&runtime_dir, &source_b).expect("second runtime copy");
+        assert!(second_copy.is_file(), "second runtime copy should exist");
+        assert_ne!(
+            first_copy, second_copy,
+            "new sidecar should use a new runtime copy path"
+        );
+        assert!(
+            !first_copy.exists(),
+            "older runtime sidecar copy should be cleaned after switching"
+        );
 
         fs::remove_dir_all(root).expect("temp root should be removed");
     }
@@ -1302,7 +1418,10 @@ mod tests {
             },
         ];
 
-        assert_eq!(preview_affinity_mask_for_cpu_sets(&cpu_sets), Some((1usize << 8) | (1usize << 9)));
+        assert_eq!(
+            preview_affinity_mask_for_cpu_sets(&cpu_sets),
+            Some((1usize << 8) | (1usize << 9))
+        );
     }
 
     #[test]
@@ -1396,12 +1515,9 @@ mod tests {
             "seed": 100123,
             "mixing": 625
         });
-        let events = run_sidecar_request_collect(
-            &path,
-            &request,
-            SidecarProcessPriority::LowPerfAffinity,
-        )
-        .expect("preview smoke should succeed");
+        let events =
+            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity)
+                .expect("preview smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "preview"));
     }
 
@@ -1442,12 +1558,9 @@ mod tests {
             "seed": 100030,
             "mixing": 625
         });
-        let events = run_sidecar_request_collect(
-            &path,
-            &request,
-            SidecarProcessPriority::LowPerfAffinity,
-        )
-        .expect("preview should not crash");
+        let events =
+            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity)
+                .expect("preview should not crash");
         assert!(events
             .iter()
             .any(|event| { event["event"] == "preview" || event["event"] == "failed" }));
