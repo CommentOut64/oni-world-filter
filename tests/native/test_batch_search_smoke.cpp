@@ -252,6 +252,85 @@ int RunAllTests()
         Expect(sawRecovered, "worker cap run should observe recovered active workers", failures);
     }
 
+    {
+        Batch::SearchRequest request;
+        request.seedStart = 1;
+        request.seedEnd = 3600;
+        request.workerCount = 6;
+        request.chunkSize = 4;
+        request.progressInterval = 4;
+        request.sampleWindow = std::chrono::milliseconds(40);
+        request.maxRunDuration = std::chrono::milliseconds(0);
+        request.enableAdaptive = true;
+        request.adaptiveConfig.enabled = true;
+        request.adaptiveConfig.minWorkers = 3;
+        request.adaptiveConfig.dropThreshold = 0.20;
+        request.adaptiveConfig.consecutiveDropWindows = 2;
+        request.adaptiveConfig.cooldown = std::chrono::milliseconds(20);
+        request.enableRecovery = true;
+        request.recoveryConfig.enabled = true;
+        request.recoveryConfig.stableWindows = 1;
+        request.recoveryConfig.retentionRatio = 0.95;
+        request.recoveryConfig.cooldown = std::chrono::milliseconds(15);
+
+        std::atomic<int> counter{0};
+        request.evaluateSeed = [&](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            const int index = counter.fetch_add(1, std::memory_order_relaxed);
+            if (index < 240) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            } else if (index < 1200) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            return evaluation;
+        };
+
+        std::vector<int> observedWorkers;
+        std::mutex observedWorkersMutex;
+
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
+            if (!event.hasWindowSample) {
+                return;
+            }
+            std::lock_guard<std::mutex> lock(observedWorkersMutex);
+            observedWorkers.push_back(event.activeWorkers);
+        };
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+
+        bool sawReduced = false;
+        bool sawRecoveredToInitial = false;
+        int maxObservedWorkers = 0;
+        for (int value : observedWorkers) {
+            maxObservedWorkers = std::max(maxObservedWorkers, value);
+            if (value < static_cast<int>(request.workerCount)) {
+                sawReduced = true;
+            }
+            if (sawReduced && value == static_cast<int>(request.workerCount)) {
+                sawRecoveredToInitial = true;
+            }
+        }
+
+        Expect(!result.failed, "bounded recovery run should not fail", failures);
+        Expect(!result.cancelled, "bounded recovery run should not cancel", failures);
+        Expect(result.processedSeeds == result.totalSeeds,
+               "bounded recovery run should process all seeds",
+               failures);
+        Expect(sawReduced,
+               "bounded recovery run should reduce active workers after throughput drops",
+               failures);
+        Expect(sawRecoveredToInitial,
+               "bounded recovery run should recover back to the initial worker count",
+               failures);
+        Expect(maxObservedWorkers <= static_cast<int>(request.workerCount),
+               "bounded recovery run should never exceed the initial worker count",
+               failures);
+    }
+
     if (failures == 0) {
         std::cout << "[PASS] test_batch_search_smoke" << std::endl;
         return 0;

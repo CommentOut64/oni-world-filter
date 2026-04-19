@@ -59,6 +59,37 @@ int RunAllTests()
     }
 
     {
+        BatchCpu::RecoveryConfig config;
+        config.enabled = true;
+        config.stableWindows = 2;
+        config.retentionRatio = 0.97;
+        config.cooldown = std::chrono::milliseconds(1);
+
+        BatchCpu::BoundedRecoveryController controller(config, 8);
+        const auto t0 = std::chrono::steady_clock::now();
+
+        Expect(!controller.Observe(70.0, 6, t0).has_value(),
+               "recovery controller should establish a stage baseline before recovering",
+               failures);
+        Expect(!controller.Observe(69.0, 6, t0 + std::chrono::milliseconds(2)).has_value(),
+               "recovery controller should wait for the configured number of stable windows",
+               failures);
+
+        const auto firstRecovery =
+            controller.Observe(68.5, 6, t0 + std::chrono::milliseconds(4));
+        Expect(firstRecovery.has_value() && firstRecovery.value() == 7,
+               "recovery controller should raise workers by exactly one after stable windows",
+               failures);
+
+        Expect(!controller.Observe(68.0, 7, t0 + std::chrono::milliseconds(6)).has_value(),
+               "worker-count changes should reset the recovery baseline",
+               failures);
+        Expect(!controller.Observe(68.0, 8, t0 + std::chrono::milliseconds(8)).has_value(),
+               "recovery controller should never raise above the initial worker count",
+               failures);
+    }
+
+    {
         Batch::SearchRequest request;
         request.seedStart = 1;
         request.seedEnd = 100000;
@@ -169,7 +200,6 @@ int RunAllTests()
     Expect(reducedEvents.load(std::memory_order_relaxed) > 0,
            "adaptive run should emit reduced progress events",
            failures);
-
     if (failures == 0) {
         std::cout << "[PASS] test_adaptive_concurrency" << std::endl;
         return 0;
