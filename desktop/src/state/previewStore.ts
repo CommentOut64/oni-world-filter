@@ -2,11 +2,7 @@ import { create } from "zustand";
 
 import type { PreviewPayload, SearchMatchSummary } from "../lib/contracts";
 import { formatTauriError, loadPreview } from "../lib/tauri";
-import {
-  beginPreviewLoad,
-  completePreviewLoad,
-  failPreviewLoad,
-} from "./previewStoreState";
+import { beginPreviewLoad, completePreviewLoad, failPreviewLoad } from "./previewStoreState";
 
 interface PreviewState {
   activeKey: string | null;
