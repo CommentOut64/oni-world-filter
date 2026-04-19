@@ -19,9 +19,9 @@
 #include "Batch/BatchSearchService.hpp"
 #include "Batch/CpuTopology.hpp"
 #include "Batch/FilterConfig.hpp"
+#include "Batch/SessionWarmupPlanner.hpp"
 #include "Batch/SidecarProtocol.hpp"
 #include "Batch/ThreadPolicy.hpp"
-#include "Batch/ThroughputCalibration.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
 #include "SearchAnalysis/HardValidator.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
@@ -334,23 +334,32 @@ BatchCpu::ThreadPolicy SelectPolicy(const Batch::FilterConfig &cfg)
         return candidates.front();
     }
 
-    const int warmupEnd = std::min(
-        cfg.seedEnd,
-        cfg.seedStart + std::max(1, cfg.cpu.warmupSeedCount) - 1);
+    const int warmupEnd =
+        std::min(cfg.seedEnd, cfg.seedStart + std::max(1, cfg.cpu.warmupSeedCount) - 1);
+    const int warmupTotalSeeds = warmupEnd - cfg.seedStart + 1;
 
-    Batch::ThroughputCalibrationOptions warmupConfig;
+    Batch::SessionWarmupPlannerOptions warmupConfig;
     warmupConfig.enableWarmup = true;
+    warmupConfig.warmupSeedCount = cfg.cpu.warmupSeedCount;
+    warmupConfig.minProcessedSeeds = static_cast<uint64_t>(std::min(
+        warmupTotalSeeds,
+        std::max(1, cfg.cpu.warmupMinSampledSeeds)));
     warmupConfig.totalBudget = std::chrono::milliseconds(cfg.cpu.warmupTotalMs);
     warmupConfig.perCandidateBudget = std::chrono::milliseconds(cfg.cpu.warmupPerCandidateMs);
     warmupConfig.tieToleranceRatio = cfg.cpu.warmupTieTolerance;
 
-    const auto calibration = Batch::SelectThreadPolicyWithWarmup(
+    const auto calibration = Batch::SelectThreadPolicyWithSessionWarmup(
         "sidecar-session",
+        cfg.seedStart,
+        warmupEnd,
         candidates,
         warmupConfig,
-        [&](const BatchCpu::ThreadPolicy &policy, std::chrono::milliseconds budget) {
+        [&](const BatchCpu::ThreadPolicy &policy,
+            const Batch::WarmupSampleSegment &segment,
+            std::chrono::milliseconds budget) {
             auto warmupRequest = BuildSearchRequest(cfg, policy, nullptr, nullptr);
-            warmupRequest.seedEnd = warmupEnd;
+            warmupRequest.seedStart = segment.seedStart;
+            warmupRequest.seedEnd = segment.seedEnd;
             warmupRequest.enableAdaptive = false;
             warmupRequest.adaptiveConfig.enabled = false;
             warmupRequest.maxRunDuration = budget;

@@ -83,6 +83,11 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                                              static_cast<uint32_t>(workerCount));
     BatchCpu::AdaptiveConcurrencyController controller(adaptive,
                                                        static_cast<uint32_t>(workerCount));
+    BatchCpu::RecoveryConfig recovery = request.recoveryConfig;
+    recovery.enabled = request.enableRecovery && recovery.enabled;
+    BatchCpu::BoundedRecoveryController recoveryController(
+        recovery,
+        static_cast<uint32_t>(workerCount));
 
     auto currentActiveWorkers = [&]() {
         int workers = adaptiveWorkers.load(std::memory_order_relaxed);
@@ -273,6 +278,19 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                     adaptiveWorkers.store(static_cast<int>(nextWorkers.value()),
                                           std::memory_order_relaxed);
                     reduced = true;
+                }
+            }
+            if (!reduced && recovery.enabled && !cappedDuringWindow) {
+                const int effectiveWorkers = currentActiveWorkers();
+                const auto nextWorkers = recoveryController.Observe(
+                    seedsPerSecond,
+                    static_cast<uint32_t>(effectiveWorkers),
+                    now);
+                if (nextWorkers.has_value() &&
+                    static_cast<int>(nextWorkers.value()) >
+                        adaptiveWorkers.load(std::memory_order_relaxed)) {
+                    adaptiveWorkers.store(static_cast<int>(nextWorkers.value()),
+                                          std::memory_order_relaxed);
                 }
             }
 

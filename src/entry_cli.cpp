@@ -23,8 +23,8 @@
 #include "Batch/BatchMatcher.hpp"
 #include "Batch/CpuTopology.hpp"
 #include "Batch/FilterConfig.hpp"
+#include "Batch/SessionWarmupPlanner.hpp"
 #include "Batch/ThreadPolicy.hpp"
-#include "Batch/ThroughputCalibration.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
 #include "config.h"
 #include "Setting/SettingsCache.hpp"
@@ -453,8 +453,14 @@ int main(int argc, char *argv[])
             const int warmupMinSampledSeeds = std::min(
                 warmupTotalSeeds,
                 std::max(1, cfg.cpu.warmupMinSampledSeeds));
-            Batch::ThroughputCalibrationOptions warmupConfig;
+            const int plannedSegmentCount = std::clamp(3, 1, warmupTotalSeeds);
+            const int warmupMinSampledSeedsPerSegment = std::max(
+                1,
+                (warmupMinSampledSeeds + plannedSegmentCount - 1) / plannedSegmentCount);
+            Batch::SessionWarmupPlannerOptions warmupConfig;
             warmupConfig.enableWarmup = true;
+            warmupConfig.warmupSeedCount = cfg.cpu.warmupSeedCount;
+            warmupConfig.minProcessedSeeds = static_cast<uint64_t>(warmupMinSampledSeeds);
             warmupConfig.totalBudget = std::chrono::milliseconds(cfg.cpu.warmupTotalMs);
             warmupConfig.perCandidateBudget = std::chrono::milliseconds(cfg.cpu.warmupPerCandidateMs);
             warmupConfig.tieToleranceRatio = cfg.cpu.warmupTieTolerance;
@@ -471,22 +477,30 @@ int main(int argc, char *argv[])
                 printf("  [warmup] calibrating policies on seeds %d ~ %d ...\n",
                        cfg.seedStart, warmupEnd);
             }
-            const auto calibration = Batch::SelectThreadPolicyWithWarmup(
+            const auto calibration = Batch::SelectThreadPolicyWithSessionWarmup(
                 "cli-session",
+                cfg.seedStart,
+                warmupEnd,
                 candidates,
                 warmupConfig,
-                [&](const BatchCpu::ThreadPolicy &policy, std::chrono::milliseconds budget) {
+                [&](const BatchCpu::ThreadPolicy &policy,
+                    const Batch::WarmupSampleSegment &segment,
+                    std::chrono::milliseconds budget) {
                     auto currentBudget = budget;
                     Batch::BatchSearchResult bestRun;
+                    const int segmentTotalSeeds = segment.seedEnd - segment.seedStart + 1;
+                    const int segmentMinSampledSeeds = std::min(
+                        segmentTotalSeeds,
+                        warmupMinSampledSeedsPerSegment);
                     for (int attempt = 0; attempt <= cfg.cpu.warmupMaxRetry; ++attempt) {
                         warmupOptions.maxRunDuration = currentBudget;
                         auto request = BuildSearchRequest(
-                            cfg, cfg.seedStart, warmupEnd, policy, warmupOptions, nullptr);
+                            cfg, segment.seedStart, segment.seedEnd, policy, warmupOptions, nullptr);
                         auto attemptRun = Batch::BatchSearchService::Run(request);
                         if (attemptRun.processedSeeds > bestRun.processedSeeds) {
                             bestRun = attemptRun;
                         }
-                        const bool sampledEnough = attemptRun.processedSeeds >= warmupMinSampledSeeds;
+                        const bool sampledEnough = attemptRun.processedSeeds >= segmentMinSampledSeeds;
                         if (!attemptRun.failed &&
                             !attemptRun.cancelled &&
                             attemptRun.throughput.valid &&
@@ -500,6 +514,9 @@ int main(int argc, char *argv[])
                         }
                         currentBudget = std::max(currentBudget * 2, std::chrono::milliseconds(5000));
                     }
+                    if (bestRun.processedSeeds < segmentMinSampledSeeds) {
+                        bestRun.throughput.valid = false;
+                    }
                     return bestRun.throughput;
                 });
             const auto &warmupResults = calibration.warmupResults;
@@ -508,28 +525,24 @@ int main(int argc, char *argv[])
                 for (size_t i = 0; i < warmupResults.size(); ++i) {
                     const auto &item = warmupResults[i];
                     const bool sampledEnough =
-                        (int)item.stats.processedSeeds >= warmupMinSampledSeeds;
+                        static_cast<int>(item.aggregatedStats.processedSeeds) >= warmupMinSampledSeeds;
                     printf("  [warmup] candidate[%zu] %s -> avg %.1f seeds/s, stdev %.1f, sampled=%llu/%d%s\n",
                            i,
                            item.policy.name.c_str(),
-                           item.stats.averageSeedsPerSecond,
-                           item.stats.stddevSeedsPerSecond,
-                           (unsigned long long)item.stats.processedSeeds,
+                           item.aggregatedStats.averageSeedsPerSecond,
+                           item.aggregatedStats.stddevSeedsPerSecond,
+                           (unsigned long long)item.aggregatedStats.processedSeeds,
                            warmupMinSampledSeeds,
                            sampledEnough ? "" : " [under-sampled]");
                 }
             }
 
             if (!warmupResults.empty()) {
-                auto selectableResults = warmupResults;
                 bool hasQualifiedResult = false;
-                for (auto &item : selectableResults) {
-                    if ((int)item.stats.processedSeeds < warmupMinSampledSeeds) {
-                        item.stats.valid = false;
-                        continue;
-                    }
-                    if (item.stats.valid) {
+                for (const auto &item : warmupResults) {
+                    if (item.aggregatedStats.valid) {
                         hasQualifiedResult = true;
+                        break;
                     }
                 }
                 if (!hasQualifiedResult && cfg.cpu.printDiagnostics && !benchmarkSilent) {

@@ -621,6 +621,72 @@ std::optional<uint32_t> AdaptiveConcurrencyController::Observe(
     return nextWorkers;
 }
 
+BoundedRecoveryController::BoundedRecoveryController(RecoveryConfig config,
+                                                     uint32_t initialWorkers)
+    : m_config(std::move(config)),
+      m_initialWorkers(std::max<uint32_t>(1, initialWorkers)),
+      m_lastObservedWorkers(m_initialWorkers),
+      m_lastAdjustment(std::chrono::steady_clock::time_point::min())
+{
+    if (m_config.stableWindows < 1) {
+        m_config.stableWindows = 1;
+    }
+    m_config.retentionRatio = std::clamp(m_config.retentionRatio, 0.0, 1.0);
+}
+
+std::optional<uint32_t> BoundedRecoveryController::Observe(
+    double currentSeedsPerSecond,
+    uint32_t currentWorkers,
+    std::chrono::steady_clock::time_point now)
+{
+    if (!m_config.enabled || currentWorkers >= m_initialWorkers) {
+        return std::nullopt;
+    }
+    if (!(currentSeedsPerSecond > 0.0)) {
+        return std::nullopt;
+    }
+
+    if (currentWorkers != m_lastObservedWorkers) {
+        m_lastObservedWorkers = currentWorkers;
+        m_stageBaselineSeedsPerSecond = currentSeedsPerSecond;
+        m_consecutiveStableWindows = 0;
+        m_lastAdjustment = now;
+        return std::nullopt;
+    }
+
+    if (!(m_stageBaselineSeedsPerSecond > 0.0)) {
+        m_stageBaselineSeedsPerSecond = currentSeedsPerSecond;
+        m_consecutiveStableWindows = 0;
+        return std::nullopt;
+    }
+
+    const double retentionLine = m_stageBaselineSeedsPerSecond * m_config.retentionRatio;
+    if (currentSeedsPerSecond >= retentionLine) {
+        ++m_consecutiveStableWindows;
+    } else {
+        m_consecutiveStableWindows = 0;
+    }
+
+    if (m_consecutiveStableWindows < m_config.stableWindows) {
+        return std::nullopt;
+    }
+    if (m_lastAdjustment != std::chrono::steady_clock::time_point::min() &&
+        now - m_lastAdjustment < m_config.cooldown) {
+        return std::nullopt;
+    }
+
+    const uint32_t nextWorkers = std::min<uint32_t>(m_initialWorkers, currentWorkers + 1);
+    if (nextWorkers <= currentWorkers) {
+        return std::nullopt;
+    }
+
+    m_stageBaselineSeedsPerSecond = 0.0;
+    m_consecutiveStableWindows = 0;
+    m_lastAdjustment = now;
+    m_lastObservedWorkers = nextWorkers;
+    return nextWorkers;
+}
+
 CpuMode ParseCpuMode(const std::string &value)
 {
     const auto lower = ToLower(value);

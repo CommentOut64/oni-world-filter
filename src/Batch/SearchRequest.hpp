@@ -35,6 +35,8 @@ struct SearchRequest {
 
     bool enableAdaptive = false;
     BatchCpu::AdaptiveConfig adaptiveConfig{};
+    bool enableRecovery = false;
+    BatchCpu::RecoveryConfig recoveryConfig{};
 
     std::atomic<bool> *cancelRequested = nullptr;
     std::atomic<int> *activeWorkerCap = nullptr;
