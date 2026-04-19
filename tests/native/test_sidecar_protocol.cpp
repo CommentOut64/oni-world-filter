@@ -119,6 +119,21 @@ int RunAllTests()
     }
 
     {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"set_search_active_workers","jobId":"job-search-001","activeWorkers":2})");
+        Expect(result.Ok(), "set_search_active_workers request should parse", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::SetSearchActiveWorkers,
+               "set_search_active_workers command mismatch",
+               failures);
+        Expect(result.request.setSearchActiveWorkers.jobId == "job-search-001",
+               "set_search_active_workers jobId mismatch",
+               failures);
+        Expect(result.request.setSearchActiveWorkers.activeWorkers == 2,
+               "set_search_active_workers activeWorkers mismatch",
+               failures);
+    }
+
+    {
         const auto path = FixturePath("analyze-search-request.json");
         const auto jsonText = ReadText(path);
         Expect(!jsonText.empty(), "analyze_search_request fixture should be readable", failures);

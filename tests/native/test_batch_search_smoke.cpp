@@ -196,6 +196,62 @@ int RunAllTests()
         Expect(cancelledCount.load(std::memory_order_relaxed) == 0, "cancelled event should be zero when failed", failures);
     }
 
+    {
+        std::atomic<int> activeWorkerCap{0};
+
+        Batch::SearchRequest request;
+        request.seedStart = 1;
+        request.seedEnd = 240;
+        request.workerCount = 4;
+        request.chunkSize = 1;
+        request.progressInterval = 1;
+        request.sampleWindow = std::chrono::milliseconds(10);
+        request.maxRunDuration = std::chrono::milliseconds(0);
+        request.enableAdaptive = false;
+        request.activeWorkerCap = &activeWorkerCap;
+        request.evaluateSeed = [](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(3));
+            return evaluation;
+        };
+
+        std::vector<int> observedWorkers;
+        std::mutex observedWorkersMutex;
+
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
+            std::lock_guard<std::mutex> lock(observedWorkersMutex);
+            observedWorkers.push_back(event.activeWorkers);
+        };
+
+        std::thread capThread([&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+            activeWorkerCap.store(2, std::memory_order_relaxed);
+            std::this_thread::sleep_for(std::chrono::milliseconds(80));
+            activeWorkerCap.store(0, std::memory_order_relaxed);
+        });
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+        capThread.join();
+
+        bool sawReduced = false;
+        bool sawRecovered = false;
+        for (int value : observedWorkers) {
+            if (value <= 2) {
+                sawReduced = true;
+            }
+            if (sawReduced && value >= 4) {
+                sawRecovered = true;
+            }
+        }
+
+        Expect(!result.failed, "worker cap run should not fail", failures);
+        Expect(!result.cancelled, "worker cap run should not cancel", failures);
+        Expect(sawReduced, "worker cap run should observe reduced active workers", failures);
+        Expect(sawRecovered, "worker cap run should observe recovered active workers", failures);
+    }
+
     if (failures == 0) {
         std::cout << "[PASS] test_batch_search_smoke" << std::endl;
         return 0;
