@@ -38,11 +38,7 @@ pub struct JobRegistry {
 }
 
 impl JobRegistry {
-    pub fn insert_running(
-        &self,
-        job_id: String,
-        handles: RunningJobHandles,
-    ) -> Result<(), HostError> {
+    pub fn insert_running(&self, job_id: String, handles: RunningJobHandles) -> Result<(), HostError> {
         let mut guard = self.jobs.lock().expect("job registry lock poisoned");
         if let Some(existing) = guard.get(&job_id) {
             if existing.status == JobStatus::Running {

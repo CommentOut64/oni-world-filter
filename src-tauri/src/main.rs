@@ -35,7 +35,8 @@ mod tests {
             .expect("default capability should declare permissions")
             .iter()
             .map(|entry| {
-                entry.as_str()
+                entry
+                    .as_str()
                     .expect("permission entry should be a string")
                     .to_string()
             })

@@ -15,6 +15,19 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::error::HostError;
 use crate::state::{JobRegistry, JobStatus, RunningJobHandles};
 
+#[cfg(windows)]
+use std::mem::size_of;
+#[cfg(windows)]
+use std::os::windows::io::AsRawHandle;
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::{GetLastError, ERROR_INSUFFICIENT_BUFFER};
+#[cfg(windows)]
+use windows_sys::Win32::System::SystemInformation::{
+    CpuSetInformation, GetSystemCpuSetInformation, SYSTEM_CPU_SET_INFORMATION,
+};
+#[cfg(windows)]
+use windows_sys::Win32::System::Threading::SetProcessAffinityMask;
+
 pub const SIDECAR_EVENT_CHANNEL: &str = "sidecar://event";
 pub const SIDECAR_STDERR_CHANNEL: &str = "sidecar://stderr";
 const HOST_DEBUG_PREFIX: &str = "[host-debug]";
@@ -493,39 +506,10 @@ pub fn cancel_search(
         return Ok(());
     }
 
-    handles.cancel_token.store(true, Ordering::Relaxed);
-    if let Ok(mut guard) = handles.stdin_handle.lock() {
-        if let Some(stdin) = guard.as_mut() {
-            let cancel = json!({
-                "command": "cancel",
-                "jobId": job_id
-            });
-            let _ = write_json_line(stdin, &cancel);
-        }
-    }
+    request_search_cancel(&handles, job_id);
+    let forced = force_stop_child_process(&handles);
 
-    // 优先等待 sidecar 自身完成取消，超时后再强制终止。
-    let mut finished = false;
-    for _ in 0..20 {
-        thread::sleep(Duration::from_millis(50));
-        match registry.get_status(job_id) {
-            Some(JobStatus::Cancelled) | Some(JobStatus::Completed) | Some(JobStatus::Failed) => {
-                finished = true;
-                break;
-            }
-            _ => {}
-        }
-    }
-
-    if !finished {
-        if let Ok(mut guard) = handles.child_handle.lock() {
-            if let Some(child) = guard.as_mut() {
-                let _ = child.kill();
-            }
-        }
-    }
-
-    if registry.is_running(job_id) {
+    if forced && registry.is_running(job_id) {
         registry.set_status(job_id, JobStatus::Cancelled)?;
         let _ = app.emit(
             SIDECAR_EVENT_CHANNEL,
@@ -542,6 +526,36 @@ pub fn cancel_search(
     Ok(())
 }
 
+fn request_search_cancel(handles: &RunningJobHandles, job_id: &str) {
+    handles.cancel_token.store(true, Ordering::Relaxed);
+    if let Ok(mut guard) = handles.stdin_handle.lock() {
+        if let Some(stdin) = guard.as_mut() {
+            let cancel = json!({
+                "command": "cancel",
+                "jobId": job_id
+            });
+            let _ = write_json_line(stdin, &cancel);
+        }
+    }
+}
+
+fn force_stop_child_process(handles: &RunningJobHandles) -> bool {
+    let mut forced = false;
+    if let Ok(mut guard) = handles.child_handle.lock() {
+        if let Some(child) = guard.as_mut() {
+            match child.try_wait() {
+                Ok(Some(_)) => {}
+                Ok(None) | Err(_) => {
+                    let _ = child.kill();
+                    forced = true;
+                }
+            }
+        }
+    }
+    let _ = handles.stdin_handle.lock().map(|mut guard| guard.take());
+    forced
+}
+
 pub fn load_preview(
     app: Option<&AppHandle>,
     request: &PreviewRequestPayload,
@@ -555,7 +569,12 @@ pub fn load_preview(
         ));
     }
     let sidecar_path = resolve_sidecar_path(app)?;
-    let events = run_sidecar_request_collect(&sidecar_path, &build_preview_command(request))?;
+    let payload = build_preview_command(request);
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+    )?;
 
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
@@ -579,7 +598,8 @@ pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayloa
     let sidecar_path = resolve_sidecar_path(app)?;
     let job_id = "search-catalog";
     let request = build_get_search_catalog_command(job_id);
-    let events = run_sidecar_request_collect(&sidecar_path, &request)?;
+    let events =
+        run_sidecar_request_collect(&sidecar_path, &request, sidecar_request_priority(&request))?;
 
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
@@ -618,8 +638,12 @@ pub fn analyze_search_request(
         return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
     }
     let sidecar_path = resolve_sidecar_path(app)?;
-    let events =
-        run_sidecar_request_collect(&sidecar_path, &build_analyze_search_command(request))?;
+    let payload = build_analyze_search_command(request);
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+    )?;
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
             let message = event
@@ -703,15 +727,15 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
     Err(HostError::SidecarNotFound { candidates })
 }
 
-pub fn run_sidecar_request_collect(
+fn run_sidecar_request_collect(
     sidecar_path: &Path,
     request: &Value,
+    priority: SidecarProcessPriority,
 ) -> Result<Vec<Value>, HostError> {
-    let mut child = Command::new(sidecar_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    let mut command = Command::new(sidecar_path);
+    command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = command.spawn()?;
+    apply_process_priority(&child, priority);
 
     {
         let mut stdin = child
@@ -753,6 +777,109 @@ pub fn run_sidecar_request_collect(
 
     Ok(events)
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SidecarProcessPriority {
+    Normal,
+    LowPerfAffinity,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PreviewCpuSetInfo {
+    logical_index: u32,
+    efficiency_class: u8,
+}
+
+fn preview_affinity_mask_for_cpu_sets(cpu_sets: &[PreviewCpuSetInfo]) -> Option<usize> {
+    let min_efficiency_class = cpu_sets.iter().map(|cpu| cpu.efficiency_class).min()?;
+    let mut has_low_perf = false;
+    let mut mask = 0usize;
+
+    for cpu in cpu_sets {
+        if cpu.efficiency_class <= min_efficiency_class {
+            continue;
+        }
+        has_low_perf = true;
+        if cpu.logical_index < usize::BITS {
+            mask |= 1usize << cpu.logical_index;
+        }
+    }
+
+    if !has_low_perf || mask == 0 {
+        return None;
+    }
+    Some(mask)
+}
+
+#[cfg(windows)]
+fn detect_preview_affinity_mask() -> Option<usize> {
+    let mut bytes_needed = 0u32;
+    let probe_ok = unsafe {
+        GetSystemCpuSetInformation(
+            std::ptr::null_mut(),
+            0,
+            &mut bytes_needed,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if probe_ok != 0 || bytes_needed == 0 {
+        return None;
+    }
+    if unsafe { GetLastError() } != ERROR_INSUFFICIENT_BUFFER {
+        return None;
+    }
+
+    let mut buffer = vec![0u8; bytes_needed as usize];
+    let load_ok = unsafe {
+        GetSystemCpuSetInformation(
+            buffer.as_mut_ptr() as *mut SYSTEM_CPU_SET_INFORMATION,
+            bytes_needed,
+            &mut bytes_needed,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if load_ok == 0 {
+        return None;
+    }
+
+    let mut cpu_sets = Vec::new();
+    let mut offset = 0usize;
+    while offset + size_of::<SYSTEM_CPU_SET_INFORMATION>() <= bytes_needed as usize {
+        let raw =
+            unsafe { &*(buffer.as_ptr().add(offset) as *const SYSTEM_CPU_SET_INFORMATION) };
+        if raw.Size == 0 {
+            break;
+        }
+        if raw.Type == CpuSetInformation {
+            let cpu = unsafe { raw.Anonymous.CpuSet };
+            cpu_sets.push(PreviewCpuSetInfo {
+                logical_index: cpu.LogicalProcessorIndex as u32,
+                efficiency_class: cpu.EfficiencyClass,
+            });
+        }
+        offset += raw.Size as usize;
+    }
+
+    preview_affinity_mask_for_cpu_sets(&cpu_sets)
+}
+
+#[cfg(windows)]
+fn apply_process_priority(child: &std::process::Child, priority: SidecarProcessPriority) {
+    if priority != SidecarProcessPriority::LowPerfAffinity {
+        return;
+    }
+    let Some(mask) = detect_preview_affinity_mask() else {
+        return;
+    };
+    unsafe {
+        let _ = SetProcessAffinityMask(child.as_raw_handle() as _, mask);
+    }
+}
+
+#[cfg(not(windows))]
+fn apply_process_priority(_child: &std::process::Child, _priority: SidecarProcessPriority) {}
 
 fn build_search_command(request: &SearchRequestPayload) -> Value {
     let cpu = request.cpu.clone().map(|cpu| {
@@ -825,6 +952,13 @@ fn build_analyze_search_command(request: &SearchRequestPayload) -> Value {
         },
         "cpu": request.cpu,
     })
+}
+
+fn sidecar_request_priority(request: &Value) -> SidecarProcessPriority {
+    if request.get("command").and_then(Value::as_str) == Some("preview") {
+        return SidecarProcessPriority::LowPerfAffinity;
+    }
+    SidecarProcessPriority::Normal
 }
 
 fn write_json_line(writer: &mut impl Write, value: &Value) -> Result<(), HostError> {
@@ -1014,14 +1148,20 @@ fn spawn_waiter(
 mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::process::{Command, Stdio};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use serde_json::json;
 
+    use crate::state::RunningJobHandles;
+
     use super::{
         collect_sidecar_candidates, first_existing_sidecar_path, list_geyser_options,
-        list_world_options, resolve_sidecar_path, run_sidecar_request_collect,
-        SearchCatalogPayload,
+        list_world_options, preview_affinity_mask_for_cpu_sets, request_search_cancel,
+        force_stop_child_process, resolve_sidecar_path, run_sidecar_request_collect,
+        PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -1043,6 +1183,16 @@ mod tests {
         let parent = path.parent().expect("sidecar path should have parent");
         fs::create_dir_all(parent).expect("sidecar parent should be created");
         fs::write(path, b"ok").expect("dummy sidecar should be written");
+    }
+
+    fn spawn_sleeping_process() -> std::process::Child {
+        Command::new("cmd")
+            .args(["/C", "ping -n 10 127.0.0.1 > nul"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("sleeping child should spawn")
     }
 
     fn build_catalog_with_trait_field(field_name: &str) -> serde_json::Value {
@@ -1132,6 +1282,86 @@ mod tests {
     }
 
     #[test]
+    fn preview_affinity_should_prefer_low_perf_logical_processors() {
+        let cpu_sets = vec![
+            PreviewCpuSetInfo {
+                logical_index: 0,
+                efficiency_class: 0,
+            },
+            PreviewCpuSetInfo {
+                logical_index: 2,
+                efficiency_class: 0,
+            },
+            PreviewCpuSetInfo {
+                logical_index: 8,
+                efficiency_class: 6,
+            },
+            PreviewCpuSetInfo {
+                logical_index: 9,
+                efficiency_class: 6,
+            },
+        ];
+
+        assert_eq!(preview_affinity_mask_for_cpu_sets(&cpu_sets), Some((1usize << 8) | (1usize << 9)));
+    }
+
+    #[test]
+    fn preview_affinity_should_skip_homogeneous_topology() {
+        let cpu_sets = vec![
+            PreviewCpuSetInfo {
+                logical_index: 0,
+                efficiency_class: 0,
+            },
+            PreviewCpuSetInfo {
+                logical_index: 1,
+                efficiency_class: 0,
+            },
+        ];
+
+        assert_eq!(preview_affinity_mask_for_cpu_sets(&cpu_sets), None);
+    }
+
+    #[test]
+    fn cancel_helpers_should_force_stop_running_child_promptly() {
+        let mut child = spawn_sleeping_process();
+        let stdin = child.stdin.take();
+        let handles = RunningJobHandles {
+            child_handle: Arc::new(Mutex::new(Some(child))),
+            stdin_handle: Arc::new(Mutex::new(stdin)),
+            cancel_token: Arc::new(AtomicBool::new(false)),
+        };
+
+        request_search_cancel(&handles, "job-cancel");
+        let started_at = Instant::now();
+        force_stop_child_process(&handles);
+
+        let status = {
+            let mut guard = handles
+                .child_handle
+                .lock()
+                .expect("child handle lock should succeed");
+            guard
+                .as_mut()
+                .expect("child should remain owned until wait")
+                .wait()
+                .expect("child wait should succeed")
+        };
+
+        assert!(
+            started_at.elapsed() < Duration::from_secs(1),
+            "forced stop should return before a long-running seed evaluation finishes"
+        );
+        assert!(
+            handles.cancel_token.load(Ordering::Relaxed),
+            "cancel token should be set before force stop"
+        );
+        assert!(
+            !status.success(),
+            "force-stopped search sidecar should not exit successfully"
+        );
+    }
+
+    #[test]
     #[ignore = "需要先构建 out/build/x64-release/src/oni-sidecar.exe"]
     fn sidecar_search_smoke() {
         let path = resolve_sidecar_path(None).expect("sidecar path should be resolvable");
@@ -1149,8 +1379,8 @@ mod tests {
                 "distance": []
             }
         });
-        let events =
-            run_sidecar_request_collect(&path, &request).expect("search smoke should succeed");
+        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal)
+            .expect("search smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "started"));
         assert!(events.iter().any(|event| event["event"] == "completed"));
     }
@@ -1166,8 +1396,12 @@ mod tests {
             "seed": 100123,
             "mixing": 625
         });
-        let events =
-            run_sidecar_request_collect(&path, &request).expect("preview smoke should succeed");
+        let events = run_sidecar_request_collect(
+            &path,
+            &request,
+            SidecarProcessPriority::LowPerfAffinity,
+        )
+        .expect("preview smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "preview"));
     }
 
@@ -1189,7 +1423,8 @@ mod tests {
                 "distance": []
             }
         });
-        let events = run_sidecar_request_collect(&path, &request).expect("search should not crash");
+        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal)
+            .expect("search should not crash");
         assert!(events.iter().any(|event| event["event"] == "started"));
         assert!(events
             .iter()
@@ -1207,8 +1442,12 @@ mod tests {
             "seed": 100030,
             "mixing": 625
         });
-        let events =
-            run_sidecar_request_collect(&path, &request).expect("preview should not crash");
+        let events = run_sidecar_request_collect(
+            &path,
+            &request,
+            SidecarProcessPriority::LowPerfAffinity,
+        )
+        .expect("preview should not crash");
         assert!(events
             .iter()
             .any(|event| { event["event"] == "preview" || event["event"] == "failed" }));
