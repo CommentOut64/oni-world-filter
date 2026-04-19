@@ -644,6 +644,22 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         return result;
     }
 
+    if (command == "set_search_active_workers") {
+        result.request.command = SidecarCommandType::SetSearchActiveWorkers;
+        auto &request = result.request.setSearchActiveWorkers;
+        if (!RequireString(root, "jobId", &request.jobId, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "activeWorkers", &request.activeWorkers, &result.error)) {
+            return result;
+        }
+        if (request.activeWorkers < 0) {
+            SetParseError(result, "activeWorkers must be >= 0");
+            return result;
+        }
+        return result;
+    }
+
     if (command == "get_search_catalog") {
         result.request.command = SidecarCommandType::GetSearchCatalog;
         auto &request = result.request.getSearchCatalog;

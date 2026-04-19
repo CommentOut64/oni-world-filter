@@ -39,6 +39,7 @@ struct ActiveSearchState {
     bool running = false;
     std::string jobId;
     std::shared_ptr<std::atomic<bool>> cancelToken;
+    std::shared_ptr<std::atomic<int>> activeWorkerCap;
     std::thread worker;
 };
 
@@ -69,6 +70,7 @@ void JoinInactiveSearchWorker()
             worker = std::move(g_activeSearch.worker);
             g_activeSearch.jobId.clear();
             g_activeSearch.cancelToken.reset();
+            g_activeSearch.activeWorkerCap.reset();
         }
     }
     if (worker.joinable()) {
@@ -86,6 +88,7 @@ void MarkSearchFinished(const std::string &jobId)
 
 bool StartSearchWorker(const std::string &jobId,
                        const std::shared_ptr<std::atomic<bool>> &cancelToken,
+                       const std::shared_ptr<std::atomic<int>> &activeWorkerCap,
                        std::thread &&worker,
                        std::string *errorMessage)
 {
@@ -100,6 +103,7 @@ bool StartSearchWorker(const std::string &jobId,
     g_activeSearch.running = true;
     g_activeSearch.jobId = jobId;
     g_activeSearch.cancelToken = cancelToken;
+    g_activeSearch.activeWorkerCap = activeWorkerCap;
     g_activeSearch.worker = std::move(worker);
     return true;
 }
@@ -117,6 +121,19 @@ bool RequestSearchCancel(const std::string &jobId)
     return true;
 }
 
+bool RequestSearchActiveWorkers(const std::string &jobId, int activeWorkers)
+{
+    std::lock_guard<std::mutex> lock(g_activeSearch.mutex);
+    if (!g_activeSearch.running || !g_activeSearch.activeWorkerCap) {
+        return false;
+    }
+    if (!jobId.empty() && g_activeSearch.jobId != jobId) {
+        return false;
+    }
+    g_activeSearch.activeWorkerCap->store(activeWorkers, std::memory_order_relaxed);
+    return true;
+}
+
 void ShutdownSearchWorker()
 {
     std::thread worker;
@@ -128,6 +145,7 @@ void ShutdownSearchWorker()
         g_activeSearch.running = false;
         g_activeSearch.jobId.clear();
         g_activeSearch.cancelToken.reset();
+        g_activeSearch.activeWorkerCap.reset();
     }
     if (worker.joinable()) {
         worker.join();
@@ -218,7 +236,8 @@ private:
 
 Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
                                         const BatchCpu::ThreadPolicy &policy,
-                                        std::atomic<bool> *cancelRequested)
+                                        std::atomic<bool> *cancelRequested,
+                                        std::atomic<int> *activeWorkerCap)
 {
     Batch::SearchRequest request;
     request.seedStart = cfg.seedStart;
@@ -241,6 +260,7 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
     request.adaptiveConfig.consecutiveDropWindows = cfg.cpu.adaptiveDropWindows;
     request.adaptiveConfig.cooldown = std::chrono::milliseconds(cfg.cpu.adaptiveCooldownMs);
     request.cancelRequested = cancelRequested;
+    request.activeWorkerCap = activeWorkerCap;
 
     request.initializeWorker = []() {
         auto *runtime = AppRuntime::Instance();
@@ -329,7 +349,7 @@ BatchCpu::ThreadPolicy SelectPolicy(const Batch::FilterConfig &cfg)
         candidates,
         warmupConfig,
         [&](const BatchCpu::ThreadPolicy &policy, std::chrono::milliseconds budget) {
-            auto warmupRequest = BuildSearchRequest(cfg, policy, nullptr);
+            auto warmupRequest = BuildSearchRequest(cfg, policy, nullptr, nullptr);
             warmupRequest.seedEnd = warmupEnd;
             warmupRequest.enableAdaptive = false;
             warmupRequest.adaptiveConfig.enabled = false;
@@ -358,8 +378,9 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
 
     const auto selectedPolicy = SelectPolicy(cfg);
     auto cancelRequested = std::make_shared<std::atomic<bool>>(false);
+    auto activeWorkerCap = std::make_shared<std::atomic<int>>(0);
 
-    std::thread worker([cfg, request, selectedPolicy, cancelRequested]() {
+    std::thread worker([cfg, request, selectedPolicy, cancelRequested, activeWorkerCap]() {
         try {
             Batch::SearchEventCallbacks callbacks;
             callbacks.onStarted = [&](const Batch::SearchStartedEvent &event) {
@@ -381,7 +402,10 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
                 EmitBuiltLine([&]() { return Batch::SerializeCancelledEvent(request.jobId, event); });
             };
 
-            auto searchRequest = BuildSearchRequest(cfg, selectedPolicy, cancelRequested.get());
+            auto searchRequest = BuildSearchRequest(cfg,
+                                                    selectedPolicy,
+                                                    cancelRequested.get(),
+                                                    activeWorkerCap.get());
             (void)Batch::BatchSearchService::Run(searchRequest, callbacks);
         } catch (const std::exception &ex) {
             EmitLine(Batch::SerializeFailedEvent(request.jobId, ex.what()));
@@ -392,7 +416,11 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
     });
 
     std::string startError;
-    if (!StartSearchWorker(request.jobId, cancelRequested, std::move(worker), &startError)) {
+    if (!StartSearchWorker(request.jobId,
+                           cancelRequested,
+                           activeWorkerCap,
+                           std::move(worker),
+                           &startError)) {
         if (worker.joinable()) {
             worker.join();
         }
@@ -541,6 +569,13 @@ int main()
         case Batch::SidecarCommandType::Cancel:
             if (!RequestSearchCancel(parsed.request.cancel.jobId)) {
                 EmitLine(Batch::SerializeFailedEvent(parsed.request.cancel.jobId,
+                                                     "job is not running"));
+            }
+            break;
+        case Batch::SidecarCommandType::SetSearchActiveWorkers:
+            if (!RequestSearchActiveWorkers(parsed.request.setSearchActiveWorkers.jobId,
+                                            parsed.request.setSearchActiveWorkers.activeWorkers)) {
+                EmitLine(Batch::SerializeFailedEvent(parsed.request.setSearchActiveWorkers.jobId,
                                                      "job is not running"));
             }
             break;

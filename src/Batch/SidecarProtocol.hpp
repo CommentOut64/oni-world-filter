@@ -16,6 +16,7 @@ enum class SidecarCommandType {
     Search,
     Preview,
     Cancel,
+    SetSearchActiveWorkers,
     GetSearchCatalog,
     AnalyzeSearchRequest,
 };
@@ -79,6 +80,11 @@ struct SidecarCancelRequest {
     std::string jobId;
 };
 
+struct SidecarSetSearchActiveWorkersRequest {
+    std::string jobId;
+    int activeWorkers = 0;
+};
+
 struct SidecarGetSearchCatalogRequest {
     std::string jobId = "search-catalog";
 };
@@ -99,6 +105,7 @@ struct SidecarRequest {
     SidecarSearchRequest search;
     SidecarPreviewRequest preview;
     SidecarCancelRequest cancel;
+    SidecarSetSearchActiveWorkersRequest setSearchActiveWorkers;
     SidecarGetSearchCatalogRequest getSearchCatalog;
     SidecarAnalyzeSearchRequest analyze;
 };

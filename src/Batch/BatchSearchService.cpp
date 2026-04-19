@@ -66,7 +66,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     std::atomic<int> nextSeed{request.seedStart};
     std::atomic<int> processed{0};
     std::atomic<int> totalMatches{0};
-    std::atomic<int> activeWorkers{workerCount};
+    std::atomic<int> adaptiveWorkers{workerCount};
     std::atomic<bool> stopRequested{false};
     std::atomic<bool> hitBudget{false};
     std::atomic<bool> failed{false};
@@ -83,6 +83,25 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                                              static_cast<uint32_t>(workerCount));
     BatchCpu::AdaptiveConcurrencyController controller(adaptive,
                                                        static_cast<uint32_t>(workerCount));
+
+    auto currentActiveWorkers = [&]() {
+        int workers = adaptiveWorkers.load(std::memory_order_relaxed);
+        if (request.activeWorkerCap != nullptr) {
+            const int cap = request.activeWorkerCap->load(std::memory_order_relaxed);
+            if (cap > 0) {
+                workers = std::min(workers, cap);
+            }
+        }
+        return std::clamp(workers, 1, workerCount);
+    };
+
+    auto isExternallyCapped = [&]() {
+        if (request.activeWorkerCap == nullptr) {
+            return false;
+        }
+        const int cap = request.activeWorkerCap->load(std::memory_order_relaxed);
+        return cap > 0 && cap < adaptiveWorkers.load(std::memory_order_relaxed);
+    };
 
     const auto startedAt = std::chrono::steady_clock::now();
     auto deadline = startedAt;
@@ -138,7 +157,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
             if (nextSeed.load(std::memory_order_relaxed) > request.seedEnd) {
                 break;
             }
-            if (workerIndex >= activeWorkers.load(std::memory_order_relaxed)) {
+            if (workerIndex >= currentActiveWorkers()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
@@ -193,7 +212,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                     event.processedSeeds = done;
                     event.totalSeeds = result.totalSeeds;
                     event.totalMatches = totalMatches.load(std::memory_order_relaxed);
-                    event.activeWorkers = activeWorkers.load(std::memory_order_relaxed);
+                    event.activeWorkers = currentActiveWorkers();
                     callbacks.onProgress(event);
                 }
 
@@ -216,6 +235,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                 break;
             }
 
+            const bool externallyCappedAtWindowStart = isExternallyCapped();
             std::this_thread::sleep_for(sampleWindow);
             const auto now = std::chrono::steady_clock::now();
 
@@ -239,16 +259,19 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
             sampledThroughput.push_back(seedsPerSecond);
 
             bool reduced = false;
-            if (adaptive.enabled) {
+            const bool cappedDuringWindow =
+                externallyCappedAtWindowStart || isExternallyCapped();
+            if (adaptive.enabled && !cappedDuringWindow) {
+                const int effectiveWorkers = currentActiveWorkers();
                 const auto nextWorkers = controller.Observe(
                     seedsPerSecond,
-                    static_cast<uint32_t>(activeWorkers.load(std::memory_order_relaxed)),
+                    static_cast<uint32_t>(effectiveWorkers),
                     now);
                 if (nextWorkers.has_value() &&
                     static_cast<int>(nextWorkers.value()) <
-                        activeWorkers.load(std::memory_order_relaxed)) {
-                    activeWorkers.store(static_cast<int>(nextWorkers.value()),
-                                        std::memory_order_relaxed);
+                        adaptiveWorkers.load(std::memory_order_relaxed)) {
+                    adaptiveWorkers.store(static_cast<int>(nextWorkers.value()),
+                                          std::memory_order_relaxed);
                     reduced = true;
                 }
             }
@@ -258,7 +281,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                 event.processedSeeds = current;
                 event.totalSeeds = result.totalSeeds;
                 event.totalMatches = totalMatches.load(std::memory_order_relaxed);
-                event.activeWorkers = activeWorkers.load(std::memory_order_relaxed);
+                event.activeWorkers = currentActiveWorkers();
                 event.windowSeedsPerSecond = seedsPerSecond;
                 event.hasWindowSample = true;
                 event.activeWorkersReduced = reduced;
@@ -288,7 +311,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
 
     result.processedSeeds = processed.load(std::memory_order_relaxed);
     result.totalMatches = totalMatches.load(std::memory_order_relaxed);
-    result.finalActiveWorkers = activeWorkers.load(std::memory_order_relaxed);
+    result.finalActiveWorkers = currentActiveWorkers();
     result.autoFallbackCount = controller.ReductionCount();
     result.stoppedByBudget = hitBudget.load(std::memory_order_relaxed);
     result.cancelled = cancelled.load(std::memory_order_relaxed);

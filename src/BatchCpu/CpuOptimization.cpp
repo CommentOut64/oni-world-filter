@@ -587,7 +587,14 @@ std::optional<uint32_t> AdaptiveConcurrencyController::Observe(
         return std::nullopt;
     }
 
-    const double triggerLine = m_peakSeedsPerSecond * (1.0 - m_config.dropThreshold);
+    if (!(m_stagePeakSeedsPerSecond > 0.0)) {
+        m_stagePeakSeedsPerSecond = currentSeedsPerSecond;
+        m_consecutiveDrops = 0;
+        return std::nullopt;
+    }
+
+    m_stagePeakSeedsPerSecond = std::max(m_stagePeakSeedsPerSecond, currentSeedsPerSecond);
+    const double triggerLine = m_stagePeakSeedsPerSecond * (1.0 - m_config.dropThreshold);
     if (currentSeedsPerSecond <= triggerLine) {
         ++m_consecutiveDrops;
     } else {
@@ -606,6 +613,7 @@ std::optional<uint32_t> AdaptiveConcurrencyController::Observe(
     m_consecutiveDrops = 0;
     m_lastAdjustment = now;
     ++m_reductionCount;
+    m_stagePeakSeedsPerSecond = 0.0;
     const uint32_t nextWorkers = std::max<uint32_t>(m_config.minWorkers, currentWorkers - 1);
     if (nextWorkers >= currentWorkers) {
         return std::nullopt;

@@ -138,6 +138,7 @@ private:
     uint32_t m_initialWorkers = 1;
     uint32_t m_reductionCount = 0;
     double m_peakSeedsPerSecond = 0.0;
+    double m_stagePeakSeedsPerSecond = 0.0;
     int m_consecutiveDrops = 0;
     std::chrono::steady_clock::time_point m_lastAdjustment{};
 };

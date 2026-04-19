@@ -37,6 +37,7 @@ struct SearchRequest {
     BatchCpu::AdaptiveConfig adaptiveConfig{};
 
     std::atomic<bool> *cancelRequested = nullptr;
+    std::atomic<int> *activeWorkerCap = nullptr;
 
     SearchWorkerInitializer initializeWorker;
     SearchThreadPlacementApplier applyThreadPlacement;
