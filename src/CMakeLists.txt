@@ -316,6 +316,24 @@ target_link_libraries(test_settings_cache PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_settings_cache COMMAND test_settings_cache)
 
+add_executable(test_app_runtime_worker_reset
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_app_runtime_worker_reset.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_app_runtime_worker_reset
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_app_runtime_worker_reset PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_app_runtime_worker_reset PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_app_runtime_worker_reset COMMAND test_app_runtime_worker_reset)
+
 add_executable(test_sidecar_protocol
     "../tests/native/test_main.cpp"
     "../tests/native/test_sidecar_protocol.cpp"
@@ -352,6 +370,16 @@ target_include_directories(test_search_analysis
 )
 target_link_libraries(test_search_analysis PRIVATE jsoncpp)
 add_test(NAME test_search_analysis COMMAND test_search_analysis)
+
+# 临时表征测试，先停用。
+# add_executable(test_search_runtime_equivalence
+#     "../tests/native/test_main.cpp"
+#     "../tests/native/test_search_runtime_equivalence.cpp"
+# )
+# target_include_directories(test_search_runtime_equivalence
+#     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+# )
+# add_test(NAME test_search_runtime_equivalence COMMAND test_search_runtime_equivalence)
 
 add_executable(test_poisson_binomial
     "../tests/native/test_main.cpp"
