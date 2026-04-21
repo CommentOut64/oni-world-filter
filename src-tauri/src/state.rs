@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
+use crate::control_sidecar::ControlSidecarManager;
 use crate::error::HostError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -112,9 +113,19 @@ impl JobRegistry {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AppState {
     pub jobs: Arc<JobRegistry>,
+    pub control_sidecar: ControlSidecarManager,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            jobs: Arc::new(JobRegistry::default()),
+            control_sidecar: ControlSidecarManager::default(),
+        }
+    }
 }
 
 fn now_epoch_ms() -> u128 {
@@ -126,7 +137,7 @@ fn now_epoch_ms() -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
+    use super::{AppState, JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
     use std::sync::atomic::AtomicBool;
     use std::sync::{Arc, Mutex};
 
@@ -212,6 +223,16 @@ mod tests {
         assert_eq!(
             registry.get_progress_snapshot("job-progress"),
             Some(snapshot)
+        );
+    }
+
+    #[test]
+    fn app_state_should_enable_control_sidecar_by_default() {
+        let state = AppState::default();
+
+        assert!(
+            state.control_sidecar.is_enabled(),
+            "Task 3 切默认值后，desktop 应默认走常驻 control sidecar"
         );
     }
 }

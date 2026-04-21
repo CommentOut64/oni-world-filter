@@ -566,14 +566,7 @@ pub fn load_preview(
     app: Option<&AppHandle>,
     request: &PreviewRequestPayload,
 ) -> Result<Value, HostError> {
-    if request.job_id.trim().is_empty() {
-        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
-    }
-    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
-        return Err(HostError::InvalidRequest(
-            "worldType 超出有效范围".to_string(),
-        ));
-    }
+    validate_preview_request(request)?;
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_preview_command(request);
     let events =
@@ -627,7 +620,9 @@ pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayloa
     ))
 }
 
-fn deserialize_search_catalog_payload(catalog: Value) -> Result<SearchCatalogPayload, HostError> {
+pub(crate) fn deserialize_search_catalog_payload(
+    catalog: Value,
+) -> Result<SearchCatalogPayload, HostError> {
     serde_json::from_value(catalog).map_err(|error| {
         HostError::InvalidRequest(format!("search_catalog 反序列化失败: {}", error))
     })
@@ -637,9 +632,7 @@ pub fn analyze_search_request(
     app: Option<&AppHandle>,
     request: &SearchRequestPayload,
 ) -> Result<SearchAnalysisPayload, HostError> {
-    if request.job_id.trim().is_empty() {
-        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
-    }
+    validate_analyze_search_request(request)?;
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_analyze_search_command(request);
     let events =
@@ -1006,7 +999,28 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
     })
 }
 
-fn build_preview_command(request: &PreviewRequestPayload) -> Value {
+pub(crate) fn validate_preview_request(request: &PreviewRequestPayload) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+        return Err(HostError::InvalidRequest(
+            "worldType 超出有效范围".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_analyze_search_request(
+    request: &SearchRequestPayload,
+) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    Ok(())
+}
+
+pub(crate) fn build_preview_command(request: &PreviewRequestPayload) -> Value {
     json!({
         "command": "preview",
         "jobId": request.job_id,
@@ -1016,14 +1030,14 @@ fn build_preview_command(request: &PreviewRequestPayload) -> Value {
     })
 }
 
-fn build_get_search_catalog_command(job_id: &str) -> Value {
+pub(crate) fn build_get_search_catalog_command(job_id: &str) -> Value {
     json!({
         "command": "get_search_catalog",
         "jobId": job_id
     })
 }
 
-fn build_analyze_search_command(request: &SearchRequestPayload) -> Value {
+pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Value {
     json!({
         "command": "analyze_search_request",
         "jobId": request.job_id,

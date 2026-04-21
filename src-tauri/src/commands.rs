@@ -1,5 +1,6 @@
 use tauri::{AppHandle, State};
 
+use crate::control_sidecar;
 use crate::sidecar::{
     self, GeyserOption, PreviewRequestPayload, SearchAnalysisPayload, SearchCatalogPayload,
     SearchRequestPayload, WorldOption,
@@ -28,13 +29,17 @@ pub async fn cancel_search(
 #[tauri::command]
 pub async fn load_preview(
     app: AppHandle,
+    state: State<'_, AppState>,
     request: PreviewRequestPayload,
 ) -> Result<serde_json::Value, String> {
     let app_handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || sidecar::load_preview(Some(&app_handle), &request))
-        .await
-        .map_err(|error| error.to_string())?
-        .map_err(|error| error.to_string())
+    let control_sidecar = state.control_sidecar.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        control_sidecar::load_preview(Some(&app_handle), &control_sidecar, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -48,22 +53,30 @@ pub fn list_geysers() -> Vec<GeyserOption> {
 }
 
 #[tauri::command]
-pub async fn get_search_catalog(app: AppHandle) -> Result<SearchCatalogPayload, String> {
+pub async fn get_search_catalog(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SearchCatalogPayload, String> {
     let app_handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || sidecar::get_search_catalog(Some(&app_handle)))
-        .await
-        .map_err(|error| error.to_string())?
-        .map_err(|error| error.to_string())
+    let control_sidecar = state.control_sidecar.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        control_sidecar::get_search_catalog(Some(&app_handle), &control_sidecar)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub async fn analyze_search_request(
     app: AppHandle,
+    state: State<'_, AppState>,
     request: SearchRequestPayload,
 ) -> Result<SearchAnalysisPayload, String> {
     let app_handle = app.clone();
+    let control_sidecar = state.control_sidecar.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        sidecar::analyze_search_request(Some(&app_handle), &request)
+        control_sidecar::analyze_search_request(Some(&app_handle), &control_sidecar, &request)
     })
     .await
     .map_err(|error| error.to_string())?
