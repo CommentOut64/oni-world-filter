@@ -530,3 +530,35 @@ void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids)
         world->ApplayMixings(filtered);
     }
 }
+
+SearchMutableStateSnapshot SettingsCache::CaptureSearchMutableState() const
+{
+    SearchMutableStateSnapshot snapshot;
+    snapshot.cluster = cluster;
+    snapshot.seed = seed;
+    snapshot.dlcState = m_dlcState;
+    snapshot.mixConfigs = mixConfigs;
+    if (cluster != nullptr) {
+        snapshot.activeWorlds.reserve(cluster->worldPlacements.size());
+        for (const auto &placement : cluster->worldPlacements) {
+            snapshot.activeWorlds.push_back(placement.world);
+        }
+    }
+    return snapshot;
+}
+
+void SettingsCache::RestoreSearchMutableState(const SearchMutableStateSnapshot &snapshot)
+{
+    cluster = snapshot.cluster;
+    seed = snapshot.seed;
+    m_dlcState = snapshot.dlcState;
+    mixConfigs = snapshot.mixConfigs;
+    for (const auto &worldName : snapshot.activeWorlds) {
+        auto itr = worlds.find(worldName);
+        if (itr == worlds.end()) {
+            LogE("world %s was wrong during RestoreSearchMutableState().", worldName.c_str());
+            continue;
+        }
+        itr->second.ClearMixingsAndTraits();
+    }
+}

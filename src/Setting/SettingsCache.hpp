@@ -32,6 +32,14 @@ struct MixingConfig {
     }
 };
 
+struct SearchMutableStateSnapshot {
+    ClusterLayout *cluster = nullptr;
+    int seed = 0;
+    int dlcState = 0;
+    std::vector<MixingConfig> mixConfigs;
+    std::vector<std::string> activeWorlds;
+};
+
 class SettingsCache
 {
 public:
@@ -74,6 +82,8 @@ public:
     bool IsSpaceOutEnabled() const { return (m_dlcState & 1) == 1; }
     std::vector<const WorldTrait *> GetRandomTraits(const World &world) const;
     void DoSubworldMixing(std::vector<World *> worlds);
+    SearchMutableStateSnapshot CaptureSearchMutableState() const;
+    void RestoreSearchMutableState(const SearchMutableStateSnapshot &snapshot);
     static uint32_t Base36ToBinary(const std::string &input);
     static std::string BinaryToBase36(uint32_t input);
 

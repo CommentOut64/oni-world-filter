@@ -111,6 +111,55 @@ void AppRuntime::Initialize(int seed)
     m_random = KRandom(seed);
 }
 
+bool AppRuntime::PrepareSearchWorker(const std::string &code)
+{
+    Initialize(0);
+    if (!m_settings.CoordinateChanged(code, m_settings)) {
+        LogE("parse seed code %s failed during PrepareSearchWorker().", code.c_str());
+        m_searchWorkerPrepared = false;
+        m_searchSeedPrepared = false;
+        m_searchWarpWorld = false;
+        return false;
+    }
+    m_searchMutableBaseline = m_settings.CaptureSearchMutableState();
+    m_searchWorkerPrepared = true;
+    m_searchSeedPrepared = false;
+    m_searchWarpWorld = false;
+    return true;
+}
+
+bool AppRuntime::ResetSearchSeed(const std::string &code)
+{
+    if (!m_searchWorkerPrepared) {
+        LogE("search worker is not prepared before ResetSearchSeed()");
+        return false;
+    }
+    m_settings.RestoreSearchMutableState(m_searchMutableBaseline);
+    m_random = KRandom(0);
+    if (!m_settings.CoordinateChanged(code, m_settings)) {
+        LogE("parse seed code %s failed.", code.c_str());
+        return false;
+    }
+    m_searchSeedPrepared = true;
+    m_searchWarpWorld = code.find("M-") == 0;
+    return true;
+}
+
+bool AppRuntime::GeneratePrepared(int traitsFlag)
+{
+    if (m_sink == nullptr) {
+        LogE("result sink is not set before GeneratePrepared()");
+        return false;
+    }
+    if (!m_searchWorkerPrepared || !m_searchSeedPrepared) {
+        LogE("search seed is not prepared before GeneratePrepared()");
+        return false;
+    }
+    const bool generated = GenerateCurrentState(traitsFlag, m_searchWarpWorld);
+    m_searchSeedPrepared = false;
+    return generated;
+}
+
 bool AppRuntime::Generate(const std::string &code, int traitsFlag)
 {
     if (m_sink == nullptr) {
@@ -121,8 +170,16 @@ bool AppRuntime::Generate(const std::string &code, int traitsFlag)
         LogE("parse seed code %s failed.", code.c_str());
         return false;
     }
+    return GenerateCurrentState(traitsFlag, code.find("M-") == 0);
+}
 
-    std::vector<World *> worlds;
+bool AppRuntime::BuildWorldList(std::vector<World *> &worlds)
+{
+    worlds.clear();
+    if (m_settings.cluster == nullptr) {
+        LogE("cluster is null before BuildWorldList()");
+        return false;
+    }
     for (auto &worldPlacement : m_settings.cluster->worldPlacements) {
         auto itr = m_settings.worlds.find(worldPlacement.world);
         if (itr == m_settings.worlds.end()) {
@@ -135,13 +192,21 @@ bool AppRuntime::Generate(const std::string &code, int traitsFlag)
     if (worlds.size() == 1) {
         worlds[0]->locationType = LocationType::StartWorld;
     }
+    return true;
+}
+
+bool AppRuntime::GenerateCurrentState(int traitsFlag, bool genWarpWorld)
+{
+    std::vector<World *> worlds;
+    if (!BuildWorldList(worlds)) {
+        return false;
+    }
     if (traitsFlag != 0) {
         SetSeedWithTraits(worlds, traitsFlag);
     }
 
     m_settings.DoSubworldMixing(worlds);
     int seed = m_settings.seed;
-    bool genWarpWorld = code.find("M-") == 0;
     for (size_t i = 0; i < worlds.size(); ++i) {
         auto world = worlds[i];
         if (world->locationType == LocationType::Cluster) {

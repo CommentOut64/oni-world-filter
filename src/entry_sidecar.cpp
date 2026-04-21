@@ -19,6 +19,7 @@
 #include "Batch/BatchSearchService.hpp"
 #include "Batch/CpuTopology.hpp"
 #include "Batch/DesktopSearchPolicy.hpp"
+#include "Batch/DesktopSearchRuntimeMode.hpp"
 #include "Batch/FilterConfig.hpp"
 #include "Batch/SessionWarmupPlanner.hpp"
 #include "Batch/SidecarProtocol.hpp"
@@ -169,6 +170,86 @@ bool BuildWorldCode(int worldType, int seed, int mixing, std::string *code)
     return true;
 }
 
+DesktopSearchRuntimeMode ResolveDesktopSearchRuntimeMode()
+{
+    const char *raw = std::getenv("ONI_DESKTOP_SEARCH_RUNTIME");
+    if (raw != nullptr) {
+        if (const auto parsed = ParseDesktopSearchRuntimeMode(raw); parsed.has_value()) {
+            return parsed.value();
+        }
+    }
+    return DesktopSearchRuntimeMode::Optimized;
+}
+
+void PrepareSearchRuntime(AppRuntime *runtime,
+                          DesktopSearchRuntimeMode mode,
+                          const Batch::FilterConfig &cfg)
+{
+    runtime->SetResultSink(&g_batchSink);
+    runtime->SetSkipPolygons(true);
+    g_batchSink.SetActive(true);
+    if (mode == DesktopSearchRuntimeMode::Optimized) {
+        std::string code;
+        if (!BuildWorldCode(cfg.worldType, cfg.seedStart, cfg.mixing, &code)) {
+            throw std::runtime_error("invalid worldType");
+        }
+        if (!runtime->PrepareSearchWorker(code)) {
+            throw std::runtime_error("prepare search worker failed");
+        }
+        return;
+    }
+    runtime->Initialize(0);
+}
+
+Batch::SearchSeedEvaluation EvaluateSearchSeed(const Batch::FilterConfig &cfg,
+                                               int seed,
+                                               DesktopSearchRuntimeMode mode)
+{
+    Batch::SearchSeedEvaluation evaluation;
+
+    auto *runtime = AppRuntime::Instance();
+    runtime->SetResultSink(&g_batchSink);
+    runtime->SetSkipPolygons(true);
+    g_batchSink.SetActive(true);
+    g_batchSink.Reset();
+
+    std::string code;
+    if (!BuildWorldCode(cfg.worldType, seed, cfg.mixing, &code)) {
+        evaluation.ok = false;
+        evaluation.errorMessage = "invalid worldType";
+        return evaluation;
+    }
+
+    if (mode == DesktopSearchRuntimeMode::Optimized) {
+        if (!runtime->ResetSearchSeed(code)) {
+            evaluation.ok = false;
+            evaluation.errorMessage = "reset search seed failed";
+            return evaluation;
+        }
+        evaluation.generated = runtime->GeneratePrepared(0);
+    } else {
+        runtime->Initialize(0);
+        evaluation.generated = runtime->Generate(code, 0);
+    }
+    if (!evaluation.generated) {
+        return evaluation;
+    }
+
+    const auto matchResult = Batch::MatchFilter(cfg, g_batchSink.Data());
+    if (!matchResult.Ok()) {
+        evaluation.ok = false;
+        evaluation.errorMessage = matchResult.errors.empty()
+                                      ? "invalid capture for matcher"
+                                      : matchResult.errors.front().detail;
+        return evaluation;
+    }
+    evaluation.matched = matchResult.matched;
+    if (evaluation.matched) {
+        evaluation.capture = g_batchSink.Data();
+    }
+    return evaluation;
+}
+
 bool ReadSettingsBlob(std::vector<char> &data, std::string *errorMessage)
 {
     std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
@@ -240,6 +321,7 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
                                         std::atomic<bool> *cancelRequested,
                                         std::atomic<int> *activeWorkerCap)
 {
+    const auto runtimeMode = ResolveDesktopSearchRuntimeMode();
     Batch::SearchRequest request;
     request.seedStart = cfg.seedStart;
     request.seedEnd = cfg.seedEnd;
@@ -263,51 +345,15 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
     request.cancelRequested = cancelRequested;
     request.activeWorkerCap = activeWorkerCap;
 
-    request.initializeWorker = []() {
+    request.initializeWorker = [cfg, runtimeMode]() {
         auto *runtime = AppRuntime::Instance();
-        runtime->SetResultSink(&g_batchSink);
-        runtime->SetSkipPolygons(true);
-        g_batchSink.SetActive(true);
-        runtime->Initialize(0);
+        PrepareSearchRuntime(runtime, runtimeMode, cfg);
     };
     request.applyThreadPlacement = [policy](uint32_t workerIndex, std::string *errorMessage) {
         return BatchCpu::ApplyThreadPlacement(policy, workerIndex, errorMessage);
     };
-    request.evaluateSeed = [&cfg](int seed) {
-        Batch::SearchSeedEvaluation evaluation;
-
-        auto *runtime = AppRuntime::Instance();
-        runtime->SetResultSink(&g_batchSink);
-        runtime->SetSkipPolygons(true);
-        g_batchSink.SetActive(true);
-        runtime->Initialize(0);
-        g_batchSink.Reset();
-
-        std::string code;
-        if (!BuildWorldCode(cfg.worldType, seed, cfg.mixing, &code)) {
-            evaluation.ok = false;
-            evaluation.errorMessage = "invalid worldType";
-            return evaluation;
-        }
-
-        evaluation.generated = runtime->Generate(code, 0);
-        if (!evaluation.generated) {
-            return evaluation;
-        }
-
-        const auto matchResult = Batch::MatchFilter(cfg, g_batchSink.Data());
-        if (!matchResult.Ok()) {
-            evaluation.ok = false;
-            evaluation.errorMessage = matchResult.errors.empty()
-                                          ? "invalid capture for matcher"
-                                          : matchResult.errors.front().detail;
-            return evaluation;
-        }
-        evaluation.matched = matchResult.matched;
-        if (evaluation.matched) {
-            evaluation.capture = g_batchSink.Data();
-        }
-        return evaluation;
+    request.evaluateSeed = [&cfg, runtimeMode](int seed) {
+        return EvaluateSearchSeed(cfg, seed, runtimeMode);
     };
 
     return request;
