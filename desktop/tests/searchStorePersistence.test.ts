@@ -17,19 +17,9 @@ const SAMPLE_DRAFT = {
   threads: 0,
   cpu: {
     mode: "balanced" as const,
-    workers: 0,
     allowSmt: true,
     allowLowPerf: false,
     placement: "preferred" as const,
-    enableWarmup: false,
-    enableAdaptiveDown: true,
-    chunkSize: 64,
-    progressInterval: 1000,
-    sampleWindowMs: 2000,
-    adaptiveMinWorkers: 1,
-    adaptiveDropThreshold: 0.12,
-    adaptiveDropWindows: 3,
-    adaptiveCooldownMs: 8000,
   },
   constraints: {
     required: [],
@@ -139,25 +129,40 @@ test("restoreSearchSessionSnapshot normalizes legacy warmup flag to desktop defa
   persistSearchSessionSnapshot(storage, {
     draft: {
       ...SAMPLE_DRAFT,
+      threads: 6,
       cpu: {
         ...SAMPLE_DRAFT.cpu,
+        mode: "custom" as never,
+        workers: 6,
         enableWarmup: true,
+        enableAdaptiveDown: true,
       },
     },
     results: [createMatch(100123)],
     selectedSeed: 100123,
     lastSubmittedRequest: {
       ...request,
+      threads: 6,
       cpu: {
         ...request.cpu,
+        mode: "custom" as never,
+        workers: 6,
         enableWarmup: true,
+        enableAdaptiveDown: true,
       },
     },
   });
 
   const restored = restoreSearchSessionSnapshot(storage);
   assert.ok(restored);
-  assert.equal(restored.draft.cpu.enableWarmup, false);
-  assert.equal(restored.lastSubmittedRequest?.cpu?.enableWarmup, false);
-  assert.equal(restored.draft.cpu.enableAdaptiveDown, SAMPLE_DRAFT.cpu.enableAdaptiveDown);
+  assert.equal(restored.draft.threads, 0);
+  assert.equal(restored.lastSubmittedRequest?.threads, 0);
+  assert.deepEqual(restored.draft.cpu, {
+    ...SAMPLE_DRAFT.cpu,
+    mode: "turbo",
+  });
+  assert.deepEqual(restored.lastSubmittedRequest?.cpu, {
+    ...SAMPLE_DRAFT.cpu,
+    mode: "turbo",
+  });
 });

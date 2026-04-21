@@ -76,12 +76,13 @@ int RunAllTests()
         Expect(result.request.search.mixing == 625, "search request mixing mismatch", failures);
         Expect(result.request.search.threads == 8, "search request threads mismatch", failures);
         Expect(result.request.search.cpu.hasValue, "search request cpu should exist", failures);
-        Expect(result.request.search.cpu.mode == "custom", "search request cpu mode mismatch", failures);
-        Expect(result.request.search.cpu.workers == 8, "search request cpu workers mismatch", failures);
+        Expect(result.request.search.cpu.mode == "turbo", "search request cpu mode mismatch", failures);
         Expect(!result.request.search.cpu.allowSmt, "search request cpu allowSmt mismatch", failures);
-        Expect(result.request.search.cpu.chunkSize == 32, "search request cpu chunkSize mismatch", failures);
-        Expect(result.request.search.cpu.progressInterval == 400,
-               "search request cpu progressInterval mismatch",
+        Expect(!result.request.search.cpu.allowLowPerf,
+               "search request cpu allowLowPerf mismatch",
+               failures);
+        Expect(result.request.search.cpu.placement == "preferred",
+               "search request cpu placement mismatch",
                failures);
         Expect(result.request.search.constraints.required.size() == 2,
                "search request required size mismatch",
@@ -116,6 +117,18 @@ int RunAllTests()
         Expect(result.request.preview.worldType == 13, "preview request worldType mismatch", failures);
         Expect(result.request.preview.seed == 100123, "preview request seed mismatch", failures);
         Expect(result.request.preview.mixing == 625, "preview request mixing mismatch", failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"search","jobId":"job-binding-001","worldType":13,"seedStart":1,"seedEnd":1,"cpu":{"mode":"balanced","allowSmt":true,"allowLowPerf":true,"binding":"strict"}})");
+        Expect(result.Ok(), "search request with binding alias should parse", failures);
+        Expect(result.request.search.cpu.hasValue,
+               "search request with binding alias should set cpu",
+               failures);
+        Expect(result.request.search.cpu.placement == "strict",
+               "search request binding alias should map to placement",
+               failures);
     }
 
     {

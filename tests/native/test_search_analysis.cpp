@@ -5,6 +5,77 @@
 
 namespace {
 
+template<typename T>
+concept HasWorkersField = requires(T value) {
+    value.workers;
+};
+
+template<typename T>
+concept HasEnableWarmupField = requires(T value) {
+    value.enableWarmup;
+};
+
+template<typename T>
+concept HasEnableAdaptiveDownField = requires(T value) {
+    value.enableAdaptiveDown;
+};
+
+template<typename T>
+concept HasChunkSizeField = requires(T value) {
+    value.chunkSize;
+};
+
+template<typename T>
+concept HasProgressIntervalField = requires(T value) {
+    value.progressInterval;
+};
+
+template<typename T>
+concept HasSampleWindowMsField = requires(T value) {
+    value.sampleWindowMs;
+};
+
+template<typename T>
+concept HasAdaptiveMinWorkersField = requires(T value) {
+    value.adaptiveMinWorkers;
+};
+
+template<typename T>
+concept HasAdaptiveDropThresholdField = requires(T value) {
+    value.adaptiveDropThreshold;
+};
+
+template<typename T>
+concept HasAdaptiveDropWindowsField = requires(T value) {
+    value.adaptiveDropWindows;
+};
+
+template<typename T>
+concept HasAdaptiveCooldownMsField = requires(T value) {
+    value.adaptiveCooldownMs;
+};
+
+static_assert(!HasWorkersField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy workers");
+static_assert(!HasEnableWarmupField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy enableWarmup");
+static_assert(!HasEnableAdaptiveDownField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy enableAdaptiveDown");
+static_assert(!HasChunkSizeField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy chunkSize");
+static_assert(!HasProgressIntervalField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy progressInterval");
+static_assert(!HasSampleWindowMsField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy sampleWindowMs");
+static_assert(!HasAdaptiveMinWorkersField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy adaptiveMinWorkers");
+static_assert(!HasAdaptiveDropThresholdField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy adaptiveDropThreshold");
+static_assert(!HasAdaptiveDropWindowsField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy adaptiveDropWindows");
+static_assert(!HasAdaptiveCooldownMsField<SearchAnalysis::SearchCpuConfig>,
+              "SearchAnalysis::SearchCpuConfig should not expose legacy adaptiveCooldownMs");
+
 bool Expect(bool condition, const char *message, int &failures)
 {
     if (condition) {
