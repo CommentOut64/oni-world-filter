@@ -116,28 +116,28 @@ struct DesktopSearchExecutionPlan {
 - 异构 CPU：
   - 若存在 `balanced-p-core-plus-smt`，则：
     - `runtimePolicy = balanced-p-core-plus-smt`
-    - 若存在 `balanced-p-core-plus-smt-partial` 且 `balanced-p-core.workerCount >= 4`
-      - `initialActiveWorkers = balanced-p-core-plus-smt-partial.workerCount`
-    - 否则
-      - `initialActiveWorkers = balanced-p-core.workerCount`
+    - `initialActiveWorkers = ceil(runtimePolicy.workerCount * 0.9)`，再 clamp 到 `runtimePolicy.workerCount`
   - 若不存在 `balanced-p-core-plus-smt`
-    - 回退到现有静态首档逻辑，`initialActiveWorkers = runtimePolicy.workerCount`
+    - 若存在 `balanced-p-core`
+      - `runtimePolicy = balanced-p-core`
+      - `initialActiveWorkers = runtimePolicy.workerCount`
+    - 否则回退到 worker 数最多的候选，并按 `ceil(runtimePolicy.workerCount * 0.9)` 计算 `initialActiveWorkers`
 - 同构 CPU：
   - 若存在 `balanced-physical-plus-smt`，则：
     - `runtimePolicy = balanced-physical-plus-smt`
-    - 若存在 `balanced-physical-plus-smt-partial` 且 `balanced-physical.workerCount >= 4`
-      - `initialActiveWorkers = balanced-physical-plus-smt-partial.workerCount`
-    - 否则
-      - `initialActiveWorkers = balanced-physical.workerCount`
+    - `initialActiveWorkers = ceil(runtimePolicy.workerCount * 0.9)`，再 clamp 到 `runtimePolicy.workerCount`
   - 若不存在 `balanced-physical-plus-smt`
-    - 回退到现有静态首档逻辑，`initialActiveWorkers = runtimePolicy.workerCount`
+    - 若存在 `balanced-physical`
+      - `runtimePolicy = balanced-physical`
+      - `initialActiveWorkers = runtimePolicy.workerCount`
+    - 否则回退到 worker 数最多的候选，并按 `ceil(runtimePolicy.workerCount * 0.9)` 计算 `initialActiveWorkers`
 - 继续不默认使用：
   - `balanced-p-core-plus-low-core`
 
 解释：
 
 - 这样仍保持 desktop 默认不把低性能核心作为 balanced 首选。
-- 但 ceiling 不再停在 partial SMT，而是抬到 full SMT；非 warmup 启动时先用 partial/physical 档立即开跑，再由 recovery 回升到 full SMT。
+- 但 ceiling 不再停在 partial SMT，而是抬到 full SMT；非 warmup 启动时直接以 runtime ceiling 的 90% 高档位开跑，再由 recovery 补齐剩余 headroom。
 
 #### `turbo`
 
@@ -146,9 +146,8 @@ struct DesktopSearchExecutionPlan {
   - 其次 `turbo-all-logical`
   - 再次 fallback 到 worker 数最多的候选
 - `initialActiveWorkers`
-  - 若 `runtimePolicy.workerCount <= 4`，直接等于 ceiling
-  - 否则取 `ceil(runtimePolicy.workerCount * 0.75)`
-- 这样 turbo 在大核数机器上仍会“先高起步”，但保留约 25% headroom 给 recovery
+  - 取 `ceil(runtimePolicy.workerCount * 0.9)`，再 clamp 到 ceiling
+- 这样 turbo 在大核数机器上仍会“先高起步”，但只保留约 10% headroom 给 recovery
 
 #### `custom` / `conservative` / 单候选
 
@@ -175,8 +174,8 @@ struct DesktopSearchExecutionPlan {
 ## Success Criteria
 
 - desktop + sidecar 交互搜索继续保持无 warmup 毫秒级启动；`started` 延迟目标仍 `< 100ms`。
-- `balanced` 模式下，运行中 `activeWorkers` 能从 partial/physical 首档回升到 full SMT ceiling。
-- `turbo` 模式下，运行中 `activeWorkers` 能从约 75% ceiling 回升到 full ceiling。
+- `balanced` 模式下，运行中 `activeWorkers` 能从约 90% ceiling 回升到 full SMT ceiling；小核数场景允许启动值直接等于 ceiling。
+- `turbo` 模式下，运行中 `activeWorkers` 能从约 90% ceiling 回升到 full ceiling。
 - CLI 行为、CLI warmup 路径和 CLI 参数不发生变化。
 - 现有 `adaptive down` 与 `bounded recovery` 测试继续通过。
 
@@ -271,12 +270,12 @@ Expected:
 - 异构 `balanced`
   - 有 `balanced-p-core-plus-smt`、`balanced-p-core-plus-smt-partial`、`balanced-p-core`
   - 断言 `runtimePolicy` 选 full SMT
-  - 断言 `initialActiveWorkers` 选 partial SMT 或 p-core
+  - 断言 `initialActiveWorkers` 取 runtime ceiling 的 90%
 - 同构 `balanced`
-  - 同样断言 full SMT 为 ceiling，partial/physical 为 startup
+  - 同样断言 full SMT 为 ceiling，startup 为 runtime ceiling 的 90%
 - `turbo`
   - 断言 `runtimePolicy` 选 turbo 候选
-  - 断言 `initialActiveWorkers` 为 ceiling 的 75% 规则
+  - 断言 `initialActiveWorkers` 为 ceiling 的 90% 规则
 - `custom/conservative/单候选`
   - 断言 `initialActiveWorkers == runtimePolicy.workerCount`
   - 断言 `enableRecovery == false`
@@ -466,4 +465,3 @@ Expected:
 - 不修改 CLI 的 warmup、sample window 或 recovery 行为
 - 不重写 `BoundedRecoveryController` 为更激进的指数/二分/带回退的在线爬坡器
 - 不引入机器级持久化 benchmark cache
-
