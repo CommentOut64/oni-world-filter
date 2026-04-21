@@ -17,23 +17,13 @@ export interface SearchConstraints {
   count: CountRule[];
 }
 
-export type CpuMode = "balanced" | "turbo" | "custom";
+export type CpuMode = "balanced" | "turbo";
 
 export interface SearchCpuConfig {
   mode: CpuMode;
-  workers: number;
   allowSmt: boolean;
   allowLowPerf: boolean;
   placement: "preferred" | "strict" | "none";
-  enableWarmup: boolean;
-  enableAdaptiveDown: boolean;
-  chunkSize: number;
-  progressInterval: number;
-  sampleWindowMs: number;
-  adaptiveMinWorkers: number;
-  adaptiveDropThreshold: number;
-  adaptiveDropWindows: number;
-  adaptiveCooldownMs: number;
 }
 
 export interface SearchRequest {

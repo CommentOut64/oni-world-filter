@@ -1,37 +1,25 @@
 #pragma once
 
-#include <vector>
+#include <string>
 
 #include "Batch/CpuTopology.hpp"
+#include "BatchCpu/SearchCpuGovernor.hpp"
 
 namespace Batch {
 
 struct FilterConfig;
 
-enum class ThreadPolicyMode {
-    Balanced,
-    Throughput,
-    Custom,
-    Conservative,
+struct CompiledSearchCpuRuntime {
+    BatchCpu::CompiledSearchCpuPlan cpuPlan{};
+    BatchCpu::SearchCpuGovernorConfig cpuGovernorConfig{};
 };
 
-struct ThreadPolicyRequest {
-    ThreadPolicyMode mode = ThreadPolicyMode::Balanced;
-    uint32_t legacyThreads = 0;
-    uint32_t customWorkers = 0;
-    bool customAllowSmt = true;
-    bool customAllowLowPerf = true;
-    BatchCpu::PlacementMode customPlacement = BatchCpu::PlacementMode::Preferred;
-};
+CompiledSearchCpuRuntime CompileSearchCpuRuntime(const FilterConfig &cfg,
+                                                const CpuTopologyFacts &topology);
 
-BatchCpu::PlannerInput BuildPlannerInput(const ThreadPolicyRequest &request,
-                                         const CpuTopology &topology);
+int ResolveActivePhysicalCoreCapFromWorkerLimit(const BatchCpu::CompiledSearchCpuPlan &plan,
+                                                int requestedActiveWorkers);
 
-std::vector<BatchCpu::ThreadPolicy> BuildThreadPolicyCandidates(
-    const ThreadPolicyRequest &request,
-    const CpuTopology &topology);
-
-ThreadPolicyRequest BuildThreadPolicyRequestFromFilter(
-    const FilterConfig &cfg);
+std::string DescribeCompiledSearchCpuPlan(const BatchCpu::CompiledSearchCpuPlan &plan);
 
 } // namespace Batch

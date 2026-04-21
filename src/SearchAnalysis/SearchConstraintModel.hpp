@@ -23,19 +23,9 @@ struct CountConstraint {
 struct SearchCpuConfig {
     bool hasValue = false;
     std::string mode = "balanced";
-    int workers = 0;
     bool allowSmt = true;
     bool allowLowPerf = false;
     std::string placement = "preferred";
-    bool enableWarmup = true;
-    bool enableAdaptiveDown = true;
-    int chunkSize = 64;
-    int progressInterval = 1000;
-    int sampleWindowMs = 2000;
-    int adaptiveMinWorkers = 1;
-    double adaptiveDropThreshold = 0.12;
-    int adaptiveDropWindows = 3;
-    int adaptiveCooldownMs = 8000;
 };
 
 struct SearchConstraints {

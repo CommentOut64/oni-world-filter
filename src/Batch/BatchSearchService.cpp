@@ -34,6 +34,44 @@ bool IsCancellationRequested(const SearchRequest &request)
            request.cancelRequested->load(std::memory_order_relaxed);
 }
 
+BatchCpu::CompiledSearchCpuPlan BuildFallbackCpuPlan()
+{
+    BatchCpu::CompiledSearchCpuPlan plan;
+    plan.policy.binding = BatchCpu::PlacementMode::None;
+    plan.envelope.eligiblePhysicalCoreCount = 1;
+    plan.envelope.absolutePhysicalCoreCap = 1;
+    plan.envelope.startupPhysicalCoreCount = 1;
+    plan.envelope.absoluteWorkerCap = 1;
+
+    BatchCpu::PlannedCore core;
+    core.physicalCoreIndex = 0;
+    core.group = 0;
+    core.coreIndex = 0;
+    core.numaNodeIndex = 0;
+    core.isHighPerformance = true;
+    core.allowedLogicalThreads.push_back({
+        .logicalIndex = 0,
+        .group = 0,
+        .coreIndex = 0,
+        .numaNodeIndex = 0,
+        .efficiencyClass = 0,
+        .parked = false,
+        .allocated = false,
+        .isPrimaryThread = true,
+    });
+    plan.placement.plannedCoresByPriority.push_back(core);
+    plan.placement.workerSlotsByPriority.push_back({
+        .workerIndex = 0,
+        .physicalCoreIndex = 0,
+        .logicalIndex = 0,
+        .group = 0,
+        .coreIndex = 0,
+        .numaNodeIndex = 0,
+        .isPrimaryThread = true,
+    });
+    return plan;
+}
+
 } // namespace
 
 BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
@@ -58,13 +96,18 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
         return result;
     }
 
-    const int workerCount = std::max<int>(1, static_cast<int>(request.workerCount));
-    const int startingActiveWorkers = std::clamp(
-        request.initialActiveWorkers > 0
-            ? static_cast<int>(request.initialActiveWorkers)
-            : workerCount,
+    const auto fallbackCpuPlan = BuildFallbackCpuPlan();
+    const auto &cpuPlan =
+        request.cpuPlan.envelope.absoluteWorkerCap > 0
+            ? request.cpuPlan
+            : fallbackCpuPlan;
+    BatchCpu::SearchCpuGovernor governor(cpuPlan, request.cpuGovernorConfig);
+    const int workerCount = std::max<int>(
         1,
-        workerCount);
+        static_cast<int>(std::max<uint32_t>(1, cpuPlan.envelope.absoluteWorkerCap)));
+    const int startingActivePhysicalCores = std::max<int>(
+        1,
+        static_cast<int>(governor.StartupActivePhysicalCores()));
     const int chunkSize = std::max(1, request.chunkSize);
     const int progressInterval = std::max(1, request.progressInterval);
     const auto sampleWindow = std::max(request.sampleWindow, std::chrono::milliseconds(1));
@@ -72,7 +115,8 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     std::atomic<int> nextSeed{request.seedStart};
     std::atomic<int> processed{0};
     std::atomic<int> totalMatches{0};
-    std::atomic<int> adaptiveWorkers{startingActiveWorkers};
+    std::atomic<int> activePhysicalCores{startingActivePhysicalCores};
+    std::atomic<uint32_t> autoFallbackCount{0};
     std::atomic<bool> stopRequested{false};
     std::atomic<bool> hitBudget{false};
     std::atomic<bool> failed{false};
@@ -82,28 +126,20 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     std::vector<double> sampledThroughput;
     sampledThroughput.reserve(64);
 
-    BatchCpu::AdaptiveConfig adaptive = request.adaptiveConfig;
-    adaptive.enabled = request.enableAdaptive && adaptive.enabled;
-    adaptive.minWorkers = std::max<uint32_t>(1u, adaptive.minWorkers);
-    adaptive.minWorkers = std::min<uint32_t>(adaptive.minWorkers,
-                                             static_cast<uint32_t>(workerCount));
-    BatchCpu::AdaptiveConcurrencyController controller(adaptive,
-                                                       static_cast<uint32_t>(workerCount));
-    BatchCpu::RecoveryConfig recovery = request.recoveryConfig;
-    recovery.enabled = request.enableRecovery && recovery.enabled;
-    BatchCpu::BoundedRecoveryController recoveryController(
-        recovery,
-        static_cast<uint32_t>(workerCount));
-
-    auto currentActiveWorkers = [&]() {
-        int workers = adaptiveWorkers.load(std::memory_order_relaxed);
+    auto currentActivePhysicalCores = [&]() {
+        int cores = activePhysicalCores.load(std::memory_order_relaxed);
         if (request.activeWorkerCap != nullptr) {
             const int cap = request.activeWorkerCap->load(std::memory_order_relaxed);
             if (cap > 0) {
-                workers = std::min(workers, cap);
+                cores = std::min(cores, cap);
             }
         }
-        return std::clamp(workers, 1, workerCount);
+        return std::clamp(cores, 1, startingActivePhysicalCores);
+    };
+
+    auto currentActiveWorkers = [&]() {
+        return static_cast<int>(governor.ActiveWorkerCountFor(
+            static_cast<uint32_t>(currentActivePhysicalCores())));
     };
 
     auto isExternallyCapped = [&]() {
@@ -111,7 +147,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
             return false;
         }
         const int cap = request.activeWorkerCap->load(std::memory_order_relaxed);
-        return cap > 0 && cap < adaptiveWorkers.load(std::memory_order_relaxed);
+        return cap > 0 && cap < activePhysicalCores.load(std::memory_order_relaxed);
     };
 
     const auto startedAt = std::chrono::steady_clock::now();
@@ -154,6 +190,17 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
         if (request.applyThreadPlacement) {
             std::string placementError;
             request.applyThreadPlacement(static_cast<uint32_t>(workerIndex), &placementError);
+        } else if (!cpuPlan.placement.workerSlotsByPriority.empty()) {
+            std::string placementError;
+            const bool applied = BatchCpu::ApplyThreadPlacement(
+                cpuPlan.placement,
+                cpuPlan.policy.binding,
+                static_cast<uint32_t>(workerIndex),
+                &placementError);
+            if (!applied && cpuPlan.policy.binding == BatchCpu::PlacementMode::Strict) {
+                markFailure(placementError.empty() ? "thread placement failed" : placementError);
+                return;
+            }
         }
 
         while (true) {
@@ -240,6 +287,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     std::thread monitor([&] {
         int lastProcessed = 0;
         auto lastTs = std::chrono::steady_clock::now();
+        double peakSeedsPerSecond = 0.0;
 
         while (!stopRequested.load(std::memory_order_relaxed)) {
             if (processed.load(std::memory_order_relaxed) >= result.totalSeeds) {
@@ -272,31 +320,25 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
             bool reduced = false;
             const bool cappedDuringWindow =
                 externallyCappedAtWindowStart || isExternallyCapped();
-            if (adaptive.enabled && !cappedDuringWindow) {
-                const int effectiveWorkers = currentActiveWorkers();
-                const auto nextWorkers = controller.Observe(
+            peakSeedsPerSecond = std::max(peakSeedsPerSecond, seedsPerSecond);
+            if (!cappedDuringWindow) {
+                const int effectivePhysicalCores = currentActivePhysicalCores();
+                const auto nextPhysicalCores = governor.Observe(
                     seedsPerSecond,
-                    static_cast<uint32_t>(effectiveWorkers),
+                    static_cast<uint32_t>(effectivePhysicalCores),
                     now);
-                if (nextWorkers.has_value() &&
-                    static_cast<int>(nextWorkers.value()) <
-                        adaptiveWorkers.load(std::memory_order_relaxed)) {
-                    adaptiveWorkers.store(static_cast<int>(nextWorkers.value()),
-                                          std::memory_order_relaxed);
+                if (nextPhysicalCores.has_value() &&
+                    static_cast<int>(nextPhysicalCores.value()) <
+                        activePhysicalCores.load(std::memory_order_relaxed)) {
+                    activePhysicalCores.store(static_cast<int>(nextPhysicalCores.value()),
+                                              std::memory_order_relaxed);
+                    autoFallbackCount.fetch_add(1, std::memory_order_relaxed);
                     reduced = true;
-                }
-            }
-            if (!reduced && recovery.enabled && !cappedDuringWindow) {
-                const int effectiveWorkers = currentActiveWorkers();
-                const auto nextWorkers = recoveryController.Observe(
-                    seedsPerSecond,
-                    static_cast<uint32_t>(effectiveWorkers),
-                    now);
-                if (nextWorkers.has_value() &&
-                    static_cast<int>(nextWorkers.value()) >
-                        adaptiveWorkers.load(std::memory_order_relaxed)) {
-                    adaptiveWorkers.store(static_cast<int>(nextWorkers.value()),
-                                          std::memory_order_relaxed);
+                } else if (nextPhysicalCores.has_value() &&
+                           static_cast<int>(nextPhysicalCores.value()) >
+                               activePhysicalCores.load(std::memory_order_relaxed)) {
+                    activePhysicalCores.store(static_cast<int>(nextPhysicalCores.value()),
+                                              std::memory_order_relaxed);
                 }
             }
 
@@ -309,7 +351,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                 event.windowSeedsPerSecond = seedsPerSecond;
                 event.hasWindowSample = true;
                 event.activeWorkersReduced = reduced;
-                event.peakSeedsPerSecond = controller.PeakSeedsPerSecond();
+                event.peakSeedsPerSecond = peakSeedsPerSecond;
                 callbacks.onProgress(event);
             }
 
@@ -336,7 +378,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     result.processedSeeds = processed.load(std::memory_order_relaxed);
     result.totalMatches = totalMatches.load(std::memory_order_relaxed);
     result.finalActiveWorkers = currentActiveWorkers();
-    result.autoFallbackCount = controller.ReductionCount();
+    result.autoFallbackCount = autoFallbackCount.load(std::memory_order_relaxed);
     result.stoppedByBudget = hitBudget.load(std::memory_order_relaxed);
     result.cancelled = cancelled.load(std::memory_order_relaxed);
     result.failed = failed.load(std::memory_order_relaxed);

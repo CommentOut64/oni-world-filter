@@ -44,19 +44,9 @@ const DEFAULT_CONSTRAINTS: SearchConstraints = {
 
 const DEFAULT_CPU_CONFIG: SearchCpuConfig = {
   mode: "balanced",
-  workers: 0,
   allowSmt: true,
   allowLowPerf: false,
   placement: "preferred",
-  enableWarmup: false,
-  enableAdaptiveDown: true,
-  chunkSize: 64,
-  progressInterval: 1000,
-  sampleWindowMs: 2000,
-  adaptiveMinWorkers: 1,
-  adaptiveDropThreshold: 0.12,
-  adaptiveDropWindows: 3,
-  adaptiveCooldownMs: 8000,
 };
 
 export interface SearchDraft {

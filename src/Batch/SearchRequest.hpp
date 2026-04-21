@@ -7,7 +7,7 @@
 #include <string>
 
 #include "App/ResultSink.hpp"
-#include "BatchCpu/CpuOptimization.hpp"
+#include "BatchCpu/SearchCpuGovernor.hpp"
 
 namespace Batch {
 
@@ -27,18 +27,12 @@ using SearchThreadPlacementApplier =
 struct SearchRequest {
     int seedStart = 1;
     int seedEnd = 0;
-    uint32_t workerCount = 1;
-    // 0 表示沿用 workerCount，保持旧行为。
-    uint32_t initialActiveWorkers = 0;
+    BatchCpu::CompiledSearchCpuPlan cpuPlan{};
+    BatchCpu::SearchCpuGovernorConfig cpuGovernorConfig{};
     int chunkSize = 64;
     int progressInterval = 1000;
     std::chrono::milliseconds sampleWindow{2000};
     std::chrono::milliseconds maxRunDuration{0};
-
-    bool enableAdaptive = false;
-    BatchCpu::AdaptiveConfig adaptiveConfig{};
-    bool enableRecovery = false;
-    BatchCpu::RecoveryConfig recoveryConfig{};
 
     std::atomic<bool> *cancelRequested = nullptr;
     std::atomic<int> *activeWorkerCap = nullptr;

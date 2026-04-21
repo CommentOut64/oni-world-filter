@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -49,37 +50,120 @@ std::vector<uint32_t> UniqueSorted(std::vector<uint32_t> values)
     return values;
 }
 
-CpuTopology BuildFallbackTopology(const std::string &reason)
+std::vector<uint32_t> BuildAllLogicalIndices(const CpuTopology &topology);
+
+CpuTopologyFacts BuildFallbackFacts(const std::string &reason)
 {
-    CpuTopology fallback;
+    CpuTopologyFacts fallback;
     fallback.detectionSucceeded = false;
     fallback.usedFallback = true;
     fallback.isHeterogeneous = false;
-    fallback.logicalThreadCount = SafeHardwareConcurrency();
-    fallback.physicalCoreCount = std::max<uint32_t>(1, fallback.logicalThreadCount / 2);
-    fallback.highPerfLogicalIndices.reserve(fallback.logicalThreadCount);
-    fallback.physicalPreferredLogicalIndices.reserve(fallback.physicalCoreCount);
+    const uint32_t logicalThreadCount = SafeHardwareConcurrency();
+    const uint32_t physicalCoreCount = std::max<uint32_t>(1, logicalThreadCount / 2);
+    uint32_t nextLogicalIndex = 0;
 
-    for (uint32_t i = 0; i < fallback.logicalThreadCount; ++i) {
-        LogicalProcessorInfo info;
-        info.logicalIndex = i;
-        info.group = 0;
-        info.coreIndex = (uint16_t)(i / 2);
-        info.numaNodeIndex = 0;
-        info.efficiencyClass = 0;
-        fallback.logicalProcessors.push_back(info);
-        fallback.highPerfLogicalIndices.push_back(i);
-        if (i % 2 == 0 && fallback.physicalPreferredLogicalIndices.size() < fallback.physicalCoreCount) {
-            fallback.physicalPreferredLogicalIndices.push_back(i);
-        }
-    }
-    if (fallback.physicalPreferredLogicalIndices.empty() && !fallback.highPerfLogicalIndices.empty()) {
-        fallback.physicalPreferredLogicalIndices.push_back(fallback.highPerfLogicalIndices.front());
-    }
     fallback.processorGroups.push_back(0);
     fallback.numaNodes.push_back(0);
+    fallback.physicalCoresBySystemOrder.reserve(physicalCoreCount);
+
+    for (uint32_t coreIndex = 0; coreIndex < physicalCoreCount; ++coreIndex) {
+        PhysicalCoreFacts core;
+        core.physicalCoreIndex = coreIndex;
+        core.group = 0;
+        core.coreIndex = static_cast<uint16_t>(coreIndex);
+        core.numaNodeIndex = 0;
+        core.efficiencyClass = 0;
+        core.isHighPerformance = true;
+
+        LogicalThreadFacts primary;
+        primary.logicalIndex = nextLogicalIndex++;
+        primary.group = 0;
+        primary.coreIndex = core.coreIndex;
+        primary.numaNodeIndex = 0;
+        primary.efficiencyClass = 0;
+        primary.isPrimaryThread = true;
+        core.logicalThreads.push_back(primary);
+
+        if (nextLogicalIndex < logicalThreadCount) {
+            LogicalThreadFacts sibling;
+            sibling.logicalIndex = nextLogicalIndex++;
+            sibling.group = 0;
+            sibling.coreIndex = core.coreIndex;
+            sibling.numaNodeIndex = 0;
+            sibling.efficiencyClass = 0;
+            sibling.isPrimaryThread = false;
+            core.logicalThreads.push_back(sibling);
+        }
+
+        fallback.physicalCoresBySystemOrder.push_back(std::move(core));
+    }
+
     fallback.diagnostics = "fallback topology: " + reason;
     return fallback;
+}
+
+CpuTopology BuildLegacyTopologyFromFacts(const CpuTopologyFacts &facts)
+{
+    CpuTopology topology;
+    topology.detectionSucceeded = facts.detectionSucceeded;
+    topology.usedFallback = facts.usedFallback;
+    topology.isHeterogeneous = facts.isHeterogeneous;
+    topology.physicalCoreCount = static_cast<uint32_t>(facts.physicalCoresBySystemOrder.size());
+    topology.processorGroups = facts.processorGroups;
+    topology.numaNodes = facts.numaNodes;
+    topology.diagnostics = facts.diagnostics;
+
+    for (const auto &core : facts.physicalCoresBySystemOrder) {
+        uint32_t preferredLogicalIndex = 0;
+        bool hasPreferredLogicalIndex = false;
+        for (const auto &thread : core.logicalThreads) {
+            LogicalProcessorInfo info;
+            info.logicalIndex = thread.logicalIndex;
+            info.group = thread.group;
+            info.coreIndex = thread.coreIndex;
+            info.numaNodeIndex = thread.numaNodeIndex;
+            info.efficiencyClass = thread.efficiencyClass;
+            info.parked = thread.parked;
+            info.allocated = thread.allocated;
+            topology.logicalProcessors.push_back(info);
+            if (core.isHighPerformance) {
+                topology.highPerfLogicalIndices.push_back(thread.logicalIndex);
+            } else {
+                topology.lowPerfLogicalIndices.push_back(thread.logicalIndex);
+            }
+            if (!hasPreferredLogicalIndex || thread.isPrimaryThread) {
+                preferredLogicalIndex = thread.logicalIndex;
+                hasPreferredLogicalIndex = true;
+            }
+        }
+        if (hasPreferredLogicalIndex) {
+            topology.physicalPreferredLogicalIndices.push_back(preferredLogicalIndex);
+        }
+    }
+
+    topology.logicalThreadCount = static_cast<uint32_t>(topology.logicalProcessors.size());
+    std::sort(topology.logicalProcessors.begin(), topology.logicalProcessors.end(),
+              [](const LogicalProcessorInfo &a, const LogicalProcessorInfo &b) {
+                  if (a.group != b.group) {
+                      return a.group < b.group;
+                  }
+                  if (a.logicalIndex != b.logicalIndex) {
+                      return a.logicalIndex < b.logicalIndex;
+                  }
+                  return a.coreIndex < b.coreIndex;
+              });
+    topology.highPerfLogicalIndices = UniqueSorted(std::move(topology.highPerfLogicalIndices));
+    topology.lowPerfLogicalIndices = UniqueSorted(std::move(topology.lowPerfLogicalIndices));
+    topology.physicalPreferredLogicalIndices = UniqueSorted(std::move(topology.physicalPreferredLogicalIndices));
+    if (topology.highPerfLogicalIndices.empty()) {
+        topology.highPerfLogicalIndices = BuildAllLogicalIndices(topology);
+    }
+    return topology;
+}
+
+CpuTopology BuildFallbackTopology(const std::string &reason)
+{
+    return BuildLegacyTopologyFromFacts(BuildFallbackFacts(reason));
 }
 
 std::vector<uint32_t> BuildAllLogicalIndices(const CpuTopology &topology)
@@ -161,9 +245,109 @@ ThreadPolicy BuildPolicy(const std::string &name,
     return policy;
 }
 
+std::optional<ThreadBindingTarget> BuildThreadBindingTarget(const WorkerBindingSlot &slot)
+{
+    ThreadBindingTarget target;
+    target.group = slot.group;
+    target.logicalIndex = slot.logicalIndex;
+    target.coreIndex = slot.coreIndex;
+    target.numaNodeIndex = slot.numaNodeIndex;
+    return target;
+}
+
+bool ApplyThreadBindingTarget(const ThreadBindingTarget &target,
+                              PlacementMode placement,
+                              std::string *errorMessage)
+{
+    if (placement == PlacementMode::None) {
+        return true;
+    }
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+    using SetThreadGroupAffinityFn = BOOL (WINAPI *)(HANDLE, const GROUP_AFFINITY *, PGROUP_AFFINITY);
+    using SetThreadIdealProcessorExFn = BOOL (WINAPI *)(HANDLE, PPROCESSOR_NUMBER, PPROCESSOR_NUMBER);
+
+    auto *kernel32 = GetModuleHandleW(L"kernel32.dll");
+    if (kernel32 == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "GetModuleHandleW(kernel32.dll) failed";
+        }
+        return false;
+    }
+
+    HANDLE threadHandle = GetCurrentThread();
+    if (placement == PlacementMode::Strict) {
+        if (target.logicalIndex >= sizeof(KAFFINITY) * 8) {
+            if (errorMessage != nullptr) {
+                *errorMessage = "logical processor index exceeds group affinity mask width";
+            }
+            return false;
+        }
+
+        auto rawProc = GetProcAddress(kernel32, "SetThreadGroupAffinity");
+        SetThreadGroupAffinityFn setThreadGroupAffinity = nullptr;
+        static_assert(sizeof(rawProc) == sizeof(setThreadGroupAffinity));
+        std::memcpy(&setThreadGroupAffinity, &rawProc, sizeof(setThreadGroupAffinity));
+        if (setThreadGroupAffinity == nullptr) {
+            if (errorMessage != nullptr) {
+                *errorMessage = "SetThreadGroupAffinity unavailable";
+            }
+            return false;
+        }
+
+        GROUP_AFFINITY affinity{};
+        affinity.Group = target.group;
+        affinity.Mask = ((KAFFINITY)1) << target.logicalIndex;
+        GROUP_AFFINITY previous{};
+        if (setThreadGroupAffinity(threadHandle, &affinity, &previous) == FALSE) {
+            if (errorMessage != nullptr) {
+                *errorMessage = "SetThreadGroupAffinity failed";
+            }
+            return false;
+        }
+        return true;
+    }
+
+    if (target.logicalIndex > std::numeric_limits<BYTE>::max()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "logical processor index exceeds PROCESSOR_NUMBER range";
+        }
+        return false;
+    }
+
+    auto rawProc = GetProcAddress(kernel32, "SetThreadIdealProcessorEx");
+    SetThreadIdealProcessorExFn setThreadIdealProcessorEx = nullptr;
+    static_assert(sizeof(rawProc) == sizeof(setThreadIdealProcessorEx));
+    std::memcpy(&setThreadIdealProcessorEx, &rawProc, sizeof(setThreadIdealProcessorEx));
+    if (setThreadIdealProcessorEx == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "SetThreadIdealProcessorEx unavailable";
+        }
+        return false;
+    }
+
+    PROCESSOR_NUMBER idealProcessor{};
+    idealProcessor.Group = target.group;
+    idealProcessor.Number = static_cast<BYTE>(target.logicalIndex);
+    PROCESSOR_NUMBER previous{};
+    if (setThreadIdealProcessorEx(threadHandle, &idealProcessor, &previous) == FALSE) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "SetThreadIdealProcessorEx failed";
+        }
+        return false;
+    }
+    return true;
+#else
+    (void)target;
+    if (errorMessage != nullptr) {
+        *errorMessage = "thread placement unsupported on current platform";
+    }
+    return false;
+#endif
+}
+
 } // namespace
 
-CpuTopology CpuTopologyDetector::Detect()
+CpuTopologyFacts CpuTopologyDetector::DetectFacts()
 {
 #if defined(_WIN32) && !defined(__EMSCRIPTEN__)
     using GetSystemCpuSetInformationFn = BOOL (WINAPI *)(
@@ -171,7 +355,7 @@ CpuTopology CpuTopologyDetector::Detect()
 
     auto *kernel32 = GetModuleHandleW(L"kernel32.dll");
     if (kernel32 == nullptr) {
-        return BuildFallbackTopology("GetModuleHandleW(kernel32.dll) failed");
+        return BuildFallbackFacts("GetModuleHandleW(kernel32.dll) failed");
     }
 
     auto rawProc = GetProcAddress(kernel32, "GetSystemCpuSetInformation");
@@ -179,17 +363,17 @@ CpuTopology CpuTopologyDetector::Detect()
     static_assert(sizeof(rawProc) == sizeof(getCpuSetInfo));
     std::memcpy(&getCpuSetInfo, &rawProc, sizeof(getCpuSetInfo));
     if (getCpuSetInfo == nullptr) {
-        return BuildFallbackTopology("GetSystemCpuSetInformation unavailable");
+        return BuildFallbackFacts("GetSystemCpuSetInformation unavailable");
     }
 
     ULONG bytesNeeded = 0;
     SetLastError(0);
     const BOOL probeOk = getCpuSetInfo(nullptr, 0, &bytesNeeded, nullptr, 0);
     if (probeOk != FALSE || bytesNeeded == 0) {
-        return BuildFallbackTopology("failed to probe cpu set buffer size");
+        return BuildFallbackFacts("failed to probe cpu set buffer size");
     }
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-        return BuildFallbackTopology("unexpected GetSystemCpuSetInformation probe status");
+        return BuildFallbackFacts("unexpected GetSystemCpuSetInformation probe status");
     }
 
     std::vector<unsigned char> buffer(bytesNeeded);
@@ -198,12 +382,10 @@ CpuTopology CpuTopologyDetector::Detect()
                       &bytesNeeded,
                       nullptr,
                       0) == FALSE) {
-        return BuildFallbackTopology("GetSystemCpuSetInformation call failed");
+        return BuildFallbackFacts("GetSystemCpuSetInformation call failed");
     }
 
-    CpuTopology topology;
-    topology.detectionSucceeded = true;
-    topology.usedFallback = false;
+    std::vector<LogicalProcessorInfo> logicalProcessors;
 
     std::set<uint16_t> groups;
     std::set<uint16_t> numaNodes;
@@ -226,7 +408,7 @@ CpuTopology CpuTopologyDetector::Detect()
             info.efficiencyClass = cpu.EfficiencyClass;
             info.parked = cpu.Parked != 0;
             info.allocated = cpu.Allocated != 0;
-            topology.logicalProcessors.push_back(info);
+            logicalProcessors.push_back(info);
             groups.insert(info.group);
             numaNodes.insert(info.numaNodeIndex);
             efficiencyClasses.insert(info.efficiencyClass);
@@ -234,89 +416,87 @@ CpuTopology CpuTopologyDetector::Detect()
         offset += raw->Size;
     }
 
-    if (topology.logicalProcessors.empty()) {
-        return BuildFallbackTopology("cpu set list empty");
+    if (logicalProcessors.empty()) {
+        return BuildFallbackFacts("cpu set list empty");
     }
 
-    std::sort(topology.logicalProcessors.begin(), topology.logicalProcessors.end(),
+    std::sort(logicalProcessors.begin(), logicalProcessors.end(),
               [](const LogicalProcessorInfo &a, const LogicalProcessorInfo &b) {
                   if (a.group != b.group) {
                       return a.group < b.group;
                   }
+                  if (a.coreIndex != b.coreIndex) {
+                      return a.coreIndex < b.coreIndex;
+                  }
                   if (a.logicalIndex != b.logicalIndex) {
                       return a.logicalIndex < b.logicalIndex;
                   }
-                  return a.coreIndex < b.coreIndex;
+                  return a.numaNodeIndex < b.numaNodeIndex;
               });
 
-    topology.logicalThreadCount = (uint32_t)topology.logicalProcessors.size();
+    CpuTopologyFacts topology;
+    topology.detectionSucceeded = true;
+    topology.usedFallback = false;
     topology.isHeterogeneous = efficiencyClasses.size() > 1;
     topology.processorGroups.assign(groups.begin(), groups.end());
     topology.numaNodes.assign(numaNodes.begin(), numaNodes.end());
 
-    std::map<std::tuple<uint16_t, uint16_t>, std::vector<const LogicalProcessorInfo *>> byCore;
-    for (const auto &lp : topology.logicalProcessors) {
-        byCore[{lp.group, lp.coreIndex}].push_back(&lp);
-    }
-    topology.physicalCoreCount = (uint32_t)byCore.size();
+    const uint8_t minEfficiencyClass = efficiencyClasses.empty() ? 0 : *efficiencyClasses.begin();
+    std::map<std::tuple<uint16_t, uint16_t>, size_t> physicalCoreLookup;
+    for (const auto &lp : logicalProcessors) {
+        const auto key = std::tuple<uint16_t, uint16_t>{lp.group, lp.coreIndex};
+        auto lookup = physicalCoreLookup.find(key);
+        if (lookup == physicalCoreLookup.end()) {
+            PhysicalCoreFacts core;
+            core.physicalCoreIndex = static_cast<uint32_t>(topology.physicalCoresBySystemOrder.size());
+            core.group = lp.group;
+            core.coreIndex = lp.coreIndex;
+            core.numaNodeIndex = lp.numaNodeIndex;
+            core.efficiencyClass = lp.efficiencyClass;
+            core.isHighPerformance = !topology.isHeterogeneous ||
+                lp.efficiencyClass == minEfficiencyClass;
+            topology.physicalCoresBySystemOrder.push_back(core);
+            lookup = physicalCoreLookup.emplace(key, topology.physicalCoresBySystemOrder.size() - 1).first;
+        }
 
-    std::vector<const LogicalProcessorInfo *> sortedByPreference;
-    sortedByPreference.reserve(topology.logicalProcessors.size());
-    for (const auto &lp : topology.logicalProcessors) {
-        sortedByPreference.push_back(&lp);
+        auto &core = topology.physicalCoresBySystemOrder[lookup->second];
+        LogicalThreadFacts thread;
+        thread.logicalIndex = lp.logicalIndex;
+        thread.group = lp.group;
+        thread.coreIndex = lp.coreIndex;
+        thread.numaNodeIndex = lp.numaNodeIndex;
+        thread.efficiencyClass = lp.efficiencyClass;
+        thread.parked = lp.parked;
+        thread.allocated = lp.allocated;
+        thread.isPrimaryThread = core.logicalThreads.empty();
+        core.logicalThreads.push_back(thread);
     }
-    std::sort(sortedByPreference.begin(), sortedByPreference.end(),
-              [](const LogicalProcessorInfo *a, const LogicalProcessorInfo *b) {
-                  if (a->efficiencyClass != b->efficiencyClass) {
-                      return a->efficiencyClass < b->efficiencyClass;
-                  }
-                  if (a->group != b->group) {
-                      return a->group < b->group;
-                  }
-                  if (a->coreIndex != b->coreIndex) {
-                      return a->coreIndex < b->coreIndex;
-                  }
-                  return a->logicalIndex < b->logicalIndex;
-              });
 
-    std::set<std::tuple<uint16_t, uint16_t>> seenCore;
-    for (const auto *lp : sortedByPreference) {
-        const auto key = std::tuple<uint16_t, uint16_t>{lp->group, lp->coreIndex};
-        if (seenCore.insert(key).second) {
-            topology.physicalPreferredLogicalIndices.push_back(lp->logicalIndex);
+    uint32_t highPerfCoreCount = 0;
+    for (const auto &core : topology.physicalCoresBySystemOrder) {
+        if (core.isHighPerformance) {
+            ++highPerfCoreCount;
         }
     }
-    topology.physicalPreferredLogicalIndices = UniqueSorted(topology.physicalPreferredLogicalIndices);
-
-    const uint8_t minEfficiencyClass = sortedByPreference.front()->efficiencyClass;
-    for (const auto &lp : topology.logicalProcessors) {
-        if (!topology.isHeterogeneous || lp.efficiencyClass == minEfficiencyClass) {
-            topology.highPerfLogicalIndices.push_back(lp.logicalIndex);
-        } else {
-            topology.lowPerfLogicalIndices.push_back(lp.logicalIndex);
-        }
-    }
-
-    topology.highPerfLogicalIndices = UniqueSorted(topology.highPerfLogicalIndices);
-    topology.lowPerfLogicalIndices = UniqueSorted(topology.lowPerfLogicalIndices);
-    if (topology.highPerfLogicalIndices.empty()) {
-        topology.highPerfLogicalIndices = BuildAllLogicalIndices(topology);
-    }
-
     std::ostringstream summary;
-    summary << "cpu topology: logical=" << topology.logicalThreadCount
-            << ", physical=" << topology.physicalCoreCount
+    summary << "cpu topology: logical=" << logicalProcessors.size()
+            << ", physical=" << topology.physicalCoresBySystemOrder.size()
             << ", groups=" << topology.processorGroups.size()
             << ", numa=" << topology.numaNodes.size()
             << ", hetero=" << (topology.isHeterogeneous ? "yes" : "no")
-            << ", high_perf=" << topology.highPerfLogicalIndices.size()
-            << ", low_perf=" << topology.lowPerfLogicalIndices.size();
+            << ", high_perf=" << highPerfCoreCount
+            << ", low_perf=" << (topology.physicalCoresBySystemOrder.size() - highPerfCoreCount);
     topology.diagnostics = summary.str();
 
     return topology;
 #else
-    return BuildFallbackTopology("non-windows build");
+    return BuildFallbackFacts("non-windows build");
 #endif
+}
+
+CpuTopology CpuTopologyDetector::Detect()
+{
+    return BuildLegacyTopologyFromFacts(DetectFacts());
 }
 
 ThreadPolicy ThreadPolicyPlanner::BuildConservativePolicy(const CpuTopology &topology)
@@ -761,6 +941,45 @@ std::string JoinLogicalList(const std::vector<uint32_t> &values, size_t maxItems
         oss << ",...+" << (values.size() - displayCount);
     }
     return oss.str();
+}
+
+std::optional<ThreadBindingTarget> ResolveThreadBindingTarget(const CpuPlacementPlan &plan,
+                                                              uint32_t workerIndex)
+{
+    const auto slot = ResolveWorkerBindingSlot(plan, workerIndex);
+    if (!slot.has_value()) {
+        return std::nullopt;
+    }
+    return BuildThreadBindingTarget(*slot);
+}
+
+bool ApplyThreadPlacement(const WorkerBindingSlot &slot,
+                          PlacementMode placement,
+                          std::string *errorMessage)
+{
+    const auto target = BuildThreadBindingTarget(slot);
+    if (!target.has_value()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "worker binding slot unavailable";
+        }
+        return false;
+    }
+    return ApplyThreadBindingTarget(*target, placement, errorMessage);
+}
+
+bool ApplyThreadPlacement(const CpuPlacementPlan &plan,
+                          PlacementMode placement,
+                          uint32_t workerIndex,
+                          std::string *errorMessage)
+{
+    const auto slot = ResolveWorkerBindingSlot(plan, workerIndex);
+    if (!slot.has_value()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "worker binding slot unavailable";
+        }
+        return false;
+    }
+    return ApplyThreadPlacement(*slot, placement, errorMessage);
 }
 
 bool ApplyThreadPlacement(const ThreadPolicy &policy,

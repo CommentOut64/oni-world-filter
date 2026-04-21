@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BatchCpu/SearchCpuPlan.hpp"
+
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -8,19 +10,6 @@
 #include <vector>
 
 namespace BatchCpu {
-
-enum class CpuMode {
-    Balanced,
-    Turbo,
-    Custom,
-    Conservative
-};
-
-enum class PlacementMode {
-    None,
-    Preferred,
-    Strict
-};
 
 struct LogicalProcessorInfo {
     uint32_t logicalIndex = 0;
@@ -56,6 +45,13 @@ struct ThreadPolicy {
     std::vector<uint32_t> targetLogicalProcessors;
 };
 
+struct ThreadBindingTarget {
+    uint16_t group = 0;
+    uint32_t logicalIndex = 0;
+    uint16_t coreIndex = 0;
+    uint16_t numaNodeIndex = 0;
+};
+
 struct PlannerInput {
     const CpuTopology *topology = nullptr;
     CpuMode mode = CpuMode::Balanced;
@@ -69,6 +65,7 @@ struct PlannerInput {
 class CpuTopologyDetector
 {
 public:
+    static CpuTopologyFacts DetectFacts();
     static CpuTopology Detect();
 };
 
@@ -174,6 +171,18 @@ const char *ToString(CpuMode mode);
 const char *ToString(PlacementMode mode);
 std::string JoinLogicalList(const std::vector<uint32_t> &values,
                             size_t maxItems = 16);
+
+std::optional<ThreadBindingTarget> ResolveThreadBindingTarget(const CpuPlacementPlan &plan,
+                                                              uint32_t workerIndex);
+
+bool ApplyThreadPlacement(const WorkerBindingSlot &slot,
+                          PlacementMode placement,
+                          std::string *errorMessage = nullptr);
+
+bool ApplyThreadPlacement(const CpuPlacementPlan &plan,
+                          PlacementMode placement,
+                          uint32_t workerIndex,
+                          std::string *errorMessage = nullptr);
 
 bool ApplyThreadPlacement(const ThreadPolicy &policy,
                           uint32_t workerIndex,

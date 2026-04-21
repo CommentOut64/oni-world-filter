@@ -1,4 +1,4 @@
-import type { SearchMatchSummary, SearchRequest } from "../lib/contracts";
+import type { SearchCpuConfig, SearchMatchSummary, SearchRequest } from "../lib/contracts";
 import type { SearchDraft } from "./searchStore";
 
 export const SEARCH_SESSION_STORAGE_KEY = "oni-search-session/v1";
@@ -43,26 +43,54 @@ function sanitizeSelectedSeed(results: SearchMatchSummary[], selectedSeed: numbe
   return results.some((item) => item.seed === selectedSeed) ? selectedSeed : null;
 }
 
-function normalizeSearchCpuConfig<T extends { enableWarmup: boolean }>(cpu: T): T {
+function normalizeCpuMode(value: unknown): SearchCpuConfig["mode"] {
+  if (value === "turbo" || value === "custom") {
+    return "turbo";
+  }
+  return "balanced";
+}
+
+function normalizePlacement(value: unknown): SearchCpuConfig["placement"] {
+  if (value === "strict" || value === "none" || value === "preferred") {
+    return value;
+  }
+  return "preferred";
+}
+
+function normalizeSearchCpuConfig(cpu: unknown): SearchCpuConfig {
+  const source = isRecord(cpu) ? cpu : {};
+  const placementValue =
+    typeof source.placement === "string"
+      ? source.placement
+      : typeof source.binding === "string"
+        ? source.binding
+        : undefined;
   return {
-    ...cpu,
-    enableWarmup: false,
+    mode: normalizeCpuMode(source.mode),
+    allowSmt: typeof source.allowSmt === "boolean" ? source.allowSmt : true,
+    allowLowPerf: typeof source.allowLowPerf === "boolean" ? source.allowLowPerf : false,
+    placement: normalizePlacement(placementValue),
   };
 }
 
 function normalizeSearchDraft(draft: SearchDraft): SearchDraft {
   return {
     ...draft,
+    threads: 0,
     cpu: normalizeSearchCpuConfig(draft.cpu),
   };
 }
 
 function normalizeSearchRequest(request: SearchRequest): SearchRequest {
   if (!request.cpu) {
-    return request;
+    return {
+      ...request,
+      threads: 0,
+    };
   }
   return {
     ...request,
+    threads: 0,
     cpu: normalizeSearchCpuConfig(request.cpu),
   };
 }
