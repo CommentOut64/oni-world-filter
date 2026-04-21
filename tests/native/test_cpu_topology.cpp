@@ -2,6 +2,7 @@
 #include "Batch/ThreadPolicy.hpp"
 
 #include <iostream>
+#include <vector>
 
 namespace {
 
@@ -12,6 +13,42 @@ bool Expect(bool condition, const char *message, int &failures)
     }
     std::cerr << "[FAIL] " << message << std::endl;
     ++failures;
+    return false;
+}
+
+Batch::CpuTopology BuildSyntheticHeterogeneousTopology()
+{
+    Batch::CpuTopology topology;
+    topology.detectionSucceeded = true;
+    topology.isHeterogeneous = true;
+    topology.physicalCoreCount = 3;
+    topology.logicalThreadCount = 6;
+    topology.highPerfLogicalIndices = {0, 1, 2, 3};
+    topology.lowPerfLogicalIndices = {4, 5};
+    topology.physicalPreferredLogicalIndices = {0, 2, 4};
+    topology.diagnostics = "synthetic heterogeneous topology";
+    return topology;
+}
+
+bool ContainsPolicy(const std::vector<BatchCpu::ThreadPolicy> &candidates, const char *name)
+{
+    for (const auto &candidate : candidates) {
+        if (candidate.name == name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UsesAnyLogical(const BatchCpu::ThreadPolicy &policy, const std::vector<uint32_t> &logicalIndices)
+{
+    for (uint32_t logicalIndex : policy.targetLogicalProcessors) {
+        for (uint32_t forbidden : logicalIndices) {
+            if (logicalIndex == forbidden) {
+                return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -45,6 +82,33 @@ int RunAllTests()
     Expect(customCandidates.size() == 1, "custom mode should return exactly one candidate", failures);
     if (!customCandidates.empty()) {
         Expect(customCandidates[0].workerCount >= 1, "custom worker count should be >= 1", failures);
+    }
+
+    {
+        const auto syntheticTopology = BuildSyntheticHeterogeneousTopology();
+
+        Batch::ThreadPolicyRequest balancedNoLowPerfRequest;
+        balancedNoLowPerfRequest.mode = Batch::ThreadPolicyMode::Balanced;
+        balancedNoLowPerfRequest.customAllowLowPerf = false;
+        const auto noLowPerfCandidates =
+            Batch::BuildThreadPolicyCandidates(balancedNoLowPerfRequest, syntheticTopology);
+        Expect(!ContainsPolicy(noLowPerfCandidates, "balanced-p-core-plus-low-core"),
+               "balanced should not generate low-core candidate when allowLowPerf is false",
+               failures);
+        for (const auto &candidate : noLowPerfCandidates) {
+            Expect(!UsesAnyLogical(candidate, syntheticTopology.lowPerfLogicalIndices),
+                   "balanced should keep all low-perf logical processors out when allowLowPerf is false",
+                   failures);
+        }
+
+        Batch::ThreadPolicyRequest balancedAllowLowPerfRequest;
+        balancedAllowLowPerfRequest.mode = Batch::ThreadPolicyMode::Balanced;
+        balancedAllowLowPerfRequest.customAllowLowPerf = true;
+        const auto allowLowPerfCandidates =
+            Batch::BuildThreadPolicyCandidates(balancedAllowLowPerfRequest, syntheticTopology);
+        Expect(ContainsPolicy(allowLowPerfCandidates, "balanced-p-core-plus-low-core"),
+               "balanced should generate low-core candidate when allowLowPerf is true",
+               failures);
     }
 
     if (failures == 0) {

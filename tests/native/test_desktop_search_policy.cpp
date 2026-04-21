@@ -52,8 +52,8 @@ int RunAllTests()
         Expect(plan.runtimePolicy.name == "balanced-p-core-plus-smt",
                "heterogeneous balanced should use full SMT as the runtime ceiling",
                failures);
-        Expect(plan.initialActiveWorkers == 12,
-               "heterogeneous balanced should start from partial SMT workers",
+        Expect(plan.initialActiveWorkers == 15,
+               "heterogeneous balanced should start from 90 percent of the runtime ceiling",
                failures);
         Expect(plan.enableRecovery,
                "heterogeneous balanced should enable recovery when startup workers are below ceiling",
@@ -74,10 +74,10 @@ int RunAllTests()
 
         const auto plan = Batch::BuildDesktopSearchExecutionPlan(request, topology, candidates);
         Expect(plan.runtimePolicy.name == "balanced-p-core",
-               "heterogeneous balanced should stay on p-core only when worker count is small",
+               "heterogeneous balanced should keep the runtime ceiling candidate on small worker counts",
                failures);
         Expect(plan.initialActiveWorkers == 2,
-               "heterogeneous balanced fallback should keep startup workers at the runtime ceiling",
+               "heterogeneous balanced should allow 90 percent startup to collapse to the runtime ceiling on small CPUs",
                failures);
         Expect(!plan.enableRecovery,
                "heterogeneous balanced fallback should not enable recovery without extra headroom",
@@ -101,8 +101,8 @@ int RunAllTests()
         Expect(plan.runtimePolicy.name == "balanced-physical-plus-smt",
                "homogeneous balanced should use full SMT as the runtime ceiling",
                failures);
-        Expect(plan.initialActiveWorkers == 12,
-               "homogeneous balanced should start from partial SMT workers",
+        Expect(plan.initialActiveWorkers == 15,
+               "homogeneous balanced should start from 90 percent of the runtime ceiling",
                failures);
         Expect(plan.enableRecovery,
                "homogeneous balanced should enable recovery when startup workers are below ceiling",
@@ -123,10 +123,10 @@ int RunAllTests()
 
         const auto plan = Batch::BuildDesktopSearchExecutionPlan(request, topology, candidates);
         Expect(plan.runtimePolicy.name == "balanced-physical",
-               "homogeneous balanced should stay on physical cores when worker count is small",
+               "homogeneous balanced should keep the runtime ceiling candidate on small worker counts",
                failures);
         Expect(plan.initialActiveWorkers == 2,
-               "homogeneous balanced fallback should keep startup workers at the runtime ceiling",
+               "homogeneous balanced should allow 90 percent startup to collapse to the runtime ceiling on small CPUs",
                failures);
         Expect(!plan.enableRecovery,
                "homogeneous balanced fallback should not enable recovery without extra headroom",
@@ -148,8 +148,8 @@ int RunAllTests()
         Expect(plan.runtimePolicy.name == "turbo-all-logical",
                "turbo mode should prefer explicit turbo candidate",
                failures);
-        Expect(plan.initialActiveWorkers == 12,
-               "turbo mode should keep 25 percent headroom for runtime recovery on large CPUs",
+        Expect(plan.initialActiveWorkers == 15,
+               "turbo mode should start from 90 percent of the runtime ceiling",
                failures);
         Expect(plan.enableRecovery,
                "turbo mode should enable recovery when startup workers are below the runtime ceiling",
@@ -172,8 +172,8 @@ int RunAllTests()
         Expect(plan.runtimePolicy.name == "balanced-physical-plus-smt",
                "turbo mode should fall back to the largest candidate when turbo candidate is absent",
                failures);
-        Expect(plan.initialActiveWorkers == 12,
-               "turbo fallback should still keep 25 percent headroom for runtime recovery",
+        Expect(plan.initialActiveWorkers == 15,
+               "turbo fallback should still start from 90 percent of the runtime ceiling",
                failures);
         Expect(plan.enableRecovery,
                "turbo fallback should enable recovery when startup workers are below the runtime ceiling",
@@ -196,11 +196,11 @@ int RunAllTests()
         Expect(plan.runtimePolicy.name == "unknown-b",
                "unknown candidate names should fall back to the largest candidate",
                failures);
-        Expect(plan.initialActiveWorkers == 10,
-               "unknown candidate fallback should keep startup workers at the runtime ceiling",
+        Expect(plan.initialActiveWorkers == 9,
+               "unknown candidate fallback should start from 90 percent of the runtime ceiling",
                failures);
-        Expect(!plan.enableRecovery,
-               "unknown candidate fallback should not invent recovery headroom",
+        Expect(plan.enableRecovery,
+               "unknown candidate fallback should preserve recovery headroom when startup workers stay below the ceiling",
                failures);
     }
 
