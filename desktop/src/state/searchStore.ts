@@ -20,20 +20,20 @@ import {
   listWorlds,
   startSearch,
   subscribeSidecar,
-} from "../lib/tauri";
-import { publishHostDebugSnapshot } from "../lib/hostDebugWindow";
+} from "../lib/tauri.ts";
+import { publishHostDebugSnapshot } from "../lib/hostDebugWindow.ts";
 import {
   beginSidecarBinding,
   completeSidecarBinding,
   disposeSidecarBinding,
   failSidecarBinding,
-} from "./searchStoreState";
-import { appendUniqueSearchResult } from "./searchResultsState";
-import { createSidecarListenerRegistry } from "./sidecarListenerRegistry";
+} from "./searchStoreState.ts";
+import { appendUniqueSearchResult } from "./searchResultsState.ts";
+import { createSidecarListenerRegistry } from "./sidecarListenerRegistry.ts";
 import {
   persistSearchSessionSnapshot,
   restoreSearchSessionSnapshot,
-} from "./searchStorePersistence";
+} from "./searchStorePersistence.ts";
 
 const DEFAULT_CONSTRAINTS: SearchConstraints = {
   required: [],
@@ -405,9 +405,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     try {
       await cancelSearch(jobId);
     } catch (error) {
-      set({ lastError: formatTauriError(error) });
-    } finally {
-      set({ isCancelling: false });
+      set({
+        isCancelling: false,
+        lastError: formatTauriError(error),
+      });
     }
   },
   clearResults: () => {
@@ -476,6 +477,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     if (event.event === "failed") {
       set({
         isSearching: false,
+        isCancelling: false,
         activeJobId: null,
         lastError: event.message,
       });
@@ -485,6 +487,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     if (event.event === "completed") {
       set({
         isSearching: false,
+        isCancelling: false,
         activeJobId: null,
         stats: {
           ...state.stats,
@@ -501,6 +504,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     if (event.event === "cancelled") {
       set({
         isSearching: false,
+        isCancelling: false,
         activeJobId: null,
         stats: {
           ...state.stats,

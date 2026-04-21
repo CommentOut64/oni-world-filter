@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::HostError;
-use crate::state::{JobRegistry, JobStatus, RunningJobHandles};
+use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
 #[cfg(windows)]
 use std::mem::size_of;
@@ -32,6 +32,7 @@ use windows_sys::Win32::System::Threading::SetProcessAffinityMask;
 pub const SIDECAR_EVENT_CHANNEL: &str = "sidecar://event";
 pub const SIDECAR_STDERR_CHANNEL: &str = "sidecar://stderr";
 const HOST_DEBUG_PREFIX: &str = "[host-debug]";
+const CANCEL_GRACE_TIMEOUT_MS: u64 = 75;
 
 const WORLD_CODES: [&str; 38] = [
     "SNDST-A-",
@@ -496,35 +497,36 @@ pub fn start_search_streaming(
 }
 
 pub fn cancel_search(
-    app: &AppHandle,
+    _app: &AppHandle,
     registry: Arc<JobRegistry>,
     job_id: &str,
 ) -> Result<(), HostError> {
     let handles = registry
         .get_handles(job_id)
         .ok_or_else(|| HostError::JobNotFound(job_id.to_string()))?;
-    if !registry.is_running(job_id) {
+    if !begin_host_cancellation(&registry, job_id)? {
         return Ok(());
     }
 
     request_search_cancel(&handles, job_id);
-    let forced = force_stop_child_process(&handles);
-
-    if forced && registry.is_running(job_id) {
-        registry.set_status(job_id, JobStatus::Cancelled)?;
-        let _ = app.emit(
-            SIDECAR_EVENT_CHANNEL,
-            json!({
-                "event": "cancelled",
-                "jobId": job_id,
-                "processedSeeds": 0,
-                "totalSeeds": 0,
-                "totalMatches": 0,
-                "finalActiveWorkers": 0
-            }),
-        );
+    thread::sleep(Duration::from_millis(CANCEL_GRACE_TIMEOUT_MS));
+    if registry.get_status(job_id) == Some(JobStatus::Cancelling) {
+        let _ = force_stop_child_process(&handles);
     }
     Ok(())
+}
+
+fn begin_host_cancellation(registry: &JobRegistry, job_id: &str) -> Result<bool, HostError> {
+    match registry.get_status(job_id) {
+        Some(JobStatus::Running) => {
+            registry.set_status(job_id, JobStatus::Cancelling)?;
+            Ok(true)
+        }
+        Some(JobStatus::Cancelling | JobStatus::Completed | JobStatus::Failed | JobStatus::Cancelled) => {
+            Ok(false)
+        }
+        None => Err(HostError::JobNotFound(job_id.to_string())),
+    }
 }
 
 fn request_search_cancel(handles: &RunningJobHandles, job_id: &str) {
@@ -541,6 +543,7 @@ fn request_search_cancel(handles: &RunningJobHandles, job_id: &str) {
 }
 
 fn force_stop_child_process(handles: &RunningJobHandles) -> bool {
+    let _ = handles.stdin_handle.lock().map(|mut guard| guard.take());
     let mut forced = false;
     if let Ok(mut guard) = handles.child_handle.lock() {
         if let Some(child) = guard.as_mut() {
@@ -553,7 +556,6 @@ fn force_stop_child_process(handles: &RunningJobHandles) -> bool {
             }
         }
     }
-    let _ = handles.stdin_handle.lock().map(|mut guard| guard.take());
     forced
 }
 
@@ -1128,13 +1130,17 @@ fn spawn_stdout_forwarder(
             let event_json = match parsed {
                 Ok(value) => value,
                 Err(error) => {
-                    let failed = json!({
-                        "event": "failed",
-                        "jobId": fallback_job_id,
-                        "message": format!("sidecar 输出非 JSON 行: {}", error),
-                    });
-                    let _ = app.emit(SIDECAR_EVENT_CHANNEL, failed.clone());
-                    let _ = registry.set_status(&fallback_job_id, JobStatus::Failed);
+                    if should_emit_failed_for_invalid_stdout(
+                        registry.get_status(&fallback_job_id),
+                    ) {
+                        let failed = json!({
+                            "event": "failed",
+                            "jobId": fallback_job_id,
+                            "message": format!("sidecar 输出非 JSON 行: {}", error),
+                        });
+                        let _ = app.emit(SIDECAR_EVENT_CHANNEL, failed);
+                        let _ = registry.set_status(&fallback_job_id, JobStatus::Failed);
+                    }
                     continue;
                 }
             };
@@ -1150,6 +1156,7 @@ fn spawn_stdout_forwarder(
                 .unwrap_or_default()
                 .to_string();
 
+            update_progress_snapshot_from_event(&registry, &job_id, event_name.as_str(), &event_json);
             let _ = app.emit(SIDECAR_EVENT_CHANNEL, event_json);
 
             match event_name.as_str() {
@@ -1167,6 +1174,11 @@ fn spawn_stdout_forwarder(
                 }
                 _ => {}
             }
+        }
+
+        if let Some(event) = finalize_cancelled_from_stdout_eof(&registry, &fallback_job_id) {
+            let _ = app.emit(SIDECAR_EVENT_CHANNEL, event);
+            let _ = stdin_handle.lock().map(|mut guard| guard.take());
         }
     });
 }
@@ -1192,7 +1204,7 @@ fn spawn_waiter(
 
         match maybe_status {
             Ok(Some(status)) => {
-                if !status.success() && registry.is_running(&job_id) {
+                if should_emit_failed_for_exit(registry.get_status(&job_id), status.success()) {
                     let _ = registry.set_status(&job_id, JobStatus::Failed);
                     let _ = app.emit(
                         SIDECAR_EVENT_CHANNEL,
@@ -1210,7 +1222,7 @@ fn spawn_waiter(
                 thread::sleep(Duration::from_millis(40));
             }
             Err(error) => {
-                if registry.is_running(&job_id) {
+                if registry.get_status(&job_id) == Some(JobStatus::Running) {
                     let _ = registry.set_status(&job_id, JobStatus::Failed);
                     let _ = app.emit(
                         SIDECAR_EVENT_CHANNEL,
@@ -1227,6 +1239,93 @@ fn spawn_waiter(
     });
 }
 
+fn should_emit_failed_for_exit(job_status: Option<JobStatus>, exit_success: bool) -> bool {
+    !exit_success && job_status == Some(JobStatus::Running)
+}
+
+fn should_emit_failed_for_invalid_stdout(job_status: Option<JobStatus>) -> bool {
+    matches!(job_status, Some(JobStatus::Running) | None)
+}
+
+fn update_progress_snapshot_from_event(
+    registry: &JobRegistry,
+    job_id: &str,
+    event_name: &str,
+    event_json: &Value,
+) {
+    let current = registry
+        .get_progress_snapshot(job_id)
+        .unwrap_or_else(default_progress_snapshot);
+
+    let next_snapshot = match event_name {
+        "started" => Some(JobProgressSnapshot {
+            processed_seeds: 0,
+            total_seeds: read_u64_field(event_json, "totalSeeds").unwrap_or(current.total_seeds),
+            total_matches: 0,
+            active_workers: read_u32_field(event_json, "workerCount").unwrap_or(current.active_workers),
+        }),
+        "progress" | "match" => Some(JobProgressSnapshot {
+            processed_seeds: read_u64_field(event_json, "processedSeeds")
+                .unwrap_or(current.processed_seeds),
+            total_seeds: read_u64_field(event_json, "totalSeeds").unwrap_or(current.total_seeds),
+            total_matches: read_u64_field(event_json, "totalMatches")
+                .unwrap_or(current.total_matches),
+            active_workers: read_u32_field(event_json, "activeWorkers")
+                .unwrap_or(current.active_workers),
+        }),
+        "completed" | "cancelled" => Some(JobProgressSnapshot {
+            processed_seeds: read_u64_field(event_json, "processedSeeds")
+                .unwrap_or(current.processed_seeds),
+            total_seeds: read_u64_field(event_json, "totalSeeds").unwrap_or(current.total_seeds),
+            total_matches: read_u64_field(event_json, "totalMatches")
+                .unwrap_or(current.total_matches),
+            active_workers: read_u32_field(event_json, "finalActiveWorkers")
+                .unwrap_or(current.active_workers),
+        }),
+        _ => None,
+    };
+
+    if let Some(snapshot) = next_snapshot {
+        let _ = registry.update_progress_snapshot(job_id, snapshot);
+    }
+}
+
+fn finalize_cancelled_from_stdout_eof(registry: &JobRegistry, job_id: &str) -> Option<Value> {
+    if registry.get_status(job_id) != Some(JobStatus::Cancelling) {
+        return None;
+    }
+
+    let snapshot = registry
+        .get_progress_snapshot(job_id)
+        .unwrap_or_else(default_progress_snapshot);
+    let _ = registry.set_status(job_id, JobStatus::Cancelled);
+    Some(json!({
+        "event": "cancelled",
+        "jobId": job_id,
+        "processedSeeds": snapshot.processed_seeds,
+        "totalSeeds": snapshot.total_seeds,
+        "totalMatches": snapshot.total_matches,
+        "finalActiveWorkers": snapshot.active_workers,
+    }))
+}
+
+fn default_progress_snapshot() -> JobProgressSnapshot {
+    JobProgressSnapshot {
+        processed_seeds: 0,
+        total_seeds: 0,
+        total_matches: 0,
+        active_workers: 0,
+    }
+}
+
+fn read_u64_field(event_json: &Value, field_name: &str) -> Option<u64> {
+    event_json.get(field_name).and_then(Value::as_u64)
+}
+
+fn read_u32_field(event_json: &Value, field_name: &str) -> Option<u32> {
+    read_u64_field(event_json, field_name).and_then(|value| u32::try_from(value).ok())
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -1238,13 +1337,14 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::state::RunningJobHandles;
+    use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
     use super::{
-        collect_sidecar_candidates, first_existing_sidecar_path, force_stop_child_process,
-        list_geyser_options, list_world_options, prepare_runtime_sidecar_copy,
-        preview_affinity_mask_for_cpu_sets, request_search_cancel, resolve_sidecar_path,
-        run_sidecar_request_collect, PreviewCpuSetInfo, SearchCatalogPayload,
+        begin_host_cancellation, collect_sidecar_candidates, finalize_cancelled_from_stdout_eof,
+        first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
+        list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
+        request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
+        should_emit_failed_for_exit, PreviewCpuSetInfo, SearchCatalogPayload,
         SidecarProcessPriority,
     };
 
@@ -1277,6 +1377,14 @@ mod tests {
             .stderr(Stdio::null())
             .spawn()
             .expect("sleeping child should spawn")
+    }
+
+    fn create_handles() -> RunningJobHandles {
+        RunningJobHandles {
+            child_handle: Arc::new(Mutex::new(None)),
+            stdin_handle: Arc::new(Mutex::new(None)),
+            cancel_token: Arc::new(AtomicBool::new(false)),
+        }
     }
 
     fn build_catalog_with_trait_field(field_name: &str) -> serde_json::Value {
@@ -1477,6 +1585,83 @@ mod tests {
         assert!(
             !status.success(),
             "force-stopped search sidecar should not exit successfully"
+        );
+    }
+
+    #[test]
+    fn cancel_helpers_should_mark_job_as_cancelling_before_force_stop() {
+        let registry = JobRegistry::default();
+        registry
+            .insert_running("job-cancelling".to_string(), create_handles())
+            .expect("insert running job should succeed");
+
+        begin_host_cancellation(&registry, "job-cancelling")
+            .expect("begin host cancellation should succeed");
+
+        assert_eq!(
+            registry.get_status("job-cancelling"),
+            Some(JobStatus::Cancelling)
+        );
+    }
+
+    #[test]
+    fn cancel_helpers_should_synthesize_cancelled_from_stdout_eof() {
+        let registry = JobRegistry::default();
+        registry
+            .insert_running("job-eof".to_string(), create_handles())
+            .expect("insert running job should succeed");
+        registry
+            .set_status("job-eof", JobStatus::Cancelling)
+            .expect("set cancelling should succeed");
+        registry
+            .update_progress_snapshot(
+                "job-eof",
+                JobProgressSnapshot {
+                    processed_seeds: 11,
+                    total_seeds: 200,
+                    total_matches: 3,
+                    active_workers: 2,
+                },
+            )
+            .expect("update snapshot should succeed");
+
+        let event = finalize_cancelled_from_stdout_eof(&registry, "job-eof")
+            .expect("stdout eof should synthesize cancelled");
+
+        assert_eq!(event.get("event").and_then(|value| value.as_str()), Some("cancelled"));
+        assert_eq!(event.get("jobId").and_then(|value| value.as_str()), Some("job-eof"));
+        assert_eq!(
+            event.get("processedSeeds").and_then(|value| value.as_u64()),
+            Some(11)
+        );
+        assert_eq!(
+            event.get("totalSeeds").and_then(|value| value.as_u64()),
+            Some(200)
+        );
+        assert_eq!(
+            event.get("totalMatches").and_then(|value| value.as_u64()),
+            Some(3)
+        );
+        assert_eq!(
+            event.get("finalActiveWorkers").and_then(|value| value.as_u64()),
+            Some(2)
+        );
+        assert_eq!(registry.get_status("job-eof"), Some(JobStatus::Cancelled));
+    }
+
+    #[test]
+    fn cancel_helpers_should_not_report_failed_for_cancelling_exit() {
+        assert!(
+            !should_emit_failed_for_exit(Some(JobStatus::Cancelling), false),
+            "non-zero exit after host cancellation should not become failed"
+        );
+        assert!(
+            should_emit_failed_for_exit(Some(JobStatus::Running), false),
+            "non-zero exit while still running should remain failed"
+        );
+        assert!(
+            !should_emit_failed_for_exit(Some(JobStatus::Completed), true),
+            "successful exit should not emit failed"
         );
     }
 
