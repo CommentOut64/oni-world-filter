@@ -1,5 +1,5 @@
 import type { SearchCatalog } from "./contracts";
-import { FALLBACK_MIXING_SLOT_PATHS, MIXING_SLOT_DISPLAY_NAMES } from "./displayNames";
+import { FALLBACK_MIXING_SLOT_PATHS, MIXING_SLOT_DISPLAY_NAMES } from "./displayNames.ts";
 
 const FALLBACK_WORLD_CODES = [
   "SNDST-A-",
