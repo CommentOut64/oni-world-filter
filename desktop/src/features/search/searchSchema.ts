@@ -205,7 +205,7 @@ export function toSearchDraft(values: SearchFormValues): SearchDraft {
       allowSmt: values.cpuAllowSmt,
       allowLowPerf: values.cpuAllowLowPerf,
       placement: "preferred",
-      enableWarmup: true,
+      enableWarmup: false,
       enableAdaptiveDown: true,
       chunkSize: 64,
       progressInterval: 1000,

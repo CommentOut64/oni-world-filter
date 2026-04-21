@@ -48,7 +48,7 @@ const DEFAULT_CPU_CONFIG: SearchCpuConfig = {
   allowSmt: true,
   allowLowPerf: false,
   placement: "preferred",
-  enableWarmup: true,
+  enableWarmup: false,
   enableAdaptiveDown: true,
   chunkSize: 64,
   progressInterval: 1000,
@@ -452,6 +452,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       return;
     }
 
+    if (state.isCancelling && (event.event === "progress" || event.event === "match")) {
+      return;
+    }
+
     if (event.event === "started") {
       set({
         stats: {
@@ -479,6 +483,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         isSearching: false,
         isCancelling: false,
         activeJobId: null,
+        stats: {
+          ...state.stats,
+          currentSeedsPerSecond: 0,
+        },
         lastError: event.message,
       });
       return;
@@ -495,7 +503,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
           totalSeeds: event.totalSeeds,
           totalMatches: event.totalMatches,
           activeWorkers: event.finalActiveWorkers,
-          currentSeedsPerSecond: event.throughput.averageSeedsPerSecond,
+          currentSeedsPerSecond: 0,
         },
       });
       return;
@@ -512,6 +520,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
           totalSeeds: event.totalSeeds,
           totalMatches: event.totalMatches,
           activeWorkers: event.finalActiveWorkers,
+          currentSeedsPerSecond: 0,
         },
       });
     }

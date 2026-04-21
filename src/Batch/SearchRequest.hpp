@@ -28,6 +28,8 @@ struct SearchRequest {
     int seedStart = 1;
     int seedEnd = 0;
     uint32_t workerCount = 1;
+    // 0 表示沿用 workerCount，保持旧行为。
+    uint32_t initialActiveWorkers = 0;
     int chunkSize = 64;
     int progressInterval = 1000;
     std::chrono::milliseconds sampleWindow{2000};

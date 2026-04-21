@@ -59,6 +59,12 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     }
 
     const int workerCount = std::max<int>(1, static_cast<int>(request.workerCount));
+    const int startingActiveWorkers = std::clamp(
+        request.initialActiveWorkers > 0
+            ? static_cast<int>(request.initialActiveWorkers)
+            : workerCount,
+        1,
+        workerCount);
     const int chunkSize = std::max(1, request.chunkSize);
     const int progressInterval = std::max(1, request.progressInterval);
     const auto sampleWindow = std::max(request.sampleWindow, std::chrono::milliseconds(1));
@@ -66,7 +72,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     std::atomic<int> nextSeed{request.seedStart};
     std::atomic<int> processed{0};
     std::atomic<int> totalMatches{0};
-    std::atomic<int> adaptiveWorkers{workerCount};
+    std::atomic<int> adaptiveWorkers{startingActiveWorkers};
     std::atomic<bool> stopRequested{false};
     std::atomic<bool> hitBudget{false};
     std::atomic<bool> failed{false};

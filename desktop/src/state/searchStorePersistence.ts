@@ -43,6 +43,30 @@ function sanitizeSelectedSeed(results: SearchMatchSummary[], selectedSeed: numbe
   return results.some((item) => item.seed === selectedSeed) ? selectedSeed : null;
 }
 
+function normalizeSearchCpuConfig<T extends { enableWarmup: boolean }>(cpu: T): T {
+  return {
+    ...cpu,
+    enableWarmup: false,
+  };
+}
+
+function normalizeSearchDraft(draft: SearchDraft): SearchDraft {
+  return {
+    ...draft,
+    cpu: normalizeSearchCpuConfig(draft.cpu),
+  };
+}
+
+function normalizeSearchRequest(request: SearchRequest): SearchRequest {
+  if (!request.cpu) {
+    return request;
+  }
+  return {
+    ...request,
+    cpu: normalizeSearchCpuConfig(request.cpu),
+  };
+}
+
 function toSerializableSnapshot(
   state: SearchSessionStateSnapshot
 ): SerializedSearchSessionSnapshot {
@@ -111,13 +135,13 @@ export function restoreSearchSessionSnapshot(
       return null;
     }
     const results = cloneValue(snapshot.results);
-    const draft = cloneValue(snapshot.draft);
+    const draft = normalizeSearchDraft(cloneValue(snapshot.draft));
     return {
       draft,
       results,
       selectedSeed: sanitizeSelectedSeed(results, snapshot.selectedSeed),
       lastSubmittedRequest: snapshot.lastSubmittedRequest
-        ? cloneValue(snapshot.lastSubmittedRequest)
+        ? normalizeSearchRequest(cloneValue(snapshot.lastSubmittedRequest))
         : null,
       activeWorldType: draft.worldType,
       activeMixing: draft.mixing,

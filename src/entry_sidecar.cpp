@@ -18,6 +18,7 @@
 #include "Batch/BatchMatcher.hpp"
 #include "Batch/BatchSearchService.hpp"
 #include "Batch/CpuTopology.hpp"
+#include "Batch/DesktopSearchPolicy.hpp"
 #include "Batch/FilterConfig.hpp"
 #include "Batch/SessionWarmupPlanner.hpp"
 #include "Batch/SidecarProtocol.hpp"
@@ -312,17 +313,37 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
     return request;
 }
 
-BatchCpu::ThreadPolicy SelectPolicy(const Batch::FilterConfig &cfg)
+Batch::DesktopSearchExecutionPlan BuildSinglePolicyExecutionPlan(
+    const BatchCpu::ThreadPolicy &policy)
+{
+    Batch::DesktopSearchExecutionPlan plan;
+    plan.runtimePolicy = policy;
+    plan.initialActiveWorkers = std::max<uint32_t>(1u, policy.workerCount);
+    return plan;
+}
+
+Batch::DesktopSearchExecutionPlan SelectPolicy(const Batch::FilterConfig &cfg)
 {
     const auto topology = Batch::DetectCpuTopology();
     const auto policyRequest = Batch::BuildThreadPolicyRequestFromFilter(cfg);
     const auto plannerInput = Batch::BuildPlannerInput(policyRequest, topology);
     const auto candidates = Batch::BuildThreadPolicyCandidates(policyRequest, topology);
     if (candidates.empty()) {
-        return BatchCpu::ThreadPolicy{};
+        return BuildSinglePolicyExecutionPlan(BatchCpu::ThreadPolicy{});
     }
 
     const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
+    const bool shouldUseStaticDesktopPolicy =
+        cfg.hasCpuSection &&
+        !cfg.cpu.enableWarmup &&
+        !legacyThreadsOnly &&
+        plannerInput.mode != BatchCpu::CpuMode::Custom &&
+        plannerInput.mode != BatchCpu::CpuMode::Conservative &&
+        candidates.size() > 1;
+    if (shouldUseStaticDesktopPolicy) {
+        return Batch::BuildDesktopSearchExecutionPlan(policyRequest, topology, candidates);
+    }
+
     bool enableWarmup = cfg.cpu.enableWarmup && !legacyThreadsOnly &&
                         plannerInput.mode != BatchCpu::CpuMode::Custom &&
                         plannerInput.mode != BatchCpu::CpuMode::Conservative &&
@@ -331,7 +352,7 @@ BatchCpu::ThreadPolicy SelectPolicy(const Batch::FilterConfig &cfg)
         enableWarmup = false;
     }
     if (!enableWarmup) {
-        return candidates.front();
+        return BuildSinglePolicyExecutionPlan(candidates.front());
     }
 
     const int warmupEnd =
@@ -366,7 +387,7 @@ BatchCpu::ThreadPolicy SelectPolicy(const Batch::FilterConfig &cfg)
             const auto run = Batch::BatchSearchService::Run(warmupRequest);
             return run.throughput;
         });
-    return calibration.selectedPolicy;
+    return BuildSinglePolicyExecutionPlan(calibration.selectedPolicy);
 }
 
 void RunSearchCommand(const Batch::SidecarSearchRequest &request)
@@ -385,11 +406,11 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
         return;
     }
 
-    const auto selectedPolicy = SelectPolicy(cfg);
+    const auto selectedPlan = SelectPolicy(cfg);
     auto cancelRequested = std::make_shared<std::atomic<bool>>(false);
     auto activeWorkerCap = std::make_shared<std::atomic<int>>(0);
 
-    std::thread worker([cfg, request, selectedPolicy, cancelRequested, activeWorkerCap]() {
+    std::thread worker([cfg, request, selectedPlan, cancelRequested, activeWorkerCap]() {
         try {
             Batch::SearchEventCallbacks callbacks;
             callbacks.onStarted = [&](const Batch::SearchStartedEvent &event) {
@@ -412,9 +433,16 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
             };
 
             auto searchRequest = BuildSearchRequest(cfg,
-                                                    selectedPolicy,
+                                                    selectedPlan.runtimePolicy,
                                                     cancelRequested.get(),
                                                     activeWorkerCap.get());
+            searchRequest.initialActiveWorkers = selectedPlan.initialActiveWorkers;
+            searchRequest.enableRecovery = selectedPlan.enableRecovery;
+            searchRequest.recoveryConfig = selectedPlan.recoveryConfig;
+            if (selectedPlan.enableRecovery) {
+                searchRequest.sampleWindow =
+                    std::min(searchRequest.sampleWindow, std::chrono::milliseconds(500));
+            }
             (void)Batch::BatchSearchService::Run(searchRequest, callbacks);
         } catch (const std::exception &ex) {
             EmitLine(Batch::SerializeFailedEvent(request.jobId, ex.what()));

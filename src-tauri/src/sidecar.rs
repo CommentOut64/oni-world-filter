@@ -497,7 +497,7 @@ pub fn start_search_streaming(
 }
 
 pub fn cancel_search(
-    _app: &AppHandle,
+    app: &AppHandle,
     registry: Arc<JobRegistry>,
     job_id: &str,
 ) -> Result<(), HostError> {
@@ -512,6 +512,9 @@ pub fn cancel_search(
     thread::sleep(Duration::from_millis(CANCEL_GRACE_TIMEOUT_MS));
     if registry.get_status(job_id) == Some(JobStatus::Cancelling) {
         let _ = force_stop_child_process(&handles);
+        if let Some(event) = finalize_cancelled_from_snapshot(&registry, job_id) {
+            let _ = app.emit(SIDECAR_EVENT_CHANNEL, event);
+        }
     }
     Ok(())
 }
@@ -1156,6 +1159,11 @@ fn spawn_stdout_forwarder(
                 .unwrap_or_default()
                 .to_string();
 
+            let job_status = registry.get_status(&job_id);
+            if !should_forward_sidecar_event(job_status, event_name.as_str()) {
+                continue;
+            }
+
             update_progress_snapshot_from_event(&registry, &job_id, event_name.as_str(), &event_json);
             let _ = app.emit(SIDECAR_EVENT_CHANNEL, event_json);
 
@@ -1247,6 +1255,14 @@ fn should_emit_failed_for_invalid_stdout(job_status: Option<JobStatus>) -> bool 
     matches!(job_status, Some(JobStatus::Running) | None)
 }
 
+fn should_forward_sidecar_event(job_status: Option<JobStatus>, event_name: &str) -> bool {
+    match job_status {
+        Some(JobStatus::Running) | None => true,
+        Some(JobStatus::Cancelling) => event_name == "cancelled",
+        Some(JobStatus::Cancelled | JobStatus::Completed | JobStatus::Failed) => false,
+    }
+}
+
 fn update_progress_snapshot_from_event(
     registry: &JobRegistry,
     job_id: &str,
@@ -1290,7 +1306,7 @@ fn update_progress_snapshot_from_event(
     }
 }
 
-fn finalize_cancelled_from_stdout_eof(registry: &JobRegistry, job_id: &str) -> Option<Value> {
+fn finalize_cancelled_from_snapshot(registry: &JobRegistry, job_id: &str) -> Option<Value> {
     if registry.get_status(job_id) != Some(JobStatus::Cancelling) {
         return None;
     }
@@ -1307,6 +1323,10 @@ fn finalize_cancelled_from_stdout_eof(registry: &JobRegistry, job_id: &str) -> O
         "totalMatches": snapshot.total_matches,
         "finalActiveWorkers": snapshot.active_workers,
     }))
+}
+
+fn finalize_cancelled_from_stdout_eof(registry: &JobRegistry, job_id: &str) -> Option<Value> {
+    finalize_cancelled_from_snapshot(registry, job_id)
 }
 
 fn default_progress_snapshot() -> JobProgressSnapshot {
@@ -1340,11 +1360,12 @@ mod tests {
     use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
     use super::{
-        begin_host_cancellation, collect_sidecar_candidates, finalize_cancelled_from_stdout_eof,
-        first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
-        list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
-        request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
-        should_emit_failed_for_exit, PreviewCpuSetInfo, SearchCatalogPayload,
+        begin_host_cancellation, collect_sidecar_candidates, finalize_cancelled_from_snapshot,
+        finalize_cancelled_from_stdout_eof, first_existing_sidecar_path,
+        force_stop_child_process, list_geyser_options, list_world_options,
+        prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets, request_search_cancel,
+        resolve_sidecar_path, run_sidecar_request_collect, should_emit_failed_for_exit,
+        should_forward_sidecar_event, PreviewCpuSetInfo, SearchCatalogPayload,
         SidecarProcessPriority,
     };
 
@@ -1647,6 +1668,73 @@ mod tests {
             Some(2)
         );
         assert_eq!(registry.get_status("job-eof"), Some(JobStatus::Cancelled));
+    }
+
+    #[test]
+    fn cancel_helpers_should_synthesize_cancelled_immediately_after_host_abort() {
+        let registry = JobRegistry::default();
+        registry
+            .insert_running("job-host-abort".to_string(), create_handles())
+            .expect("insert running job should succeed");
+        registry
+            .set_status("job-host-abort", JobStatus::Cancelling)
+            .expect("set cancelling should succeed");
+        registry
+            .update_progress_snapshot(
+                "job-host-abort",
+                JobProgressSnapshot {
+                    processed_seeds: 77,
+                    total_seeds: 1000,
+                    total_matches: 9,
+                    active_workers: 6,
+                },
+            )
+            .expect("update snapshot should succeed");
+
+        let event = finalize_cancelled_from_snapshot(&registry, "job-host-abort")
+            .expect("host abort should synthesize cancelled immediately");
+
+        assert_eq!(event.get("event").and_then(|value| value.as_str()), Some("cancelled"));
+        assert_eq!(
+            event.get("processedSeeds").and_then(|value| value.as_u64()),
+            Some(77)
+        );
+        assert_eq!(
+            event.get("totalSeeds").and_then(|value| value.as_u64()),
+            Some(1000)
+        );
+        assert_eq!(
+            event.get("totalMatches").and_then(|value| value.as_u64()),
+            Some(9)
+        );
+        assert_eq!(
+            event.get("finalActiveWorkers").and_then(|value| value.as_u64()),
+            Some(6)
+        );
+        assert_eq!(
+            registry.get_status("job-host-abort"),
+            Some(JobStatus::Cancelled)
+        );
+    }
+
+    #[test]
+    fn cancel_helpers_should_suppress_backlogged_non_terminal_events_while_cancelling() {
+        assert!(
+            !should_forward_sidecar_event(Some(JobStatus::Cancelling), "progress"),
+            "cancelling jobs should not keep forwarding stale progress events"
+        );
+        assert!(
+            !should_forward_sidecar_event(Some(JobStatus::Cancelling), "match"),
+            "cancelling jobs should not keep forwarding stale match events"
+        );
+        assert!(
+            should_forward_sidecar_event(Some(JobStatus::Cancelling), "cancelled"),
+            "cancelling jobs should still forward the terminal cancelled event"
+        );
+        assert!(
+            !should_forward_sidecar_event(Some(JobStatus::Cancelled), "progress"),
+            "cancelled jobs should drop any late non-terminal events"
+        );
     }
 
     #[test]

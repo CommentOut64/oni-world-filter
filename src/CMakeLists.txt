@@ -53,6 +53,8 @@ set(ONI_BASE_SOURCES
     "Batch/CpuTopology.cpp"
     "Batch/ThreadPolicy.hpp"
     "Batch/ThreadPolicy.cpp"
+    "Batch/DesktopSearchPolicy.hpp"
+    "Batch/DesktopSearchPolicy.cpp"
     "Batch/ThroughputCalibration.hpp"
     "Batch/ThroughputCalibration.cpp"
     "Batch/SessionWarmupPlanner.hpp"
@@ -268,6 +270,19 @@ if(TARGET Threads::Threads)
 target_link_libraries(test_session_warmup_planner PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_session_warmup_planner COMMAND test_session_warmup_planner)
+
+add_executable(test_desktop_search_policy
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_desktop_search_policy.cpp"
+    "Batch/DesktopSearchPolicy.cpp"
+)
+target_include_directories(test_desktop_search_policy
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+if(TARGET Threads::Threads)
+target_link_libraries(test_desktop_search_policy PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_desktop_search_policy COMMAND test_desktop_search_policy)
 
 add_executable(test_adaptive_concurrency
     "../tests/native/test_main.cpp"
