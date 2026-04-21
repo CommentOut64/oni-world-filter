@@ -13,6 +13,19 @@ struct TemplateSpawner {
 
 class WorldGen
 {
+public:
+#if 0
+    // 临时 timing 检测，先停用。
+    struct GenerateTiming {
+        uint64_t seedPointsMicros = 0;
+        uint64_t diagramMicros = 0;
+        uint64_t cellProcessingMicros = 0;
+        uint64_t childrenMicros = 0;
+        uint64_t templatesMicros = 0;
+        uint64_t totalMicros = 0;
+    };
+#endif
+
 private:
     int m_seed;
     const SettingsCache &m_settings;
@@ -31,6 +44,10 @@ public:
     bool GenerateOverworld(std::vector<Site> &sites);
 
     std::vector<Vector3i> GetGeysers(int seed) const;
+#if 0
+    // 临时 timing 检测，先停用。
+    const GenerateTiming &LastGenerateTiming() const;
+#endif
 
 private:
     template<typename T>
