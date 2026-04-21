@@ -9,6 +9,7 @@ import type {
   SearchCompletedEvent,
   SearchFailedEvent,
   SearchMatchEvent,
+  SearchProgressEvent,
 } from "../src/lib/contracts.ts";
 
 type SearchStoreModule = typeof import("../src/state/searchStore.ts");
@@ -112,6 +113,21 @@ function createCancelledEvent(jobId: string): SearchCancelledEvent {
   };
 }
 
+function createProgressEvent(jobId: string): SearchProgressEvent {
+  return {
+    event: "progress",
+    jobId,
+    processedSeeds: 12,
+    totalSeeds: 200,
+    totalMatches: 2,
+    activeWorkers: 3,
+    hasWindowSample: true,
+    windowSeedsPerSecond: 321,
+    activeWorkersReduced: false,
+    peakSeedsPerSecond: 456,
+  };
+}
+
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
@@ -122,7 +138,7 @@ afterEach(() => {
   clearMocks();
 });
 
-test("cancelSearchJob keeps cancelling state until cancelled event and preserves late match", async () => {
+test("cancelSearchJob keeps cancelling state until cancelled event and drops late progress and match", async () => {
   mockIPC((cmd) => {
     if (cmd === "cancel_search") {
       return null;
@@ -141,15 +157,19 @@ test("cancelSearchJob keeps cancelling state until cancelled event and preserves
   assert.equal(cancellingState.isCancelling, true);
   assert.equal(cancellingState.activeJobId, "job-search-001");
 
+  useSearchStore.getState().ingestSidecarEvent(createProgressEvent("job-search-001"));
   useSearchStore.getState().ingestSidecarEvent(createMatchEvent("job-search-001"));
-  assert.equal(useSearchStore.getState().results.length, 1);
+  const frozenState = useSearchStore.getState();
+  assert.equal(frozenState.results.length, 0);
+  assert.equal(frozenState.stats.processedSeeds, 0);
+  assert.equal(frozenState.stats.totalMatches, 0);
 
   useSearchStore.getState().ingestSidecarEvent(createCancelledEvent("job-search-001"));
   const finalState = useSearchStore.getState();
   assert.equal(finalState.isSearching, false);
   assert.equal(finalState.isCancelling, false);
   assert.equal(finalState.activeJobId, null);
-  assert.equal(finalState.results.length, 1);
+  assert.equal(finalState.results.length, 0);
   assert.equal(finalState.stats.totalMatches, 1);
 });
 
@@ -187,17 +207,59 @@ test("terminal events should clear cancelling state and active job", async () =>
   useSearchStore.setState({
     ...createBaseState(module, "job-terminal"),
     isCancelling: true,
+    stats: {
+      startedAtMs: 123,
+      processedSeeds: 12,
+      totalSeeds: 20,
+      totalMatches: 2,
+      activeWorkers: 3,
+      currentSeedsPerSecond: 321,
+      peakSeedsPerSecond: 456,
+    },
   });
   useSearchStore.getState().ingestSidecarEvent(completedEvent);
   assert.equal(useSearchStore.getState().isCancelling, false);
   assert.equal(useSearchStore.getState().activeJobId, null);
+  assert.equal(useSearchStore.getState().stats.currentSeedsPerSecond, 0);
+  assert.equal(useSearchStore.getState().stats.peakSeedsPerSecond, 456);
 
   useSearchStore.setState({
     ...createBaseState(module, "job-terminal"),
     isCancelling: true,
+    stats: {
+      startedAtMs: 123,
+      processedSeeds: 12,
+      totalSeeds: 20,
+      totalMatches: 2,
+      activeWorkers: 3,
+      currentSeedsPerSecond: 321,
+      peakSeedsPerSecond: 456,
+    },
+  });
+  useSearchStore.getState().ingestSidecarEvent(createCancelledEvent("job-terminal"));
+  assert.equal(useSearchStore.getState().isSearching, false);
+  assert.equal(useSearchStore.getState().isCancelling, false);
+  assert.equal(useSearchStore.getState().activeJobId, null);
+  assert.equal(useSearchStore.getState().stats.currentSeedsPerSecond, 0);
+  assert.equal(useSearchStore.getState().stats.peakSeedsPerSecond, 456);
+
+  useSearchStore.setState({
+    ...createBaseState(module, "job-terminal"),
+    isCancelling: true,
+    stats: {
+      startedAtMs: 123,
+      processedSeeds: 12,
+      totalSeeds: 20,
+      totalMatches: 2,
+      activeWorkers: 3,
+      currentSeedsPerSecond: 321,
+      peakSeedsPerSecond: 456,
+    },
   });
   useSearchStore.getState().ingestSidecarEvent(failedEvent);
   assert.equal(useSearchStore.getState().isSearching, false);
   assert.equal(useSearchStore.getState().isCancelling, false);
   assert.equal(useSearchStore.getState().activeJobId, null);
+  assert.equal(useSearchStore.getState().stats.currentSeedsPerSecond, 0);
+  assert.equal(useSearchStore.getState().stats.peakSeedsPerSecond, 456);
 });

@@ -21,7 +21,7 @@ const SAMPLE_DRAFT = {
     allowSmt: true,
     allowLowPerf: false,
     placement: "preferred" as const,
-    enableWarmup: true,
+    enableWarmup: false,
     enableAdaptiveDown: true,
     chunkSize: 64,
     progressInterval: 1000,
@@ -130,4 +130,34 @@ test("restoreSearchSessionSnapshot removes corrupted session payload", () => {
   const restored = restoreSearchSessionSnapshot(storage);
   assert.equal(restored, null);
   assert.equal(storage.getItem(SEARCH_SESSION_STORAGE_KEY), null);
+});
+
+test("restoreSearchSessionSnapshot normalizes legacy warmup flag to desktop default", () => {
+  const storage = createMemoryStorage();
+  const request = createRequest();
+
+  persistSearchSessionSnapshot(storage, {
+    draft: {
+      ...SAMPLE_DRAFT,
+      cpu: {
+        ...SAMPLE_DRAFT.cpu,
+        enableWarmup: true,
+      },
+    },
+    results: [createMatch(100123)],
+    selectedSeed: 100123,
+    lastSubmittedRequest: {
+      ...request,
+      cpu: {
+        ...request.cpu,
+        enableWarmup: true,
+      },
+    },
+  });
+
+  const restored = restoreSearchSessionSnapshot(storage);
+  assert.ok(restored);
+  assert.equal(restored.draft.cpu.enableWarmup, false);
+  assert.equal(restored.lastSubmittedRequest?.cpu?.enableWarmup, false);
+  assert.equal(restored.draft.cpu.enableAdaptiveDown, SAMPLE_DRAFT.cpu.enableAdaptiveDown);
 });

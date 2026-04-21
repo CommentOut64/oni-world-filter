@@ -1,10 +1,12 @@
 #include "Batch/BatchSearchService.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -145,10 +147,59 @@ int RunAllTests()
                "external host cap should not trigger adaptive fallback",
                failures);
         Expect(result.finalActiveWorkers == static_cast<int>(request.workerCount),
-               "active workers should recover after host cap is released",
+               "active workers should recover to the runtime ceiling after host cap is released",
                failures);
         Expect(reducedEvents.load(std::memory_order_relaxed) == 0,
                "host cap windows should not emit adaptive reduction events",
+               failures);
+    }
+
+    {
+        Batch::SearchRequest request;
+        request.seedStart = 1;
+        request.seedEnd = 3600;
+        request.workerCount = 8;
+        request.initialActiveWorkers = 4;
+        request.chunkSize = 4;
+        request.progressInterval = 4;
+        request.sampleWindow = std::chrono::milliseconds(40);
+        request.enableAdaptive = false;
+        request.enableRecovery = true;
+        request.recoveryConfig.enabled = true;
+        request.recoveryConfig.stableWindows = 1;
+        request.recoveryConfig.retentionRatio = 0.95;
+        request.recoveryConfig.cooldown = std::chrono::milliseconds(15);
+
+        request.evaluateSeed = [&](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            return evaluation;
+        };
+
+        std::vector<int> observedWorkers;
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
+            if (!event.hasWindowSample) {
+                return;
+            }
+            observedWorkers.push_back(event.activeWorkers);
+        };
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+
+        int maxObservedWorkers = 0;
+        for (int value : observedWorkers) {
+            maxObservedWorkers = std::max(maxObservedWorkers, value);
+        }
+
+        Expect(!result.failed, "initial worker recovery run should not fail", failures);
+        Expect(!result.cancelled, "initial worker recovery run should not cancel", failures);
+        Expect(result.processedSeeds == result.totalSeeds,
+               "initial worker recovery run should process all seeds",
+               failures);
+        Expect(maxObservedWorkers == static_cast<int>(request.workerCount),
+               "initial worker recovery run should recover to the runtime ceiling",
                failures);
     }
 

@@ -197,6 +197,51 @@ int RunAllTests()
     }
 
     {
+        Batch::SearchRequest request;
+        request.seedStart = 1;
+        request.seedEnd = 320;
+        request.workerCount = 8;
+        request.initialActiveWorkers = 4;
+        request.chunkSize = 2;
+        request.progressInterval = 2;
+        request.sampleWindow = std::chrono::milliseconds(10);
+        request.maxRunDuration = std::chrono::milliseconds(0);
+        request.enableAdaptive = false;
+        request.enableRecovery = false;
+        request.evaluateSeed = [](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            return evaluation;
+        };
+
+        std::vector<int> observedWorkers;
+        std::mutex observedWorkersMutex;
+
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
+            std::lock_guard<std::mutex> lock(observedWorkersMutex);
+            observedWorkers.push_back(event.activeWorkers);
+        };
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+
+        int maxObservedWorkers = 0;
+        for (int value : observedWorkers) {
+            maxObservedWorkers = std::max(maxObservedWorkers, value);
+        }
+
+        Expect(!result.failed, "initial worker cap run should not fail", failures);
+        Expect(!result.cancelled, "initial worker cap run should not cancel", failures);
+        Expect(result.processedSeeds == result.totalSeeds,
+               "initial worker cap run should process all seeds",
+               failures);
+        Expect(maxObservedWorkers <= static_cast<int>(request.initialActiveWorkers),
+               "initial worker cap run should not exceed the configured startup workers without recovery",
+               failures);
+    }
+
+    {
         std::atomic<int> activeWorkerCap{0};
 
         Batch::SearchRequest request;
@@ -257,6 +302,7 @@ int RunAllTests()
         request.seedStart = 1;
         request.seedEnd = 3600;
         request.workerCount = 6;
+        request.initialActiveWorkers = 4;
         request.chunkSize = 4;
         request.progressInterval = 4;
         request.sampleWindow = std::chrono::milliseconds(40);
@@ -319,6 +365,9 @@ int RunAllTests()
         Expect(!result.cancelled, "bounded recovery run should not cancel", failures);
         Expect(result.processedSeeds == result.totalSeeds,
                "bounded recovery run should process all seeds",
+               failures);
+        Expect(maxObservedWorkers >= static_cast<int>(request.workerCount),
+               "bounded recovery run should recover up to the runtime ceiling",
                failures);
         Expect(sawReduced,
                "bounded recovery run should reduce active workers after throughput drops",

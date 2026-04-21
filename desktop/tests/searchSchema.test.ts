@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createSearchSchema } from "../src/features/search/searchSchema.ts";
+import { createSearchSchema, toSearchDraft } from "../src/features/search/searchSchema.ts";
 
 const schema = createSearchSchema({ worldTypeMax: 20, mixingMax: 48828124 });
 
@@ -68,4 +68,32 @@ test("search schema rejects distance rule on forbidden geyser", () => {
       message: "forbidden 喷口不能同时设置距离规则",
     },
   ]);
+});
+
+test("toSearchDraft disables warmup for desktop balanced mode", () => {
+  const draft = toSearchDraft(buildValidFormValues());
+
+  assert.equal(draft.cpu.mode, "balanced");
+  assert.equal(draft.cpu.enableWarmup, false);
+});
+
+test("toSearchDraft disables warmup for desktop turbo mode", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    cpuMode: "turbo",
+  });
+
+  assert.equal(draft.cpu.mode, "turbo");
+  assert.equal(draft.cpu.enableWarmup, false);
+});
+
+test("toSearchDraft disables warmup for desktop custom mode", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    cpuMode: "custom",
+    threads: 6,
+  });
+
+  assert.equal(draft.cpu.mode, "custom");
+  assert.equal(draft.cpu.enableWarmup, false);
 });
