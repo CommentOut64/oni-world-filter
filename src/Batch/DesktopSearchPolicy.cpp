@@ -7,8 +7,8 @@ namespace Batch {
 
 namespace {
 
-constexpr uint32_t kPartialSmtMinimumWorkers = 4;
-constexpr uint32_t kTurboHeadroomDivisor = 4;
+constexpr uint32_t kStartupRatioNumerator = 9;
+constexpr uint32_t kStartupRatioDenominator = 10;
 
 const BatchCpu::ThreadPolicy *FindByName(const std::vector<BatchCpu::ThreadPolicy> &candidates,
                                          std::string_view name)
@@ -57,39 +57,6 @@ DesktopSearchExecutionPlan BuildSinglePolicyPlan(const BatchCpu::ThreadPolicy &p
     return plan;
 }
 
-BatchCpu::ThreadPolicy SelectBalancedStartupPolicy(
-    const CpuTopology &topology,
-    const std::vector<BatchCpu::ThreadPolicy> &candidates)
-{
-    if (candidates.empty()) {
-        return BatchCpu::ThreadPolicy{};
-    }
-
-    if (topology.isHeterogeneous) {
-        const auto *base = FindByName(candidates, "balanced-p-core");
-        const auto *partial = FindByName(candidates, "balanced-p-core-plus-smt-partial");
-        if (base != nullptr && partial != nullptr &&
-            base->workerCount >= kPartialSmtMinimumWorkers) {
-            return *partial;
-        }
-        if (base != nullptr) {
-            return *base;
-        }
-    } else {
-        const auto *base = FindByName(candidates, "balanced-physical");
-        const auto *partial = FindByName(candidates, "balanced-physical-plus-smt-partial");
-        if (base != nullptr && partial != nullptr &&
-            base->workerCount >= kPartialSmtMinimumWorkers) {
-            return *partial;
-        }
-        if (base != nullptr) {
-            return *base;
-        }
-    }
-
-    return SelectLargestCandidate(candidates);
-}
-
 BatchCpu::ThreadPolicy SelectBalancedRuntimePolicy(
     const CpuTopology &topology,
     const std::vector<BatchCpu::ThreadPolicy> &candidates)
@@ -98,13 +65,19 @@ BatchCpu::ThreadPolicy SelectBalancedRuntimePolicy(
         if (const auto *full = FindByName(candidates, "balanced-p-core-plus-smt")) {
             return *full;
         }
+        if (const auto *base = FindByName(candidates, "balanced-p-core")) {
+            return *base;
+        }
     } else {
         if (const auto *full = FindByName(candidates, "balanced-physical-plus-smt")) {
             return *full;
         }
+        if (const auto *base = FindByName(candidates, "balanced-physical")) {
+            return *base;
+        }
     }
 
-    return SelectBalancedStartupPolicy(topology, candidates);
+    return SelectLargestCandidate(candidates);
 }
 
 BatchCpu::ThreadPolicy SelectTurboDesktopPolicy(
@@ -119,15 +92,12 @@ BatchCpu::ThreadPolicy SelectTurboDesktopPolicy(
     return SelectLargestCandidate(candidates);
 }
 
-uint32_t ComputeTurboStartupWorkers(uint32_t runtimeWorkers)
+uint32_t ComputeStartupWorkers(uint32_t runtimeWorkers)
 {
-    if (runtimeWorkers <= 4) {
-        return std::max<uint32_t>(1u, runtimeWorkers);
-    }
-    return std::max<uint32_t>(1u,
-                              (runtimeWorkers * (kTurboHeadroomDivisor - 1) +
-                               (kTurboHeadroomDivisor - 1)) /
-                                  kTurboHeadroomDivisor);
+    return std::max<uint32_t>(
+        1u,
+        (runtimeWorkers * kStartupRatioNumerator + (kStartupRatioDenominator - 1)) /
+            kStartupRatioDenominator);
 }
 
 DesktopSearchExecutionPlan FinalizePlan(const BatchCpu::ThreadPolicy &runtimePolicy,
@@ -158,16 +128,15 @@ DesktopSearchExecutionPlan BuildDesktopSearchExecutionPlan(
     switch (request.mode) {
     case ThreadPolicyMode::Throughput: {
         const auto runtimePolicy = SelectTurboDesktopPolicy(candidates);
-        return FinalizePlan(runtimePolicy, ComputeTurboStartupWorkers(runtimePolicy.workerCount));
+        return FinalizePlan(runtimePolicy, ComputeStartupWorkers(runtimePolicy.workerCount));
     }
     case ThreadPolicyMode::Custom:
     case ThreadPolicyMode::Conservative:
         return BuildSinglePolicyPlan(candidates.front());
     case ThreadPolicyMode::Balanced:
     default: {
-        const auto startupPolicy = SelectBalancedStartupPolicy(topology, candidates);
         const auto runtimePolicy = SelectBalancedRuntimePolicy(topology, candidates);
-        return FinalizePlan(runtimePolicy, startupPolicy.workerCount);
+        return FinalizePlan(runtimePolicy, ComputeStartupWorkers(runtimePolicy.workerCount));
     }
     }
 }

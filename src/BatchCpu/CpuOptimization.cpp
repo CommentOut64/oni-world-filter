@@ -425,7 +425,7 @@ std::vector<ThreadPolicy> ThreadPolicyPlanner::BuildCandidates(const PlannerInpu
             pushCandidate(BuildPolicy("balanced-p-core-plus-smt",
                                       pPlusFullSmt, true, false, PlacementMode::Preferred));
         }
-        if (!lowPhysical.empty() && !pOnly.empty()) {
+        if (input.customAllowLowPerf && !lowPhysical.empty() && !pOnly.empty()) {
             auto pPlusLow = Concat(pOnly, lowPhysical);
             pushCandidate(BuildPolicy("balanced-p-core-plus-low-core",
                                       pPlusLow, false, true, PlacementMode::Preferred));
