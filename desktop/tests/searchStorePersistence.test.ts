@@ -8,6 +8,7 @@ import {
   restoreSearchSessionSnapshot,
   type SearchSessionStorage,
 } from "../src/state/searchStorePersistence.ts";
+import { DEFAULT_SEARCH_DRAFT } from "../src/state/searchStore.ts";
 
 const SAMPLE_DRAFT = {
   worldType: 13,
@@ -193,4 +194,9 @@ test("restoreSearchSessionSnapshot migrates legacy preferred placement to strict
   assert.ok(restored);
   assert.equal(restored.draft.cpu.placement, "strict");
   assert.equal(restored.lastSubmittedRequest?.cpu?.placement, "strict");
+});
+
+test("desktop default draft starts from seed 0 to 10000", () => {
+  assert.equal(DEFAULT_SEARCH_DRAFT.seedStart, 0);
+  assert.equal(DEFAULT_SEARCH_DRAFT.seedEnd, 10000);
 });

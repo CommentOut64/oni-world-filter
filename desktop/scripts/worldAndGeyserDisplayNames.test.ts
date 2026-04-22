@@ -5,7 +5,7 @@ import { GEYSER_DISPLAY_NAMES, WORLD_DISPLAY_NAMES } from "../src/lib/displayNam
 
 test("world display names follow the legacy frontend mapping for major world and cluster labels", () => {
   const expected = new Map<string, { zh: string; en: string }>([
-    ["SNDST-A-", { zh: "Terra", en: "Terra" }],
+    ["SNDST-A-", { zh: "类地星体", en: "Terra" }],
     ["OCAN-A-", { zh: "海洋星体", en: "Oceania" }],
     ["S-FRZ-", { zh: "冰霜星体", en: "Rime" }],
     ["LUSH-A-", { zh: "翠绿星体", en: "Verdante" }],

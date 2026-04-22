@@ -6,17 +6,21 @@ import {
   applyChildMode,
   applyPackageMode,
   classifyWorld,
+  findCategoryForWorld,
   getCategoryForWorld,
   getPackageMode,
   groupMixingSlots,
   groupWorldsByCategory,
+  isWorldTypeVisibleInCategory,
   levelToUiMode,
   uiModeToLevel,
 } from "../src/features/search/worldParameterUi.ts";
 
 const worlds: WorldOption[] = [
   { id: 0, code: "SNDST-A-" },
+  { id: 12, code: "PRES-A-" },
   { id: 13, code: "V-SNDST-C-" },
+  { id: 26, code: "V-PRES-C-" },
   { id: 32, code: "M-SWMP-C-" },
 ];
 
@@ -49,7 +53,9 @@ const mixingSlots: MixingSlotMeta[] = [
 
 test("classifyWorld and getCategoryForWorld map current world codes to UI categories", () => {
   assert.equal(classifyWorld("SNDST-A-"), "baseAsteroid");
+  assert.equal(classifyWorld("PRES-A-"), "baseAsteroid");
   assert.equal(classifyWorld("V-SNDST-C-"), "classicCluster");
+  assert.equal(classifyWorld("V-PRES-C-"), "classicCluster");
   assert.equal(classifyWorld("M-SWMP-C-"), "moonletCluster");
 
   const grouped = groupWorldsByCategory(worlds);
@@ -66,7 +72,27 @@ test("classifyWorld and getCategoryForWorld map current world codes to UI catego
     [32]
   );
 
+  assert.equal(
+    grouped.baseAsteroid.some((item) => item.code === "PRES-A-"),
+    false
+  );
+  assert.equal(
+    grouped.classicCluster.some((item) => item.code === "V-PRES-C-"),
+    false
+  );
+
   assert.equal(getCategoryForWorld(worlds, 32), "moonletCluster");
+});
+
+test("world selector helpers only sync category from valid selection and clear cross-category values", () => {
+  assert.equal(findCategoryForWorld(worlds, 13), "classicCluster");
+  assert.equal(findCategoryForWorld(worlds, Number.NaN), null);
+  assert.equal(findCategoryForWorld(worlds, 999), null);
+
+  assert.equal(isWorldTypeVisibleInCategory(worlds, 13, "classicCluster"), true);
+  assert.equal(isWorldTypeVisibleInCategory(worlds, 13, "moonletCluster"), false);
+  assert.equal(isWorldTypeVisibleInCategory(worlds, 32, "moonletCluster"), true);
+  assert.equal(isWorldTypeVisibleInCategory(worlds, Number.NaN, "moonletCluster"), false);
 });
 
 test("groupMixingSlots groups package slots with child world/subworld slots", () => {

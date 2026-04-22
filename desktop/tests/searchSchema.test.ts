@@ -108,6 +108,31 @@ test("search schema rejects legacy custom cpu mode", () => {
   assert.equal(result.error.issues[0]?.path.join("."), "cpuMode");
 });
 
+test("search schema treats blank world selection as required instead of NaN type error", () => {
+  const result = schema.safeParse({
+    ...buildValidFormValues(),
+    worldType: undefined,
+  });
+
+  assert.equal(result.success, false);
+  if (result.success) {
+    return;
+  }
+
+  assert.deepEqual(
+    result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+    })),
+    [
+      {
+        path: "worldType",
+        message: "请选择具体世界",
+      },
+    ]
+  );
+});
+
 test("toSearchDraft keeps unified cpu surface for turbo mode", () => {
   const draft = toSearchDraft({
     ...buildValidFormValues(),
