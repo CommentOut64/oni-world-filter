@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { SearchDraft } from "../../state/searchStore";
 
 const nonNegativeInt = z.coerce.number().int().min(0);
-const cpuModeSchema = z.enum(["balanced", "turbo", "custom"]);
+const cpuModeSchema = z.enum(["balanced", "turbo"]);
 export const MIXING_SLOT_COUNT = 11;
 export const MIXING_LEVEL_MIN = 0;
 export const MIXING_LEVEL_MAX = 4;
@@ -92,7 +92,6 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
       mixing: mixingSchema,
       seedStart: nonNegativeInt,
       seedEnd: nonNegativeInt,
-      threads: nonNegativeInt.max(512, "线程数不能超过 512"),
       cpuMode: cpuModeSchema,
       cpuAllowSmt: z.boolean(),
       cpuAllowLowPerf: z.boolean(),
@@ -107,14 +106,6 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
           path: ["seedEnd"],
           code: z.ZodIssueCode.custom,
           message: "seedEnd 必须大于等于 seedStart",
-        });
-      }
-
-      if (value.cpuMode === "custom" && value.threads < 1) {
-        ctx.addIssue({
-          path: ["threads"],
-          code: z.ZodIssueCode.custom,
-          message: "自定义模式下线程数必须 >= 1",
         });
       }
 
@@ -198,22 +189,11 @@ export function toSearchDraft(values: SearchFormValues): SearchDraft {
     mixing: values.mixing,
     seedStart: values.seedStart,
     seedEnd: values.seedEnd,
-    threads: values.cpuMode === "custom" ? values.threads : 0,
     cpu: {
       mode: values.cpuMode,
-      workers: values.cpuMode === "custom" ? values.threads : 0,
       allowSmt: values.cpuAllowSmt,
       allowLowPerf: values.cpuAllowLowPerf,
-      placement: "preferred",
-      enableWarmup: true,
-      enableAdaptiveDown: true,
-      chunkSize: 64,
-      progressInterval: 1000,
-      sampleWindowMs: 2000,
-      adaptiveMinWorkers: 1,
-      adaptiveDropThreshold: 0.12,
-      adaptiveDropWindows: 3,
-      adaptiveCooldownMs: 8000,
+      placement: "strict",
     },
     constraints: {
       required: values.required.map((item) => item.geyser),
@@ -238,7 +218,6 @@ export function toSearchFormValues(draft: SearchDraft): SearchFormValues {
     mixing: draft.mixing,
     seedStart: draft.seedStart,
     seedEnd: draft.seedEnd,
-    threads: draft.cpu.mode === "custom" ? Math.max(1, draft.cpu.workers || draft.threads) : 0,
     cpuMode: draft.cpu.mode,
     cpuAllowSmt: draft.cpu.allowSmt,
     cpuAllowLowPerf: draft.cpu.allowLowPerf,

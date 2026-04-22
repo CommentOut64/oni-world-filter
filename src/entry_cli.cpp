@@ -23,7 +23,6 @@
 #include "Batch/BatchMatcher.hpp"
 #include "Batch/CpuTopology.hpp"
 #include "Batch/FilterConfig.hpp"
-#include "Batch/SessionWarmupPlanner.hpp"
 #include "Batch/ThreadPolicy.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
 #include "config.h"
@@ -239,43 +238,28 @@ struct BatchRunOptions {
     bool printMatches = true;
     bool printProgress = true;
     bool printDiagnostics = true;
-    bool enableAdaptive = false;
-    int chunkSize = 64;
-    int progressInterval = 1000;
-    std::chrono::milliseconds sampleWindow{2000};
-    std::chrono::milliseconds maxRunDuration{0}; // 0 表示不限制
-    BatchCpu::AdaptiveConfig adaptiveConfig{};
 };
 
-static void PrintThreadPolicy(const BatchCpu::ThreadPolicy &policy, const char *prefix)
+static void PrintCompiledSearchCpuPlan(const Batch::CompiledSearchCpuRuntime &runtime,
+                                       const char *prefix)
 {
-    printf("%sname=%s workers=%u placement=%s smt=%s low_perf=%s logical=[%s]\n",
+    printf("%s%s\n",
            prefix,
-           policy.name.c_str(),
-           policy.workerCount,
-           BatchCpu::ToString(policy.placement),
-           policy.allowSmt ? "on" : "off",
-           policy.allowLowPerf ? "on" : "off",
-           BatchCpu::JoinLogicalList(policy.targetLogicalProcessors).c_str());
+           Batch::DescribeCompiledSearchCpuPlan(runtime.cpuPlan).c_str());
 }
 
 static Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
                                                int seedStart,
                                                int seedEnd,
-                                               const BatchCpu::ThreadPolicy &policy,
+                                               const Batch::CompiledSearchCpuRuntime &runtime,
                                                const BatchRunOptions &options,
                                                std::mutex *outputMutex)
 {
     Batch::SearchRequest request;
     request.seedStart = seedStart;
     request.seedEnd = seedEnd;
-    request.workerCount = std::max<uint32_t>(1u, policy.workerCount);
-    request.chunkSize = options.chunkSize;
-    request.progressInterval = options.progressInterval;
-    request.sampleWindow = options.sampleWindow;
-    request.maxRunDuration = options.maxRunDuration;
-    request.enableAdaptive = options.enableAdaptive;
-    request.adaptiveConfig = options.adaptiveConfig;
+    request.cpuPlan = runtime.cpuPlan;
+    request.cpuGovernorConfig = runtime.cpuGovernorConfig;
     request.initializeWorker = []() {
         auto *runtime = AppRuntime::Instance();
         runtime->SetResultSink(&g_batchSink);
@@ -284,10 +268,12 @@ static Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
         app_init(0);
     };
     request.applyThreadPlacement =
-        [policy, printDiagnostics = options.printDiagnostics, outputMutex](
+        [cpuPlan = runtime.cpuPlan, printDiagnostics = options.printDiagnostics, outputMutex](
             uint32_t workerIndex, std::string *errorMessage) {
             const bool applied =
-                BatchCpu::ApplyThreadPlacement(policy, workerIndex, errorMessage);
+                BatchCpu::ApplyThreadPlacement(cpuPlan,
+                                              workerIndex,
+                                              errorMessage);
             if (!applied &&
                 printDiagnostics &&
                 errorMessage != nullptr &&
@@ -413,168 +399,30 @@ int main(int argc, char *argv[])
 
         g_batchMode = true;
         const int totalSeeds = cfg.seedEnd - cfg.seedStart + 1;
-        const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
         const bool benchmarkSilent = cfg.cpu.benchmarkSilent;
-
-        const auto topology = Batch::DetectCpuTopology();
-        const auto threadPolicyRequest = Batch::BuildThreadPolicyRequestFromFilter(cfg);
-        const auto plannerInput = Batch::BuildPlannerInput(threadPolicyRequest, topology);
-        const auto candidates = Batch::BuildThreadPolicyCandidates(threadPolicyRequest, topology);
+        const auto topology = Batch::DetectCpuTopologyFacts();
+        const auto runtimePlan = Batch::CompileSearchCpuRuntime(cfg, topology);
 
         printf("Scanning seeds %d ~ %d (worldType=%d, mixing=%d)\n",
                cfg.seedStart, cfg.seedEnd, cfg.worldType, cfg.mixing);
         printf("  required: %zu, forbidden: %zu, distance rules: %zu\n",
                cfg.required.size(), cfg.forbidden.size(), cfg.distanceRules.size());
-        printf("  cpu mode: %s%s\n",
-               BatchCpu::ToString(plannerInput.mode),
-               legacyThreadsOnly ? " (legacy threads override)" : "");
+        printf("  cpu mode: %s\n",
+               BatchCpu::ToString(runtimePlan.cpuPlan.policy.mode));
         if (cfg.cpu.printDiagnostics && !benchmarkSilent) {
             printf("  %s\n", topology.diagnostics.c_str());
-            for (size_t i = 0; i < candidates.size(); ++i) {
-                printf("  candidate[%zu] ", i);
-                PrintThreadPolicy(candidates[i], "");
-            }
-        }
-
-        auto selectedPolicy = candidates.front();
-        bool enableWarmup = cfg.cpu.enableWarmup && !legacyThreadsOnly &&
-                            plannerInput.mode != BatchCpu::CpuMode::Custom &&
-                            plannerInput.mode != BatchCpu::CpuMode::Conservative &&
-                            candidates.size() > 1;
-        if (cfg.seedStart >= cfg.seedEnd) {
-            enableWarmup = false;
-        }
-
-        if (enableWarmup) {
-            const int warmupEnd = std::min(
-                cfg.seedEnd,
-                cfg.seedStart + std::max(1, cfg.cpu.warmupSeedCount) - 1);
-            const int warmupTotalSeeds = warmupEnd - cfg.seedStart + 1;
-            const int warmupMinSampledSeeds = std::min(
-                warmupTotalSeeds,
-                std::max(1, cfg.cpu.warmupMinSampledSeeds));
-            const int plannedSegmentCount = std::clamp(3, 1, warmupTotalSeeds);
-            const int warmupMinSampledSeedsPerSegment = std::max(
-                1,
-                (warmupMinSampledSeeds + plannedSegmentCount - 1) / plannedSegmentCount);
-            Batch::SessionWarmupPlannerOptions warmupConfig;
-            warmupConfig.enableWarmup = true;
-            warmupConfig.warmupSeedCount = cfg.cpu.warmupSeedCount;
-            warmupConfig.minProcessedSeeds = static_cast<uint64_t>(warmupMinSampledSeeds);
-            warmupConfig.totalBudget = std::chrono::milliseconds(cfg.cpu.warmupTotalMs);
-            warmupConfig.perCandidateBudget = std::chrono::milliseconds(cfg.cpu.warmupPerCandidateMs);
-            warmupConfig.tieToleranceRatio = cfg.cpu.warmupTieTolerance;
-
-            BatchRunOptions warmupOptions;
-            warmupOptions.printMatches = false;
-            warmupOptions.printProgress = false;
-            warmupOptions.printDiagnostics = false;
-            warmupOptions.enableAdaptive = false;
-            warmupOptions.chunkSize = cfg.cpu.chunkSize;
-            warmupOptions.sampleWindow = std::chrono::milliseconds(cfg.cpu.sampleWindowMs);
-
-            if (!benchmarkSilent) {
-                printf("  [warmup] calibrating policies on seeds %d ~ %d ...\n",
-                       cfg.seedStart, warmupEnd);
-            }
-            const auto calibration = Batch::SelectThreadPolicyWithSessionWarmup(
-                "cli-session",
-                cfg.seedStart,
-                warmupEnd,
-                candidates,
-                warmupConfig,
-                [&](const BatchCpu::ThreadPolicy &policy,
-                    const Batch::WarmupSampleSegment &segment,
-                    std::chrono::milliseconds budget) {
-                    auto currentBudget = budget;
-                    Batch::BatchSearchResult bestRun;
-                    const int segmentTotalSeeds = segment.seedEnd - segment.seedStart + 1;
-                    const int segmentMinSampledSeeds = std::min(
-                        segmentTotalSeeds,
-                        warmupMinSampledSeedsPerSegment);
-                    for (int attempt = 0; attempt <= cfg.cpu.warmupMaxRetry; ++attempt) {
-                        warmupOptions.maxRunDuration = currentBudget;
-                        auto request = BuildSearchRequest(
-                            cfg, segment.seedStart, segment.seedEnd, policy, warmupOptions, nullptr);
-                        auto attemptRun = Batch::BatchSearchService::Run(request);
-                        if (attemptRun.processedSeeds > bestRun.processedSeeds) {
-                            bestRun = attemptRun;
-                        }
-                        const bool sampledEnough = attemptRun.processedSeeds >= segmentMinSampledSeeds;
-                        if (!attemptRun.failed &&
-                            !attemptRun.cancelled &&
-                            attemptRun.throughput.valid &&
-                            sampledEnough) {
-                            return attemptRun.throughput;
-                        }
-                        if (!attemptRun.stoppedByBudget ||
-                            attemptRun.failed ||
-                            attemptRun.cancelled) {
-                            break;
-                        }
-                        currentBudget = std::max(currentBudget * 2, std::chrono::milliseconds(5000));
-                    }
-                    if (bestRun.processedSeeds < segmentMinSampledSeeds) {
-                        bestRun.throughput.valid = false;
-                    }
-                    return bestRun.throughput;
-                });
-            const auto &warmupResults = calibration.warmupResults;
-
-            if (!benchmarkSilent) {
-                for (size_t i = 0; i < warmupResults.size(); ++i) {
-                    const auto &item = warmupResults[i];
-                    const bool sampledEnough =
-                        static_cast<int>(item.aggregatedStats.processedSeeds) >= warmupMinSampledSeeds;
-                    printf("  [warmup] candidate[%zu] %s -> avg %.1f seeds/s, stdev %.1f, sampled=%llu/%d%s\n",
-                           i,
-                           item.policy.name.c_str(),
-                           item.aggregatedStats.averageSeedsPerSecond,
-                           item.aggregatedStats.stddevSeedsPerSecond,
-                           (unsigned long long)item.aggregatedStats.processedSeeds,
-                           warmupMinSampledSeeds,
-                           sampledEnough ? "" : " [under-sampled]");
-                }
-            }
-
-            if (!warmupResults.empty()) {
-                bool hasQualifiedResult = false;
-                for (const auto &item : warmupResults) {
-                    if (item.aggregatedStats.valid) {
-                        hasQualifiedResult = true;
-                        break;
-                    }
-                }
-                if (!hasQualifiedResult && cfg.cpu.printDiagnostics && !benchmarkSilent) {
-                    printf("  [warmup] warning: no candidate reached min sampled seeds, fallback to raw comparison\n");
-                }
-            }
-            selectedPolicy = calibration.selectedPolicy;
-        }
-
-        if (!benchmarkSilent) {
-            printf("  selected policy: ");
-            PrintThreadPolicy(selectedPolicy, "");
+            printf("  cpu plan: ");
+            PrintCompiledSearchCpuPlan(runtimePlan, "");
         }
 
         BatchRunOptions runOptions;
         runOptions.printMatches = !benchmarkSilent && cfg.cpu.printMatches;
         runOptions.printProgress = !benchmarkSilent && cfg.cpu.printProgress;
         runOptions.printDiagnostics = !benchmarkSilent && cfg.cpu.printDiagnostics;
-        runOptions.enableAdaptive = cfg.cpu.enableAdaptiveDown && !legacyThreadsOnly;
-        runOptions.chunkSize = cfg.cpu.chunkSize;
-        runOptions.progressInterval = cfg.cpu.progressInterval;
-        runOptions.sampleWindow = std::chrono::milliseconds(cfg.cpu.sampleWindowMs);
-        runOptions.maxRunDuration = std::chrono::milliseconds(0);
-        runOptions.adaptiveConfig.enabled = cfg.cpu.enableAdaptiveDown && !legacyThreadsOnly;
-        runOptions.adaptiveConfig.minWorkers = (uint32_t)std::max(1, cfg.cpu.adaptiveMinWorkers);
-        runOptions.adaptiveConfig.dropThreshold = cfg.cpu.adaptiveDropThreshold;
-        runOptions.adaptiveConfig.consecutiveDropWindows = cfg.cpu.adaptiveDropWindows;
-        runOptions.adaptiveConfig.cooldown = std::chrono::milliseconds(cfg.cpu.adaptiveCooldownMs);
 
         std::mutex outputMutex;
         auto finalRequest = BuildSearchRequest(
-            cfg, cfg.seedStart, cfg.seedEnd, selectedPolicy, runOptions, &outputMutex);
+            cfg, cfg.seedStart, cfg.seedEnd, runtimePlan, runOptions, &outputMutex);
         auto finalCallbacks = BuildConsoleCallbacks(cfg, runOptions, outputMutex);
         auto finalRun = Batch::BatchSearchService::Run(finalRequest, finalCallbacks);
         if (finalRun.failed) {

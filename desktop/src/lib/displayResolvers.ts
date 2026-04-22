@@ -1,11 +1,11 @@
-import type { GeyserOption, GeyserSummary, MixingSlotMeta, WorldOption } from "./contracts";
+import type { GeyserOption, GeyserSummary, MixingSlotMeta, WorldOption } from "./contracts.ts";
 import {
   GEYSER_DISPLAY_NAMES,
   MIXING_SLOT_DISPLAY_NAMES,
   WORLD_DISPLAY_NAMES,
   ZONE_TYPE_DISPLAY_NAMES,
   type DisplayName,
-} from "./displayNames";
+} from "./displayNames.ts";
 
 export function formatDisplayName(name: DisplayName): string {
   return name.zh;

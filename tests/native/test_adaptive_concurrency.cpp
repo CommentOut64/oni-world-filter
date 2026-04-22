@@ -1,10 +1,13 @@
 #include "Batch/BatchSearchService.hpp"
-#include "BatchCpu/CpuOptimization.hpp"
+#include "BatchCpu/SearchCpuGovernor.hpp"
+#include "BatchCpu/SearchCpuPlan.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -18,6 +21,110 @@ bool Expect(bool condition, const char *message, int &failures)
     return false;
 }
 
+BatchCpu::CpuTopologyFacts BuildSmt2Topology()
+{
+    BatchCpu::CpuTopologyFacts topology;
+    topology.detectionSucceeded = true;
+    topology.isHeterogeneous = false;
+    topology.diagnostics = "adaptive smt2 topology";
+    topology.physicalCoresBySystemOrder = std::vector<BatchCpu::PhysicalCoreFacts>{
+        {.physicalCoreIndex = 0,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {
+             {.logicalIndex = 0, .group = 0, .isPrimaryThread = true},
+             {.logicalIndex = 1, .group = 0, .isPrimaryThread = false},
+         }},
+        {.physicalCoreIndex = 1,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {
+             {.logicalIndex = 2, .group = 0, .isPrimaryThread = true},
+             {.logicalIndex = 3, .group = 0, .isPrimaryThread = false},
+         }},
+        {.physicalCoreIndex = 2,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {
+             {.logicalIndex = 4, .group = 0, .isPrimaryThread = true},
+             {.logicalIndex = 5, .group = 0, .isPrimaryThread = false},
+         }},
+        {.physicalCoreIndex = 3,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {
+             {.logicalIndex = 6, .group = 0, .isPrimaryThread = true},
+             {.logicalIndex = 7, .group = 0, .isPrimaryThread = false},
+         }},
+    };
+    return topology;
+}
+
+BatchCpu::CpuTopologyFacts BuildNonSmtTopology()
+{
+    BatchCpu::CpuTopologyFacts topology;
+    topology.detectionSucceeded = true;
+    topology.isHeterogeneous = false;
+    topology.diagnostics = "adaptive non-smt topology";
+    topology.physicalCoresBySystemOrder = std::vector<BatchCpu::PhysicalCoreFacts>{
+        {.physicalCoreIndex = 0,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {{.logicalIndex = 0, .group = 0, .isPrimaryThread = true}}},
+        {.physicalCoreIndex = 1,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {{.logicalIndex = 1, .group = 0, .isPrimaryThread = true}}},
+        {.physicalCoreIndex = 2,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {{.logicalIndex = 2, .group = 0, .isPrimaryThread = true}}},
+        {.physicalCoreIndex = 3,
+         .group = 0,
+         .efficiencyClass = 0,
+         .isHighPerformance = true,
+         .logicalThreads = {{.logicalIndex = 3, .group = 0, .isPrimaryThread = true}}},
+    };
+    return topology;
+}
+
+BatchCpu::CompiledSearchCpuPlan BuildBalancedPlan(const BatchCpu::CpuTopologyFacts &topology,
+                                                  bool allowSmt)
+{
+    BatchCpu::CpuPolicySpec spec;
+    spec.mode = BatchCpu::CpuMode::Balanced;
+    spec.allowSmt = allowSmt;
+    spec.allowLowPerf = true;
+    spec.binding = BatchCpu::PlacementMode::None;
+    return BatchCpu::CompileSearchCpuPlan(topology, spec);
+}
+
+Batch::SearchRequest BuildBaseRequest(const BatchCpu::CompiledSearchCpuPlan &plan)
+{
+    Batch::SearchRequest request;
+    request.seedStart = 1;
+    request.seedEnd = 400;
+    request.cpuPlan = plan;
+    request.chunkSize = 8;
+    request.progressInterval = 8;
+    request.sampleWindow = std::chrono::milliseconds(80);
+    request.cpuGovernorConfig.enabled = true;
+    request.cpuGovernorConfig.minActivePhysicalCores = 1;
+    request.cpuGovernorConfig.scaleDownThreshold = 0.08;
+    request.cpuGovernorConfig.scaleDownWindowCount = 1;
+    request.cpuGovernorConfig.scaleUpWindowCount = 100;
+    request.cpuGovernorConfig.scaleUpRetentionRatio = 0.95;
+    request.cpuGovernorConfig.cooldown = std::chrono::milliseconds(50);
+    return request;
+}
+
 } // namespace
 
 int RunAllTests()
@@ -25,89 +132,13 @@ int RunAllTests()
     int failures = 0;
 
     {
-        BatchCpu::AdaptiveConfig config;
-        config.enabled = true;
-        config.minWorkers = 2;
-        config.dropThreshold = 0.08;
-        config.consecutiveDropWindows = 1;
-        config.cooldown = std::chrono::milliseconds(1);
-
-        BatchCpu::AdaptiveConcurrencyController controller(config, 8);
-        const auto t0 = std::chrono::steady_clock::now();
-
-        Expect(!controller.Observe(100.0, 8, t0).has_value(),
-               "initial sample should establish baseline without reducing workers",
-               failures);
-
-        const auto firstDrop =
-            controller.Observe(80.0, 8, t0 + std::chrono::milliseconds(2));
-        Expect(firstDrop.has_value() && firstDrop.value() == 7,
-               "controller should reduce workers after throughput drops below baseline",
-               failures);
-
-        const auto stableAfterDrop =
-            controller.Observe(78.0, 7, t0 + std::chrono::milliseconds(4));
-        Expect(!stableAfterDrop.has_value(),
-               "controller should rebuild baseline after a reduction instead of reusing the old peak",
-               failures);
-
-        const auto secondDrop =
-            controller.Observe(60.0, 7, t0 + std::chrono::milliseconds(6));
-        Expect(secondDrop.has_value() && secondDrop.value() == 6,
-               "controller should still be able to reduce again after the new baseline is established",
-               failures);
-    }
-
-    {
-        BatchCpu::RecoveryConfig config;
-        config.enabled = true;
-        config.stableWindows = 2;
-        config.retentionRatio = 0.97;
-        config.cooldown = std::chrono::milliseconds(1);
-
-        BatchCpu::BoundedRecoveryController controller(config, 8);
-        const auto t0 = std::chrono::steady_clock::now();
-
-        Expect(!controller.Observe(70.0, 6, t0).has_value(),
-               "recovery controller should establish a stage baseline before recovering",
-               failures);
-        Expect(!controller.Observe(69.0, 6, t0 + std::chrono::milliseconds(2)).has_value(),
-               "recovery controller should wait for the configured number of stable windows",
-               failures);
-
-        const auto firstRecovery =
-            controller.Observe(68.5, 6, t0 + std::chrono::milliseconds(4));
-        Expect(firstRecovery.has_value() && firstRecovery.value() == 7,
-               "recovery controller should raise workers by exactly one after stable windows",
-               failures);
-
-        Expect(!controller.Observe(68.0, 7, t0 + std::chrono::milliseconds(6)).has_value(),
-               "worker-count changes should reset the recovery baseline",
-               failures);
-        Expect(!controller.Observe(68.0, 8, t0 + std::chrono::milliseconds(8)).has_value(),
-               "recovery controller should never raise above the initial worker count",
-               failures);
-    }
-
-    {
-        Batch::SearchRequest request;
-        request.seedStart = 1;
+        auto request = BuildBaseRequest(BuildBalancedPlan(BuildSmt2Topology(), true));
         request.seedEnd = 100000;
-        request.workerCount = 8;
-        request.chunkSize = 8;
-        request.progressInterval = 8;
-        request.sampleWindow = std::chrono::milliseconds(80);
         request.maxRunDuration = std::chrono::milliseconds(700);
-        request.enableAdaptive = true;
-        request.adaptiveConfig.enabled = true;
-        request.adaptiveConfig.minWorkers = 2;
-        request.adaptiveConfig.dropThreshold = 0.20;
-        request.adaptiveConfig.consecutiveDropWindows = 2;
-        request.adaptiveConfig.cooldown = std::chrono::milliseconds(60);
+        request.cpuGovernorConfig.enabled = false;
 
         std::atomic<int> activeWorkerCap{0};
         request.activeWorkerCap = &activeWorkerCap;
-
         request.evaluateSeed = [&](int) {
             Batch::SearchSeedEvaluation evaluation;
             evaluation.generated = true;
@@ -125,7 +156,7 @@ int RunAllTests()
 
         std::thread hostCapThread([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(120));
-            activeWorkerCap.store(4, std::memory_order_relaxed);
+            activeWorkerCap.store(2, std::memory_order_relaxed);
             std::this_thread::sleep_for(std::chrono::milliseconds(240));
             activeWorkerCap.store(0, std::memory_order_relaxed);
         });
@@ -142,64 +173,116 @@ int RunAllTests()
                "externally capped run should process some seeds before the budget is hit",
                failures);
         Expect(result.autoFallbackCount == 0,
-               "external host cap should not trigger adaptive fallback",
+               "external host cap should not trigger governor downscale",
                failures);
-        Expect(result.finalActiveWorkers == static_cast<int>(request.workerCount),
-               "active workers should recover after host cap is released",
+        Expect(result.finalActiveWorkers == 6,
+               "active workers should recover to the startup worker count after host cap is released",
                failures);
         Expect(reducedEvents.load(std::memory_order_relaxed) == 0,
-               "host cap windows should not emit adaptive reduction events",
+               "host cap windows should not emit governor reduction events",
                failures);
     }
 
-    Batch::SearchRequest request;
-    request.seedStart = 1;
-    request.seedEnd = 400;
-    request.workerCount = 8;
-    request.chunkSize = 8;
-    request.progressInterval = 8;
-    request.sampleWindow = std::chrono::milliseconds(80);
-    request.enableAdaptive = true;
-    request.adaptiveConfig.enabled = true;
-    request.adaptiveConfig.minWorkers = 2;
-    request.adaptiveConfig.dropThreshold = 0.08;
-    request.adaptiveConfig.consecutiveDropWindows = 1;
-    request.adaptiveConfig.cooldown = std::chrono::milliseconds(50);
+    {
+        auto request = BuildBaseRequest(BuildBalancedPlan(BuildNonSmtTopology(), false));
+        request.progressInterval = 4;
 
-    std::atomic<int> counter{0};
-    request.evaluateSeed = [&](int) {
-        Batch::SearchSeedEvaluation evaluation;
-        evaluation.generated = true;
-        const int index = counter.fetch_add(1, std::memory_order_relaxed);
-        if (index < 80) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(6));
+        std::atomic<int> counter{0};
+        request.evaluateSeed = [&](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            const int index = counter.fetch_add(1, std::memory_order_relaxed);
+            if (index < 80) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(6));
+            }
+            return evaluation;
+        };
+
+        std::atomic<int> reducedEvents{0};
+        std::vector<int> observedWorkers;
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
+            if (event.hasWindowSample) {
+                observedWorkers.push_back(event.activeWorkers);
+            }
+            if (event.activeWorkersReduced) {
+                reducedEvents.fetch_add(1, std::memory_order_relaxed);
+            }
+        };
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+        bool sawSingleCoreReduction = false;
+        for (size_t i = 1; i < observedWorkers.size(); ++i) {
+            if (observedWorkers[i - 1] == 3 && observedWorkers[i] == 2) {
+                sawSingleCoreReduction = true;
+                break;
+            }
         }
-        return evaluation;
-    };
 
-    std::atomic<int> reducedEvents{0};
-    Batch::SearchEventCallbacks callbacks;
-    callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
-        if (event.activeWorkersReduced) {
-            reducedEvents.fetch_add(1, std::memory_order_relaxed);
+        Expect(!result.failed, "non-SMT adaptive run should not fail", failures);
+        Expect(!result.cancelled, "non-SMT adaptive run should not cancel", failures);
+        Expect(result.processedSeeds == result.totalSeeds, "non-SMT adaptive run should process all seeds", failures);
+        Expect(result.autoFallbackCount > 0, "non-SMT adaptive run should trigger governor reduction", failures);
+        Expect(sawSingleCoreReduction,
+               "non-SMT adaptive run should contain a 3->2 worker transition for one physical-core reduction",
+               failures);
+        Expect(reducedEvents.load(std::memory_order_relaxed) > 0,
+               "non-SMT adaptive run should emit reduced progress events",
+               failures);
+    }
+
+    {
+        auto request = BuildBaseRequest(BuildBalancedPlan(BuildSmt2Topology(), true));
+
+        std::atomic<int> counter{0};
+        request.evaluateSeed = [&](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            const int index = counter.fetch_add(1, std::memory_order_relaxed);
+            if (index < 80) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(6));
+            }
+            return evaluation;
+        };
+
+        std::atomic<int> reducedEvents{0};
+        std::vector<int> observedWorkers;
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onProgress = [&](const Batch::SearchProgressEvent &event) {
+            if (event.hasWindowSample) {
+                observedWorkers.push_back(event.activeWorkers);
+            }
+            if (event.activeWorkersReduced) {
+                reducedEvents.fetch_add(1, std::memory_order_relaxed);
+            }
+        };
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+        bool sawTwoWorkerReduction = false;
+        for (size_t i = 1; i < observedWorkers.size(); ++i) {
+            if (observedWorkers[i - 1] == 6 && observedWorkers[i] == 4) {
+                sawTwoWorkerReduction = true;
+                break;
+            }
         }
-    };
 
-    const auto result = Batch::BatchSearchService::Run(request, callbacks);
+        Expect(!result.failed, "adaptive run should not fail", failures);
+        Expect(!result.cancelled, "adaptive run should not cancel", failures);
+        Expect(result.processedSeeds == result.totalSeeds, "adaptive run should process all seeds", failures);
+        Expect(result.totalSeeds == 400, "adaptive run total seed count mismatch", failures);
+        Expect(result.autoFallbackCount > 0, "adaptive run should trigger governor reduction", failures);
+        Expect(sawTwoWorkerReduction,
+               "adaptive run should contain a 6->4 worker transition for one physical-core reduction on SMT=2 topology",
+               failures);
+        Expect(reducedEvents.load(std::memory_order_relaxed) > 0,
+               "adaptive run should emit reduced progress events",
+               failures);
+    }
 
-    Expect(!result.failed, "adaptive run should not fail", failures);
-    Expect(!result.cancelled, "adaptive run should not cancel", failures);
-    Expect(result.processedSeeds == result.totalSeeds, "adaptive run should process all seeds", failures);
-    Expect(result.totalSeeds == 400, "adaptive run total seed count mismatch", failures);
-    Expect(result.autoFallbackCount > 0, "adaptive run should trigger fallback", failures);
-    Expect(result.finalActiveWorkers < static_cast<int>(request.workerCount),
-           "adaptive run should reduce active workers",
-           failures);
-    Expect(reducedEvents.load(std::memory_order_relaxed) > 0,
-           "adaptive run should emit reduced progress events",
-           failures);
     if (failures == 0) {
         std::cout << "[PASS] test_adaptive_concurrency" << std::endl;
         return 0;

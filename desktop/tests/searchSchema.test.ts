@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createSearchSchema } from "../src/features/search/searchSchema.ts";
+import { createSearchSchema, toSearchDraft } from "../src/features/search/searchSchema.ts";
 
 const schema = createSearchSchema({ worldTypeMax: 20, mixingMax: 48828124 });
 
@@ -11,7 +11,6 @@ function buildValidFormValues() {
     mixing: 625,
     seedStart: 100000,
     seedEnd: 120000,
-    threads: 0,
     cpuMode: "balanced" as const,
     cpuAllowSmt: true,
     cpuAllowLowPerf: false,
@@ -68,4 +67,52 @@ test("search schema rejects distance rule on forbidden geyser", () => {
       message: "forbidden 喷口不能同时设置距离规则",
     },
   ]);
+});
+
+test("toSearchDraft disables warmup for desktop balanced mode", () => {
+  const draft = toSearchDraft(buildValidFormValues());
+
+  assert.deepEqual(draft.cpu, {
+    mode: "balanced",
+    allowSmt: true,
+    allowLowPerf: false,
+    placement: "strict",
+  });
+});
+
+test("toSearchDraft disables warmup for desktop turbo mode", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    cpuMode: "turbo",
+  });
+
+  assert.deepEqual(draft.cpu, {
+    mode: "turbo",
+    allowSmt: true,
+    allowLowPerf: false,
+    placement: "strict",
+  });
+});
+
+test("search schema rejects legacy custom cpu mode", () => {
+  const result = schema.safeParse({
+    ...buildValidFormValues(),
+    cpuMode: "custom",
+  });
+
+  assert.equal(result.success, false);
+  if (result.success) {
+    return;
+  }
+
+  assert.equal(result.error.issues[0]?.path.join("."), "cpuMode");
+});
+
+test("toSearchDraft keeps unified cpu surface for turbo mode", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    cpuMode: "turbo",
+  });
+
+  assert.equal(Object.keys(draft.cpu).sort().join(","), "allowLowPerf,allowSmt,mode,placement");
 });

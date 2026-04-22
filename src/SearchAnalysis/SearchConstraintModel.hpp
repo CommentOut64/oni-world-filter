@@ -23,19 +23,9 @@ struct CountConstraint {
 struct SearchCpuConfig {
     bool hasValue = false;
     std::string mode = "balanced";
-    int workers = 0;
     bool allowSmt = true;
     bool allowLowPerf = false;
-    std::string placement = "preferred";
-    bool enableWarmup = true;
-    bool enableAdaptiveDown = true;
-    int chunkSize = 64;
-    int progressInterval = 1000;
-    int sampleWindowMs = 2000;
-    int adaptiveMinWorkers = 1;
-    double adaptiveDropThreshold = 0.12;
-    int adaptiveDropWindows = 3;
-    int adaptiveCooldownMs = 8000;
+    std::string placement = "strict";
 };
 
 struct SearchConstraints {
@@ -51,7 +41,6 @@ struct SearchAnalysisRequest {
     int seedStart = 0;
     int seedEnd = 0;
     int mixing = 0;
-    int threads = 0;
     SearchCpuConfig cpu;
     SearchConstraints constraints;
 };
@@ -72,7 +61,6 @@ struct NormalizedSearchRequest {
     int seedStart = 0;
     int seedEnd = 0;
     int mixing = 0;
-    int threads = 0;
     SearchCpuConfig cpu;
     std::vector<ConstraintGroup> groups;
 };

@@ -9,6 +9,7 @@ import type {
 } from "../src/lib/contracts.ts";
 import type { SearchDraft } from "../src/state/searchStore.ts";
 import { formatAnalysisErrorMessage } from "../src/features/search/searchAnalysisDisplay.ts";
+import { encodeMixingFromLevels, MIXING_SLOT_COUNT } from "../src/features/search/searchSchema.ts";
 
 const geysers: GeyserOption[] = [{ id: 2, key: "hot_water" }];
 
@@ -27,23 +28,16 @@ const draft: SearchDraft = {
   worldType: 13,
   seedStart: 100000,
   seedEnd: 120000,
-  mixing: 1 + 5,
-  threads: 0,
+  mixing: encodeMixingFromLevels([
+    1,
+    1,
+    ...new Array<number>(MIXING_SLOT_COUNT - 2).fill(0),
+  ]),
   cpu: {
     mode: "balanced",
-    workers: 0,
     allowSmt: true,
     allowLowPerf: false,
     placement: "preferred",
-    enableWarmup: true,
-    enableAdaptiveDown: true,
-    chunkSize: 64,
-    progressInterval: 1000,
-    sampleWindowMs: 2000,
-    adaptiveMinWorkers: 1,
-    adaptiveDropThreshold: 0.12,
-    adaptiveDropWindows: 3,
-    adaptiveCooldownMs: 8000,
   },
   constraints: {
     required: [],
@@ -79,7 +73,6 @@ function createAnalysis(issue: ValidationIssue): SearchAnalysisPayload {
       seedStart: 100000,
       seedEnd: 120000,
       mixing: draft.mixing,
-      threads: 0,
       groups: [],
     },
     errors: [issue],

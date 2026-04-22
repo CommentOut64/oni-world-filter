@@ -1,4 +1,4 @@
-import type { SearchMatchSummary, SearchRequest } from "../lib/contracts";
+import type { SearchCpuConfig, SearchMatchSummary, SearchRequest } from "../lib/contracts";
 import type { SearchDraft } from "./searchStore";
 
 export const SEARCH_SESSION_STORAGE_KEY = "oni-search-session/v1";
@@ -41,6 +41,57 @@ function sanitizeSelectedSeed(results: SearchMatchSummary[], selectedSeed: numbe
     return null;
   }
   return results.some((item) => item.seed === selectedSeed) ? selectedSeed : null;
+}
+
+function normalizeCpuMode(value: unknown): SearchCpuConfig["mode"] {
+  if (value === "turbo" || value === "custom") {
+    return "turbo";
+  }
+  return "balanced";
+}
+
+function normalizePlacement(value: unknown): SearchCpuConfig["placement"] {
+  if (value === "none") {
+    return value;
+  }
+  return "strict";
+}
+
+function normalizeSearchCpuConfig(cpu: unknown): SearchCpuConfig {
+  const source = isRecord(cpu) ? cpu : {};
+  const placementValue =
+    typeof source.placement === "string"
+      ? source.placement
+      : typeof source.binding === "string"
+        ? source.binding
+        : undefined;
+  return {
+    mode: normalizeCpuMode(source.mode),
+    allowSmt: typeof source.allowSmt === "boolean" ? source.allowSmt : true,
+    allowLowPerf: typeof source.allowLowPerf === "boolean" ? source.allowLowPerf : false,
+    placement: normalizePlacement(placementValue),
+  };
+}
+
+function normalizeSearchDraft(draft: SearchDraft): SearchDraft {
+  const { threads: _legacyThreads, ...rest } = draft as SearchDraft & { threads?: unknown };
+  return {
+    ...rest,
+    cpu: normalizeSearchCpuConfig(rest.cpu),
+  };
+}
+
+function normalizeSearchRequest(request: SearchRequest): SearchRequest {
+  const { threads: _legacyThreads, ...rest } = request as SearchRequest & { threads?: unknown };
+  if (!request.cpu) {
+    return {
+      ...rest,
+    };
+  }
+  return {
+    ...rest,
+    cpu: normalizeSearchCpuConfig(rest.cpu),
+  };
 }
 
 function toSerializableSnapshot(
@@ -111,13 +162,13 @@ export function restoreSearchSessionSnapshot(
       return null;
     }
     const results = cloneValue(snapshot.results);
-    const draft = cloneValue(snapshot.draft);
+    const draft = normalizeSearchDraft(cloneValue(snapshot.draft));
     return {
       draft,
       results,
       selectedSeed: sanitizeSelectedSeed(results, snapshot.selectedSeed),
       lastSubmittedRequest: snapshot.lastSubmittedRequest
-        ? cloneValue(snapshot.lastSubmittedRequest)
+        ? normalizeSearchRequest(cloneValue(snapshot.lastSubmittedRequest))
         : null,
       activeWorldType: draft.worldType,
       activeMixing: draft.mixing,

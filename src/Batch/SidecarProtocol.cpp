@@ -107,19 +107,9 @@ bool ParseCpuConfig(const Json::Value &root,
     }
     cpu->hasValue = true;
     cpu->mode = cpuNode.get("mode", cpu->mode).asString();
-    cpu->workers = std::max(0, cpuNode.get("workers", cpu->workers).asInt());
     cpu->allowSmt = cpuNode.get("allowSmt", cpu->allowSmt).asBool();
     cpu->allowLowPerf = cpuNode.get("allowLowPerf", cpu->allowLowPerf).asBool();
-    cpu->placement = cpuNode.get("placement", cpu->placement).asString();
-    cpu->enableWarmup = cpuNode.get("enableWarmup", cpu->enableWarmup).asBool();
-    cpu->enableAdaptiveDown = cpuNode.get("enableAdaptiveDown", cpu->enableAdaptiveDown).asBool();
-    cpu->chunkSize = cpuNode.get("chunkSize", cpu->chunkSize).asInt();
-    cpu->progressInterval = cpuNode.get("progressInterval", cpu->progressInterval).asInt();
-    cpu->sampleWindowMs = cpuNode.get("sampleWindowMs", cpu->sampleWindowMs).asInt();
-    cpu->adaptiveMinWorkers = cpuNode.get("adaptiveMinWorkers", cpu->adaptiveMinWorkers).asInt();
-    cpu->adaptiveDropThreshold = cpuNode.get("adaptiveDropThreshold", cpu->adaptiveDropThreshold).asDouble();
-    cpu->adaptiveDropWindows = cpuNode.get("adaptiveDropWindows", cpu->adaptiveDropWindows).asInt();
-    cpu->adaptiveCooldownMs = cpuNode.get("adaptiveCooldownMs", cpu->adaptiveCooldownMs).asInt();
+    cpu->placement = cpuNode.get("binding", cpuNode.get("placement", cpu->placement)).asString();
     return true;
 }
 
@@ -438,7 +428,6 @@ Json::Value BuildNormalizedSearchRequestJson(const SearchAnalysis::NormalizedSea
     root["seedStart"] = request.seedStart;
     root["seedEnd"] = request.seedEnd;
     root["mixing"] = request.mixing;
-    root["threads"] = request.threads;
 
     Json::Value groups(Json::arrayValue);
     for (const auto &group : request.groups) {
@@ -606,7 +595,6 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
         request.mixing = root.get("mixing", request.mixing).asInt();
-        request.threads = std::max(0, root.get("threads", request.threads).asInt());
         if (request.seedEnd < request.seedStart) {
             SetParseError(result, "seedEnd must be >= seedStart");
             return result;
@@ -694,7 +682,6 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
         request.mixing = root.get("mixing", request.mixing).asInt();
-        request.threads = std::max(0, root.get("threads", request.threads).asInt());
         if (!ParseCpuConfig(root, &request.cpu, &result)) {
             return result;
         }
@@ -716,23 +703,12 @@ FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &requ
     cfg.seedStart = request.seedStart;
     cfg.seedEnd = request.seedEnd;
     cfg.mixing = request.mixing;
-    cfg.threads = std::max(0, request.threads);
     if (request.cpu.hasValue) {
         cfg.hasCpuSection = true;
         cfg.cpu.mode = request.cpu.mode;
-        cfg.cpu.workers = std::max(0, request.cpu.workers);
         cfg.cpu.allowSmt = request.cpu.allowSmt;
         cfg.cpu.allowLowPerf = request.cpu.allowLowPerf;
         cfg.cpu.placement = request.cpu.placement;
-        cfg.cpu.enableWarmup = request.cpu.enableWarmup;
-        cfg.cpu.enableAdaptiveDown = request.cpu.enableAdaptiveDown;
-        cfg.cpu.chunkSize = std::clamp(request.cpu.chunkSize, 1, 2048);
-        cfg.cpu.progressInterval = std::clamp(request.cpu.progressInterval, 1, 1000000);
-        cfg.cpu.sampleWindowMs = std::clamp(request.cpu.sampleWindowMs, 200, 10000);
-        cfg.cpu.adaptiveMinWorkers = std::clamp(request.cpu.adaptiveMinWorkers, 1, 1024);
-        cfg.cpu.adaptiveDropThreshold = std::clamp(request.cpu.adaptiveDropThreshold, 0.0, 0.5);
-        cfg.cpu.adaptiveDropWindows = std::clamp(request.cpu.adaptiveDropWindows, 1, 10);
-        cfg.cpu.adaptiveCooldownMs = std::clamp(request.cpu.adaptiveCooldownMs, 1000, 60000);
     }
 
     auto appendError = [&](FilterErrorCode code, std::string field, std::string detail) {

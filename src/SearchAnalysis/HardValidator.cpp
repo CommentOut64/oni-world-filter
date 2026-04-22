@@ -71,14 +71,6 @@ void ValidateLayer1(const SearchAnalysisRequest &request,
                  "mixing",
                  "mixing 超出有效范围");
     }
-    if (request.threads < 0) {
-        AddIssue(errors,
-                 "layer1",
-                 "range.threads_negative",
-                 "threads",
-                 "threads 不能为负数");
-    }
-
     for (size_t i = 0; i < request.constraints.distance.size(); ++i) {
         const auto &rule = request.constraints.distance[i];
         if (rule.minDist < 0.0) {
@@ -129,57 +121,6 @@ void ValidateLayer1(const SearchAnalysisRequest &request,
         }
     }
 
-    if (request.cpu.hasValue) {
-        if (request.cpu.chunkSize < 1 || request.cpu.chunkSize > 2048) {
-            AddIssue(errors,
-                     "layer1",
-                     "range.cpu_chunk_size",
-                     "cpu.chunkSize",
-                     "cpu.chunkSize 必须在 [1, 2048]");
-        }
-        if (request.cpu.progressInterval < 1 || request.cpu.progressInterval > 1000000) {
-            AddIssue(errors,
-                     "layer1",
-                     "range.cpu_progress_interval",
-                     "cpu.progressInterval",
-                     "cpu.progressInterval 必须在 [1, 1000000]");
-        }
-        if (request.cpu.sampleWindowMs < 200 || request.cpu.sampleWindowMs > 10000) {
-            AddIssue(errors,
-                     "layer1",
-                     "range.cpu_sample_window",
-                     "cpu.sampleWindowMs",
-                     "cpu.sampleWindowMs 必须在 [200, 10000]");
-        }
-        if (request.cpu.adaptiveMinWorkers < 1 || request.cpu.adaptiveMinWorkers > 1024) {
-            AddIssue(errors,
-                     "layer1",
-                     "range.cpu_adaptive_min_workers",
-                     "cpu.adaptiveMinWorkers",
-                     "cpu.adaptiveMinWorkers 必须在 [1, 1024]");
-        }
-        if (request.cpu.adaptiveDropThreshold < 0.0 || request.cpu.adaptiveDropThreshold > 0.5) {
-            AddIssue(errors,
-                     "layer1",
-                     "range.cpu_adaptive_drop_threshold",
-                     "cpu.adaptiveDropThreshold",
-                     "cpu.adaptiveDropThreshold 必须在 [0, 0.5]");
-        }
-        if (request.cpu.adaptiveDropWindows < 1 || request.cpu.adaptiveDropWindows > 10) {
-            AddIssue(errors,
-                     "layer1",
-                     "range.cpu_adaptive_drop_windows",
-                     "cpu.adaptiveDropWindows",
-                     "cpu.adaptiveDropWindows 必须在 [1, 10]");
-        }
-        if (request.cpu.adaptiveCooldownMs < 1000 || request.cpu.adaptiveCooldownMs > 60000) {
-            AddIssue(errors,
-                     "layer1",
-                     "range.cpu_adaptive_cooldown",
-                     "cpu.adaptiveCooldownMs",
-                     "cpu.adaptiveCooldownMs 必须在 [1000, 60000]");
-        }
-    }
 }
 
 void ValidateLayer2(const SearchAnalysisRequest &rawRequest,

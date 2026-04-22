@@ -3,10 +3,10 @@ import type {
   MixingSlotMeta,
   SearchAnalysisPayload,
   ValidationIssue,
-} from "../../lib/contracts";
-import { formatGeyserNameByKey, formatMixingSlotName } from "../../lib/displayResolvers";
-import type { SearchDraft } from "../../state/searchStore";
-import { decodeMixingToLevels, MIXING_SLOT_COUNT } from "./searchSchema";
+} from "../../lib/contracts.ts";
+import { formatGeyserNameByKey, formatMixingSlotName } from "../../lib/displayResolvers.ts";
+import type { SearchDraft } from "../../state/searchStore.ts";
+import { decodeMixingToLevels, MIXING_SLOT_COUNT } from "./searchSchema.ts";
 
 function extractTrailingGeyserId(message: string): string | null {
   const matched = message.match(/: ([a-z0-9_]+)$/i);

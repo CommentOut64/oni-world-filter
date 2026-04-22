@@ -13,7 +13,7 @@ import type {
   SidecarStderrEvent,
   WorldOption,
 } from "./contracts";
-import { FALLBACK_SEARCH_CATALOG, normalizeSearchCatalog } from "./searchCatalog";
+import { FALLBACK_SEARCH_CATALOG, normalizeSearchCatalog } from "./searchCatalog.ts";
 
 const SIDECAR_EVENT_CHANNEL = "sidecar://event";
 const SIDECAR_STDERR_CHANNEL = "sidecar://stderr";

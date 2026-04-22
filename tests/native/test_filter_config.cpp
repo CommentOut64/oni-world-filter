@@ -47,17 +47,20 @@ int RunAllTests()
     std::filesystem::create_directories(tempDir);
 
     {
-        const auto file = tempDir / "threads-default.json";
+        const auto file = tempDir / "legacy-threads-ignored.json";
         const std::string json = R"({
   "worldType": 0,
   "seedStart": 1,
   "seedEnd": 2,
-  "mixing": 0
+  "mixing": 0,
+  "threads": 8
 })";
-        Expect(WriteText(file, json), "write threads-default json failed", failures);
+        Expect(WriteText(file, json), "write legacy-threads-ignored json failed", failures);
         const auto result = Batch::LoadFilterConfig(file.string());
-        Expect(result.Ok(), "threads-default should parse", failures);
-        Expect(result.config.threads == 0, "threads default should be 0", failures);
+        Expect(result.Ok(), "legacy threads field should be ignored during parse", failures);
+        Expect(!result.config.hasCpuSection,
+               "legacy threads field should not synthesize cpu section",
+               failures);
     }
 
     {
@@ -150,6 +153,22 @@ int RunAllTests()
         Expect(!result.Ok(), "seedStart > seedEnd should fail", failures);
         Expect(ContainsErrorCode(result, Batch::FilterErrorCode::InvalidSeedRange),
                "invalid seed range should report error",
+               failures);
+    }
+
+    {
+        const auto file = tempDir / "cpu-default-placement.json";
+        const std::string json = R"({
+  "cpu": {
+    "mode": "balanced"
+  }
+})";
+        Expect(WriteText(file, json), "write cpu-default-placement json failed", failures);
+        const auto result = Batch::LoadFilterConfig(file.string());
+        Expect(result.Ok(), "cpu-default-placement should parse", failures);
+        Expect(result.config.hasCpuSection, "cpu-default-placement should keep cpu section", failures);
+        Expect(result.config.cpu.placement == "strict",
+               "cpu placement should default to strict when omitted",
                failures);
     }
 

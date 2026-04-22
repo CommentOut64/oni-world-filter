@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::HostError;
-use crate::state::{JobRegistry, JobStatus, RunningJobHandles};
+use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
 #[cfg(windows)]
 use std::mem::size_of;
@@ -32,6 +32,7 @@ use windows_sys::Win32::System::Threading::SetProcessAffinityMask;
 pub const SIDECAR_EVENT_CHANNEL: &str = "sidecar://event";
 pub const SIDECAR_STDERR_CHANNEL: &str = "sidecar://stderr";
 const HOST_DEBUG_PREFIX: &str = "[host-debug]";
+const CANCEL_GRACE_TIMEOUT_MS: u64 = 75;
 
 const WORLD_CODES: [&str; 38] = [
     "SNDST-A-",
@@ -119,8 +120,6 @@ pub struct SearchRequestPayload {
     #[serde(default)]
     pub mixing: i32,
     #[serde(default)]
-    pub threads: i32,
-    #[serde(default)]
     pub constraints: SearchConstraints,
     #[serde(default)]
     pub cpu: Option<SearchCpuConfig>,
@@ -144,32 +143,12 @@ pub struct SearchConstraints {
 pub struct SearchCpuConfig {
     #[serde(default = "default_cpu_mode")]
     pub mode: String,
-    #[serde(default)]
-    pub workers: i32,
     #[serde(default = "default_true")]
     pub allow_smt: bool,
     #[serde(default)]
     pub allow_low_perf: bool,
     #[serde(default = "default_placement")]
     pub placement: String,
-    #[serde(default = "default_true")]
-    pub enable_warmup: bool,
-    #[serde(default = "default_true")]
-    pub enable_adaptive_down: bool,
-    #[serde(default = "default_chunk_size")]
-    pub chunk_size: i32,
-    #[serde(default = "default_progress_interval")]
-    pub progress_interval: i32,
-    #[serde(default = "default_sample_window")]
-    pub sample_window_ms: i32,
-    #[serde(default = "default_adaptive_min_workers")]
-    pub adaptive_min_workers: i32,
-    #[serde(default = "default_adaptive_drop_threshold")]
-    pub adaptive_drop_threshold: f64,
-    #[serde(default = "default_adaptive_drop_windows")]
-    pub adaptive_drop_windows: i32,
-    #[serde(default = "default_adaptive_cooldown")]
-    pub adaptive_cooldown_ms: i32,
 }
 
 fn default_true() -> bool {
@@ -181,35 +160,7 @@ fn default_cpu_mode() -> String {
 }
 
 fn default_placement() -> String {
-    "preferred".to_string()
-}
-
-fn default_chunk_size() -> i32 {
-    64
-}
-
-fn default_progress_interval() -> i32 {
-    1000
-}
-
-fn default_sample_window() -> i32 {
-    2000
-}
-
-fn default_adaptive_min_workers() -> i32 {
-    1
-}
-
-fn default_adaptive_drop_threshold() -> f64 {
-    0.12
-}
-
-fn default_adaptive_drop_windows() -> i32 {
-    3
-}
-
-fn default_adaptive_cooldown() -> i32 {
-    8000
+    "strict".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -327,7 +278,6 @@ pub struct NormalizedSearchRequestPayload {
     pub seed_start: i32,
     pub seed_end: i32,
     pub mixing: i32,
-    pub threads: i32,
     pub groups: Vec<NormalizedConstraintGroup>,
 }
 
@@ -503,28 +453,32 @@ pub fn cancel_search(
     let handles = registry
         .get_handles(job_id)
         .ok_or_else(|| HostError::JobNotFound(job_id.to_string()))?;
-    if !registry.is_running(job_id) {
+    if !begin_host_cancellation(&registry, job_id)? {
         return Ok(());
     }
 
     request_search_cancel(&handles, job_id);
-    let forced = force_stop_child_process(&handles);
-
-    if forced && registry.is_running(job_id) {
-        registry.set_status(job_id, JobStatus::Cancelled)?;
-        let _ = app.emit(
-            SIDECAR_EVENT_CHANNEL,
-            json!({
-                "event": "cancelled",
-                "jobId": job_id,
-                "processedSeeds": 0,
-                "totalSeeds": 0,
-                "totalMatches": 0,
-                "finalActiveWorkers": 0
-            }),
-        );
+    thread::sleep(Duration::from_millis(CANCEL_GRACE_TIMEOUT_MS));
+    if registry.get_status(job_id) == Some(JobStatus::Cancelling) {
+        let _ = force_stop_child_process(&handles);
+        if let Some(event) = finalize_cancelled_from_snapshot(&registry, job_id) {
+            let _ = app.emit(SIDECAR_EVENT_CHANNEL, event);
+        }
     }
     Ok(())
+}
+
+fn begin_host_cancellation(registry: &JobRegistry, job_id: &str) -> Result<bool, HostError> {
+    match registry.get_status(job_id) {
+        Some(JobStatus::Running) => {
+            registry.set_status(job_id, JobStatus::Cancelling)?;
+            Ok(true)
+        }
+        Some(JobStatus::Cancelling | JobStatus::Completed | JobStatus::Failed | JobStatus::Cancelled) => {
+            Ok(false)
+        }
+        None => Err(HostError::JobNotFound(job_id.to_string())),
+    }
 }
 
 fn request_search_cancel(handles: &RunningJobHandles, job_id: &str) {
@@ -541,6 +495,7 @@ fn request_search_cancel(handles: &RunningJobHandles, job_id: &str) {
 }
 
 fn force_stop_child_process(handles: &RunningJobHandles) -> bool {
+    let _ = handles.stdin_handle.lock().map(|mut guard| guard.take());
     let mut forced = false;
     if let Ok(mut guard) = handles.child_handle.lock() {
         if let Some(child) = guard.as_mut() {
@@ -553,7 +508,6 @@ fn force_stop_child_process(handles: &RunningJobHandles) -> bool {
             }
         }
     }
-    let _ = handles.stdin_handle.lock().map(|mut guard| guard.take());
     forced
 }
 
@@ -561,14 +515,7 @@ pub fn load_preview(
     app: Option<&AppHandle>,
     request: &PreviewRequestPayload,
 ) -> Result<Value, HostError> {
-    if request.job_id.trim().is_empty() {
-        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
-    }
-    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
-        return Err(HostError::InvalidRequest(
-            "worldType 超出有效范围".to_string(),
-        ));
-    }
+    validate_preview_request(request)?;
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_preview_command(request);
     let events =
@@ -622,7 +569,9 @@ pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayloa
     ))
 }
 
-fn deserialize_search_catalog_payload(catalog: Value) -> Result<SearchCatalogPayload, HostError> {
+pub(crate) fn deserialize_search_catalog_payload(
+    catalog: Value,
+) -> Result<SearchCatalogPayload, HostError> {
     serde_json::from_value(catalog).map_err(|error| {
         HostError::InvalidRequest(format!("search_catalog 反序列化失败: {}", error))
     })
@@ -632,9 +581,7 @@ pub fn analyze_search_request(
     app: Option<&AppHandle>,
     request: &SearchRequestPayload,
 ) -> Result<SearchAnalysisPayload, HostError> {
-    if request.job_id.trim().is_empty() {
-        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
-    }
+    validate_analyze_search_request(request)?;
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_analyze_search_command(request);
     let events =
@@ -968,19 +915,9 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
     let cpu = request.cpu.clone().map(|cpu| {
         json!({
             "mode": cpu.mode,
-            "workers": cpu.workers,
             "allowSmt": cpu.allow_smt,
             "allowLowPerf": cpu.allow_low_perf,
             "placement": cpu.placement,
-            "enableWarmup": cpu.enable_warmup,
-            "enableAdaptiveDown": cpu.enable_adaptive_down,
-            "chunkSize": cpu.chunk_size,
-            "progressInterval": cpu.progress_interval,
-            "sampleWindowMs": cpu.sample_window_ms,
-            "adaptiveMinWorkers": cpu.adaptive_min_workers,
-            "adaptiveDropThreshold": cpu.adaptive_drop_threshold,
-            "adaptiveDropWindows": cpu.adaptive_drop_windows,
-            "adaptiveCooldownMs": cpu.adaptive_cooldown_ms,
         })
     });
     json!({
@@ -990,7 +927,6 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
         "seedStart": request.seed_start,
         "seedEnd": request.seed_end,
         "mixing": request.mixing,
-        "threads": request.threads,
         "constraints": {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
@@ -1001,7 +937,28 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
     })
 }
 
-fn build_preview_command(request: &PreviewRequestPayload) -> Value {
+pub(crate) fn validate_preview_request(request: &PreviewRequestPayload) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+        return Err(HostError::InvalidRequest(
+            "worldType 超出有效范围".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_analyze_search_request(
+    request: &SearchRequestPayload,
+) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    Ok(())
+}
+
+pub(crate) fn build_preview_command(request: &PreviewRequestPayload) -> Value {
     json!({
         "command": "preview",
         "jobId": request.job_id,
@@ -1011,14 +968,14 @@ fn build_preview_command(request: &PreviewRequestPayload) -> Value {
     })
 }
 
-fn build_get_search_catalog_command(job_id: &str) -> Value {
+pub(crate) fn build_get_search_catalog_command(job_id: &str) -> Value {
     json!({
         "command": "get_search_catalog",
         "jobId": job_id
     })
 }
 
-fn build_analyze_search_command(request: &SearchRequestPayload) -> Value {
+pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Value {
     json!({
         "command": "analyze_search_request",
         "jobId": request.job_id,
@@ -1026,7 +983,6 @@ fn build_analyze_search_command(request: &SearchRequestPayload) -> Value {
         "seedStart": request.seed_start,
         "seedEnd": request.seed_end,
         "mixing": request.mixing,
-        "threads": request.threads,
         "constraints": {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
@@ -1128,13 +1084,17 @@ fn spawn_stdout_forwarder(
             let event_json = match parsed {
                 Ok(value) => value,
                 Err(error) => {
-                    let failed = json!({
-                        "event": "failed",
-                        "jobId": fallback_job_id,
-                        "message": format!("sidecar 输出非 JSON 行: {}", error),
-                    });
-                    let _ = app.emit(SIDECAR_EVENT_CHANNEL, failed.clone());
-                    let _ = registry.set_status(&fallback_job_id, JobStatus::Failed);
+                    if should_emit_failed_for_invalid_stdout(
+                        registry.get_status(&fallback_job_id),
+                    ) {
+                        let failed = json!({
+                            "event": "failed",
+                            "jobId": fallback_job_id,
+                            "message": format!("sidecar 输出非 JSON 行: {}", error),
+                        });
+                        let _ = app.emit(SIDECAR_EVENT_CHANNEL, failed);
+                        let _ = registry.set_status(&fallback_job_id, JobStatus::Failed);
+                    }
                     continue;
                 }
             };
@@ -1150,6 +1110,12 @@ fn spawn_stdout_forwarder(
                 .unwrap_or_default()
                 .to_string();
 
+            let job_status = registry.get_status(&job_id);
+            if !should_forward_sidecar_event(job_status, event_name.as_str()) {
+                continue;
+            }
+
+            update_progress_snapshot_from_event(&registry, &job_id, event_name.as_str(), &event_json);
             let _ = app.emit(SIDECAR_EVENT_CHANNEL, event_json);
 
             match event_name.as_str() {
@@ -1167,6 +1133,11 @@ fn spawn_stdout_forwarder(
                 }
                 _ => {}
             }
+        }
+
+        if let Some(event) = finalize_cancelled_from_stdout_eof(&registry, &fallback_job_id) {
+            let _ = app.emit(SIDECAR_EVENT_CHANNEL, event);
+            let _ = stdin_handle.lock().map(|mut guard| guard.take());
         }
     });
 }
@@ -1192,7 +1163,7 @@ fn spawn_waiter(
 
         match maybe_status {
             Ok(Some(status)) => {
-                if !status.success() && registry.is_running(&job_id) {
+                if should_emit_failed_for_exit(registry.get_status(&job_id), status.success()) {
                     let _ = registry.set_status(&job_id, JobStatus::Failed);
                     let _ = app.emit(
                         SIDECAR_EVENT_CHANNEL,
@@ -1210,7 +1181,7 @@ fn spawn_waiter(
                 thread::sleep(Duration::from_millis(40));
             }
             Err(error) => {
-                if registry.is_running(&job_id) {
+                if registry.get_status(&job_id) == Some(JobStatus::Running) {
                     let _ = registry.set_status(&job_id, JobStatus::Failed);
                     let _ = app.emit(
                         SIDECAR_EVENT_CHANNEL,
@@ -1227,6 +1198,105 @@ fn spawn_waiter(
     });
 }
 
+fn should_emit_failed_for_exit(job_status: Option<JobStatus>, exit_success: bool) -> bool {
+    !exit_success && job_status == Some(JobStatus::Running)
+}
+
+fn should_emit_failed_for_invalid_stdout(job_status: Option<JobStatus>) -> bool {
+    matches!(job_status, Some(JobStatus::Running) | None)
+}
+
+fn should_forward_sidecar_event(job_status: Option<JobStatus>, event_name: &str) -> bool {
+    match job_status {
+        Some(JobStatus::Running) | None => true,
+        Some(JobStatus::Cancelling) => event_name == "cancelled",
+        Some(JobStatus::Cancelled | JobStatus::Completed | JobStatus::Failed) => false,
+    }
+}
+
+fn update_progress_snapshot_from_event(
+    registry: &JobRegistry,
+    job_id: &str,
+    event_name: &str,
+    event_json: &Value,
+) {
+    let current = registry
+        .get_progress_snapshot(job_id)
+        .unwrap_or_else(default_progress_snapshot);
+
+    let next_snapshot = match event_name {
+        "started" => Some(JobProgressSnapshot {
+            processed_seeds: 0,
+            total_seeds: read_u64_field(event_json, "totalSeeds").unwrap_or(current.total_seeds),
+            total_matches: 0,
+            active_workers: read_u32_field(event_json, "workerCount").unwrap_or(current.active_workers),
+        }),
+        "progress" | "match" => Some(JobProgressSnapshot {
+            processed_seeds: read_u64_field(event_json, "processedSeeds")
+                .unwrap_or(current.processed_seeds),
+            total_seeds: read_u64_field(event_json, "totalSeeds").unwrap_or(current.total_seeds),
+            total_matches: read_u64_field(event_json, "totalMatches")
+                .unwrap_or(current.total_matches),
+            active_workers: read_u32_field(event_json, "activeWorkers")
+                .unwrap_or(current.active_workers),
+        }),
+        "completed" | "cancelled" => Some(JobProgressSnapshot {
+            processed_seeds: read_u64_field(event_json, "processedSeeds")
+                .unwrap_or(current.processed_seeds),
+            total_seeds: read_u64_field(event_json, "totalSeeds").unwrap_or(current.total_seeds),
+            total_matches: read_u64_field(event_json, "totalMatches")
+                .unwrap_or(current.total_matches),
+            active_workers: read_u32_field(event_json, "finalActiveWorkers")
+                .unwrap_or(current.active_workers),
+        }),
+        _ => None,
+    };
+
+    if let Some(snapshot) = next_snapshot {
+        let _ = registry.update_progress_snapshot(job_id, snapshot);
+    }
+}
+
+fn finalize_cancelled_from_snapshot(registry: &JobRegistry, job_id: &str) -> Option<Value> {
+    if registry.get_status(job_id) != Some(JobStatus::Cancelling) {
+        return None;
+    }
+
+    let snapshot = registry
+        .get_progress_snapshot(job_id)
+        .unwrap_or_else(default_progress_snapshot);
+    let _ = registry.set_status(job_id, JobStatus::Cancelled);
+    Some(json!({
+        "event": "cancelled",
+        "jobId": job_id,
+        "processedSeeds": snapshot.processed_seeds,
+        "totalSeeds": snapshot.total_seeds,
+        "totalMatches": snapshot.total_matches,
+        "finalActiveWorkers": snapshot.active_workers,
+    }))
+}
+
+fn finalize_cancelled_from_stdout_eof(registry: &JobRegistry, job_id: &str) -> Option<Value> {
+    finalize_cancelled_from_snapshot(registry, job_id)
+}
+
+fn default_progress_snapshot() -> JobProgressSnapshot {
+    JobProgressSnapshot {
+        processed_seeds: 0,
+        total_seeds: 0,
+        total_matches: 0,
+        active_workers: 0,
+    }
+}
+
+fn read_u64_field(event_json: &Value, field_name: &str) -> Option<u64> {
+    event_json.get(field_name).and_then(Value::as_u64)
+}
+
+fn read_u32_field(event_json: &Value, field_name: &str) -> Option<u32> {
+    read_u64_field(event_json, field_name).and_then(|value| u32::try_from(value).ok())
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -1238,13 +1308,15 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::state::RunningJobHandles;
+    use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
     use super::{
-        collect_sidecar_candidates, first_existing_sidecar_path, force_stop_child_process,
-        list_geyser_options, list_world_options, prepare_runtime_sidecar_copy,
-        preview_affinity_mask_for_cpu_sets, request_search_cancel, resolve_sidecar_path,
-        run_sidecar_request_collect, PreviewCpuSetInfo, SearchCatalogPayload,
+        begin_host_cancellation, collect_sidecar_candidates, finalize_cancelled_from_snapshot,
+        finalize_cancelled_from_stdout_eof, first_existing_sidecar_path,
+        force_stop_child_process, list_geyser_options, list_world_options,
+        prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets, request_search_cancel,
+        resolve_sidecar_path, run_sidecar_request_collect, should_emit_failed_for_exit,
+        should_forward_sidecar_event, PreviewCpuSetInfo, SearchCatalogPayload,
         SidecarProcessPriority,
     };
 
@@ -1277,6 +1349,14 @@ mod tests {
             .stderr(Stdio::null())
             .spawn()
             .expect("sleeping child should spawn")
+    }
+
+    fn create_handles() -> RunningJobHandles {
+        RunningJobHandles {
+            child_handle: Arc::new(Mutex::new(None)),
+            stdin_handle: Arc::new(Mutex::new(None)),
+            cancel_token: Arc::new(AtomicBool::new(false)),
+        }
     }
 
     fn build_catalog_with_trait_field(field_name: &str) -> serde_json::Value {
@@ -1481,6 +1561,150 @@ mod tests {
     }
 
     #[test]
+    fn cancel_helpers_should_mark_job_as_cancelling_before_force_stop() {
+        let registry = JobRegistry::default();
+        registry
+            .insert_running("job-cancelling".to_string(), create_handles())
+            .expect("insert running job should succeed");
+
+        begin_host_cancellation(&registry, "job-cancelling")
+            .expect("begin host cancellation should succeed");
+
+        assert_eq!(
+            registry.get_status("job-cancelling"),
+            Some(JobStatus::Cancelling)
+        );
+    }
+
+    #[test]
+    fn cancel_helpers_should_synthesize_cancelled_from_stdout_eof() {
+        let registry = JobRegistry::default();
+        registry
+            .insert_running("job-eof".to_string(), create_handles())
+            .expect("insert running job should succeed");
+        registry
+            .set_status("job-eof", JobStatus::Cancelling)
+            .expect("set cancelling should succeed");
+        registry
+            .update_progress_snapshot(
+                "job-eof",
+                JobProgressSnapshot {
+                    processed_seeds: 11,
+                    total_seeds: 200,
+                    total_matches: 3,
+                    active_workers: 2,
+                },
+            )
+            .expect("update snapshot should succeed");
+
+        let event = finalize_cancelled_from_stdout_eof(&registry, "job-eof")
+            .expect("stdout eof should synthesize cancelled");
+
+        assert_eq!(event.get("event").and_then(|value| value.as_str()), Some("cancelled"));
+        assert_eq!(event.get("jobId").and_then(|value| value.as_str()), Some("job-eof"));
+        assert_eq!(
+            event.get("processedSeeds").and_then(|value| value.as_u64()),
+            Some(11)
+        );
+        assert_eq!(
+            event.get("totalSeeds").and_then(|value| value.as_u64()),
+            Some(200)
+        );
+        assert_eq!(
+            event.get("totalMatches").and_then(|value| value.as_u64()),
+            Some(3)
+        );
+        assert_eq!(
+            event.get("finalActiveWorkers").and_then(|value| value.as_u64()),
+            Some(2)
+        );
+        assert_eq!(registry.get_status("job-eof"), Some(JobStatus::Cancelled));
+    }
+
+    #[test]
+    fn cancel_helpers_should_synthesize_cancelled_immediately_after_host_abort() {
+        let registry = JobRegistry::default();
+        registry
+            .insert_running("job-host-abort".to_string(), create_handles())
+            .expect("insert running job should succeed");
+        registry
+            .set_status("job-host-abort", JobStatus::Cancelling)
+            .expect("set cancelling should succeed");
+        registry
+            .update_progress_snapshot(
+                "job-host-abort",
+                JobProgressSnapshot {
+                    processed_seeds: 77,
+                    total_seeds: 1000,
+                    total_matches: 9,
+                    active_workers: 6,
+                },
+            )
+            .expect("update snapshot should succeed");
+
+        let event = finalize_cancelled_from_snapshot(&registry, "job-host-abort")
+            .expect("host abort should synthesize cancelled immediately");
+
+        assert_eq!(event.get("event").and_then(|value| value.as_str()), Some("cancelled"));
+        assert_eq!(
+            event.get("processedSeeds").and_then(|value| value.as_u64()),
+            Some(77)
+        );
+        assert_eq!(
+            event.get("totalSeeds").and_then(|value| value.as_u64()),
+            Some(1000)
+        );
+        assert_eq!(
+            event.get("totalMatches").and_then(|value| value.as_u64()),
+            Some(9)
+        );
+        assert_eq!(
+            event.get("finalActiveWorkers").and_then(|value| value.as_u64()),
+            Some(6)
+        );
+        assert_eq!(
+            registry.get_status("job-host-abort"),
+            Some(JobStatus::Cancelled)
+        );
+    }
+
+    #[test]
+    fn cancel_helpers_should_suppress_backlogged_non_terminal_events_while_cancelling() {
+        assert!(
+            !should_forward_sidecar_event(Some(JobStatus::Cancelling), "progress"),
+            "cancelling jobs should not keep forwarding stale progress events"
+        );
+        assert!(
+            !should_forward_sidecar_event(Some(JobStatus::Cancelling), "match"),
+            "cancelling jobs should not keep forwarding stale match events"
+        );
+        assert!(
+            should_forward_sidecar_event(Some(JobStatus::Cancelling), "cancelled"),
+            "cancelling jobs should still forward the terminal cancelled event"
+        );
+        assert!(
+            !should_forward_sidecar_event(Some(JobStatus::Cancelled), "progress"),
+            "cancelled jobs should drop any late non-terminal events"
+        );
+    }
+
+    #[test]
+    fn cancel_helpers_should_not_report_failed_for_cancelling_exit() {
+        assert!(
+            !should_emit_failed_for_exit(Some(JobStatus::Cancelling), false),
+            "non-zero exit after host cancellation should not become failed"
+        );
+        assert!(
+            should_emit_failed_for_exit(Some(JobStatus::Running), false),
+            "non-zero exit while still running should remain failed"
+        );
+        assert!(
+            !should_emit_failed_for_exit(Some(JobStatus::Completed), true),
+            "successful exit should not emit failed"
+        );
+    }
+
+    #[test]
     #[ignore = "需要先构建 out/build/x64-release/src/oni-sidecar.exe"]
     fn sidecar_search_smoke() {
         let path = resolve_sidecar_path(None).expect("sidecar path should be resolvable");
@@ -1491,7 +1715,6 @@ mod tests {
             "seedStart": 100000,
             "seedEnd": 100000,
             "mixing": 625,
-            "threads": 1,
             "constraints": {
                 "required": [],
                 "forbidden": [],
@@ -1532,7 +1755,6 @@ mod tests {
             "seedStart": 100030,
             "seedEnd": 100030,
             "mixing": 625,
-            "threads": 1,
             "constraints": {
                 "required": [],
                 "forbidden": [],

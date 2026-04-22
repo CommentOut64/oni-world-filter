@@ -6,15 +6,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
+use crate::control_sidecar::ControlSidecarManager;
 use crate::error::HostError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JobStatus {
     Running,
+    Cancelling,
     Completed,
     Failed,
     Cancelled,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobProgressSnapshot {
+    pub processed_seeds: u64,
+    pub total_seeds: u64,
+    pub total_matches: u64,
+    pub active_workers: u32,
 }
 
 #[derive(Clone)]
@@ -30,6 +40,7 @@ pub struct JobEntry {
     pub status: JobStatus,
     pub started_at_ms: u128,
     pub handles: RunningJobHandles,
+    pub progress_snapshot: Option<JobProgressSnapshot>,
 }
 
 #[derive(Default)]
@@ -52,6 +63,7 @@ impl JobRegistry {
                 status: JobStatus::Running,
                 started_at_ms: now_epoch_ms(),
                 handles,
+                progress_snapshot: None,
             },
         );
         Ok(())
@@ -79,11 +91,41 @@ impl JobRegistry {
         let guard = self.jobs.lock().expect("job registry lock poisoned");
         guard.get(job_id).map(|entry| entry.handles.clone())
     }
+
+    pub fn update_progress_snapshot(
+        &self,
+        job_id: &str,
+        snapshot: JobProgressSnapshot,
+    ) -> Result<(), HostError> {
+        let mut guard = self.jobs.lock().expect("job registry lock poisoned");
+        let entry = guard
+            .get_mut(job_id)
+            .ok_or_else(|| HostError::JobNotFound(job_id.to_string()))?;
+        entry.progress_snapshot = Some(snapshot);
+        Ok(())
+    }
+
+    pub fn get_progress_snapshot(&self, job_id: &str) -> Option<JobProgressSnapshot> {
+        let guard = self.jobs.lock().expect("job registry lock poisoned");
+        guard
+            .get(job_id)
+            .and_then(|entry| entry.progress_snapshot.clone())
+    }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AppState {
     pub jobs: Arc<JobRegistry>,
+    pub control_sidecar: ControlSidecarManager,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            jobs: Arc::new(JobRegistry::default()),
+            control_sidecar: ControlSidecarManager::default(),
+        }
+    }
 }
 
 fn now_epoch_ms() -> u128 {
@@ -95,18 +137,22 @@ fn now_epoch_ms() -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::{JobRegistry, JobStatus, RunningJobHandles};
+    use super::{AppState, JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
     use std::sync::atomic::AtomicBool;
     use std::sync::{Arc, Mutex};
+
+    fn create_handles() -> RunningJobHandles {
+        RunningJobHandles {
+            child_handle: Arc::new(Mutex::new(None)),
+            stdin_handle: Arc::new(Mutex::new(None)),
+            cancel_token: Arc::new(AtomicBool::new(false)),
+        }
+    }
 
     #[test]
     fn registry_should_store_and_update_status() {
         let registry = JobRegistry::default();
-        let handles = RunningJobHandles {
-            child_handle: Arc::new(Mutex::new(None)),
-            stdin_handle: Arc::new(Mutex::new(None)),
-            cancel_token: Arc::new(AtomicBool::new(false)),
-        };
+        let handles = create_handles();
 
         registry
             .insert_running("job-001".to_string(), handles)
@@ -123,16 +169,70 @@ mod tests {
     #[test]
     fn registry_should_reject_running_duplicate_job() {
         let registry = JobRegistry::default();
-        let handles = RunningJobHandles {
-            child_handle: Arc::new(Mutex::new(None)),
-            stdin_handle: Arc::new(Mutex::new(None)),
-            cancel_token: Arc::new(AtomicBool::new(false)),
-        };
+        let handles = create_handles();
         registry
             .insert_running("job-dup".to_string(), handles.clone())
             .expect("first insert should succeed");
 
         let duplicate = registry.insert_running("job-dup".to_string(), handles);
         assert!(duplicate.is_err());
+    }
+
+    #[test]
+    fn registry_should_support_cancelling_status_transitions() {
+        let registry = JobRegistry::default();
+
+        registry
+            .insert_running("job-cancel".to_string(), create_handles())
+            .expect("insert running job should succeed");
+        assert_eq!(registry.get_status("job-cancel"), Some(JobStatus::Running));
+
+        registry
+            .set_status("job-cancel", JobStatus::Cancelling)
+            .expect("set cancelling should succeed");
+        assert_eq!(
+            registry.get_status("job-cancel"),
+            Some(JobStatus::Cancelling)
+        );
+
+        registry
+            .set_status("job-cancel", JobStatus::Cancelled)
+            .expect("set cancelled should succeed");
+        assert_eq!(registry.get_status("job-cancel"), Some(JobStatus::Cancelled));
+    }
+
+    #[test]
+    fn registry_should_store_latest_progress_snapshot() {
+        let registry = JobRegistry::default();
+
+        registry
+            .insert_running("job-progress".to_string(), create_handles())
+            .expect("insert running job should succeed");
+
+        let snapshot = JobProgressSnapshot {
+            processed_seeds: 128,
+            total_seeds: 1024,
+            total_matches: 7,
+            active_workers: 3,
+        };
+
+        registry
+            .update_progress_snapshot("job-progress", snapshot.clone())
+            .expect("update snapshot should succeed");
+
+        assert_eq!(
+            registry.get_progress_snapshot("job-progress"),
+            Some(snapshot)
+        );
+    }
+
+    #[test]
+    fn app_state_should_enable_control_sidecar_by_default() {
+        let state = AppState::default();
+
+        assert!(
+            state.control_sidecar.is_enabled(),
+            "Task 3 切默认值后，desktop 应默认走常驻 control sidecar"
+        );
     }
 }
