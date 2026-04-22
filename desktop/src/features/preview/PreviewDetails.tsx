@@ -82,7 +82,7 @@ export default function PreviewDetails({
           },
           {
             key: "traits",
-            label: "Traits",
+            label: "特质",
             children: preview.summary.traits.length
               ? preview.summary.traits.map(traitLabel).join(", ")
               : "-",
