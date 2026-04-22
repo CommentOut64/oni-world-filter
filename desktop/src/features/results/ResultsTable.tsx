@@ -7,16 +7,41 @@ import { createResultColumns } from "./resultColumns";
 const DEFAULT_SCROLL_Y = 240;
 const MIN_SCROLL_Y = 120;
 
+function buildPrioritizedGeyserKeys(
+  lastSubmittedRequest: ReturnType<typeof useSearchStore.getState>["lastSubmittedRequest"]
+): string[] {
+  if (!lastSubmittedRequest) {
+    return [];
+  }
+
+  const orderedKeys = [
+    ...lastSubmittedRequest.constraints.required,
+    ...lastSubmittedRequest.constraints.forbidden,
+    ...lastSubmittedRequest.constraints.distance.map((item) => item.geyser),
+    ...lastSubmittedRequest.constraints.count.map((item) => item.geyser),
+  ];
+
+  return [...new Set(orderedKeys)];
+}
+
 export default function ResultsTable() {
   void React;
   const results = useSearchStore((state) => state.results);
   const geysers = useSearchStore((state) => state.geysers);
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
   const selectSeed = useSearchStore((state) => state.selectSeed);
+  const lastSubmittedRequest = useSearchStore((state) => state.lastSubmittedRequest);
   const wrapperRef = useRef<HTMLElement | null>(null);
   const [scrollY, setScrollY] = useState(DEFAULT_SCROLL_Y);
 
-  const columns = useMemo(() => createResultColumns(geysers), [geysers]);
+  const prioritizedGeyserKeys = useMemo(
+    () => buildPrioritizedGeyserKeys(lastSubmittedRequest),
+    [lastSubmittedRequest]
+  );
+  const columns = useMemo(
+    () => createResultColumns(geysers, prioritizedGeyserKeys),
+    [geysers, prioritizedGeyserKeys]
+  );
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -58,6 +83,7 @@ export default function ResultsTable() {
       <Table
         className="results-table"
         rowKey="seed"
+        virtual
         size="small"
         pagination={false}
         scroll={{ y: scrollY }}

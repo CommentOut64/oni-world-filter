@@ -117,14 +117,6 @@ textarea {
   position: relative;
 }
 
-.back-to-results {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  white-space: nowrap;
-  z-index: 10;
-}
-
 .search-panel {
   height: 100%;
   display: grid;
@@ -163,6 +155,7 @@ textarea {
 
 .search-column-rules {
   overflow: hidden;
+  position: relative;
 }
 
 .search-section {
@@ -557,15 +550,31 @@ textarea {
 }
 
 .search-actions {
-  display: block;
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 10;
+  width: calc(100% - 32px);
 }
 
-.search-actions .ant-space-compact {
+.search-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
 }
 
-.search-actions .ant-space-compact .ant-btn {
-  flex: 1 1 0;
+.search-actions-row .ant-btn {
+  white-space: nowrap;
+}
+
+.search-action-primary {
+  margin-right: auto;
+}
+
+.search-action-secondary {
+  margin-left: auto;
 }
 
 .analysis-hints {
@@ -673,25 +682,19 @@ textarea {
 
 .result-toolbar {
   margin-top: 10px;
-  display: grid;
-  gap: 10px;
+  display: flex;
+  justify-content: center;
 }
 
-.result-toolbar .ant-flex {
-  width: 100%;
+.result-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
 }
 
-.result-toolbar .ant-tag {
-  margin-inline-end: 0;
-  padding-inline: 10px;
-}
-
-.result-toolbar .ant-badge {
-  color: var(--text-muted);
-}
-
-.result-toolbar .ant-btn {
-  margin-left: auto;
+.result-toolbar-actions .ant-btn {
+  white-space: nowrap;
 }
 
 .host-debug-window {
@@ -1088,8 +1091,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .results-pane-header,
-  .search-actions {
+  .results-pane-header {
     grid-template-columns: 1fr;
   }
 

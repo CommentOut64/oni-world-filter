@@ -24,6 +24,7 @@ import MixingSelector from "./MixingSelector";
 import SearchActions from "./SearchActions";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
 import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay";
+import { shouldShowSearchWarningConfirmation } from "./searchWarningPolicy";
 import {
   createSearchSchema,
   toSearchDraft,
@@ -34,22 +35,22 @@ import WorldSelector from "./WorldSelector";
 
 interface SearchPanelProps {
   onSearchStarted?: () => void;
+  onViewResults?: () => void;
 }
 
-export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
+export default function SearchPanel({ onSearchStarted, onViewResults }: SearchPanelProps) {
   const worlds = useSearchStore((state) => state.worlds);
   const catalog = useSearchStore((state) => state.catalog);
   const geysers = useSearchStore((state) => state.geysers);
   const draft = useSearchStore((state) => state.draft);
+  const resultsCount = useSearchStore((state) => state.results.length);
   const isSearching = useSearchStore((state) => state.isSearching);
-  const isCancelling = useSearchStore((state) => state.isCancelling);
   const startSearchJob = useSearchStore((state) => state.startSearchJob);
-  const cancelSearchJob = useSearchStore((state) => state.cancelSearchJob);
-  const clearResults = useSearchStore((state) => state.clearResults);
   const setDraft = useSearchStore((state) => state.setDraft);
   const lastError = useSearchStore((state) => state.lastError);
   const clearError = useSearchStore((state) => state.clearError);
   const clearPreview = usePreviewStore((state) => state.clear);
+  const hasResults = resultsCount > 0 || isSearching;
 
   const schema = useMemo(() => {
     const worldTypeMax = worlds.length > 0 ? worlds.length - 1 : undefined;
@@ -140,7 +141,7 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
         });
         return;
       }
-      if (analysis.warnings.length > 0) {
+      if (shouldShowSearchWarningConfirmation(analysis)) {
         setPendingWarningConfirmation({ draft: nextDraft, analysis });
         return;
       }
@@ -163,30 +164,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
 
   const handleWarningAbandon = () => {
     setPendingWarningConfirmation(null);
-  };
-
-  const copyAsJson = async () => {
-    const values = methods.getValues();
-    const nextDraft = toSearchDraft(values);
-    const text = JSON.stringify(
-      {
-        worldType: nextDraft.worldType,
-        mixing: nextDraft.mixing,
-        seedStart: nextDraft.seedStart,
-        seedEnd: nextDraft.seedEnd,
-        cpu: nextDraft.cpu,
-        constraints: nextDraft.constraints,
-      },
-      null,
-      2
-    );
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (error) {
-      useSearchStore.setState({
-        lastError: `复制失败: ${error instanceof Error ? error.message : String(error)}`,
-      });
-    }
   };
 
   return (
@@ -323,20 +300,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
               </div>
             </Card>
 
-            <SearchActions
-              isSearching={isSearching}
-              isCancelling={isCancelling}
-              onCancel={() => {
-                void cancelSearchJob();
-              }}
-              onClear={() => {
-                clearResults();
-                clearPreview();
-              }}
-              onCopy={() => {
-                void copyAsJson();
-              }}
-            />
           </section>
 
           <section className="search-column search-column-rules">
@@ -365,6 +328,14 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
                 <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
               </div>
             </Card>
+            <SearchActions
+              isSearching={isSearching}
+              hasResults={hasResults}
+              resultsCount={resultsCount}
+              onViewResults={() => {
+                onViewResults?.();
+              }}
+            />
           </section>
         </section>
       </form>

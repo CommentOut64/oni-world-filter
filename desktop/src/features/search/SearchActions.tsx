@@ -1,34 +1,41 @@
 import React from "react";
-import { Button, Space } from "antd";
+import { Button } from "antd";
 
 interface SearchActionsProps {
   isSearching: boolean;
-  isCancelling: boolean;
-  onCancel: () => void;
-  onClear: () => void;
-  onCopy: () => void;
+  hasResults: boolean;
+  resultsCount: number;
+  onViewResults: () => void;
 }
 
 export default function SearchActions({
   isSearching,
-  isCancelling,
-  onCancel,
-  onClear,
-  onCopy,
+  hasResults,
+  resultsCount,
+  onViewResults,
 }: SearchActionsProps) {
   void React;
   return (
     <section className="search-actions">
-      <Space.Compact block>
-        <Button htmlType="submit" type="primary" loading={isSearching} disabled={isSearching}>
+      <div className="search-actions-row">
+        <Button
+          htmlType="submit"
+          type="primary"
+          className="search-action-primary"
+          loading={isSearching}
+          disabled={isSearching}
+        >
           {isSearching ? "搜索进行中..." : "开始搜索"}
         </Button>
-        <Button onClick={onCancel} disabled={!isSearching || isCancelling} loading={isCancelling}>
-          {isCancelling ? "取消中..." : "取消搜索"}
+        <Button
+          htmlType="button"
+          className="search-action-secondary"
+          onClick={onViewResults}
+          disabled={!hasResults}
+        >
+          查看结果{isSearching ? "（搜索中…）" : hasResults ? ` (${resultsCount})` : ""}
         </Button>
-        <Button onClick={onClear}>清空结果</Button>
-        <Button onClick={onCopy}>复制协议 JSON</Button>
-      </Space.Compact>
+      </div>
     </section>
   );
 }

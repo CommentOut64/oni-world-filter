@@ -74,16 +74,10 @@ function App() {
               onSearchStarted={() => {
                 setActivePage("results");
               }}
+              onViewResults={() => {
+                setActivePage("results");
+              }}
             />
-            {hasResults ? (
-              <Button
-                type="primary"
-                className="back-to-results"
-                onClick={() => setActivePage("results")}
-              >
-                查看结果{isSearching ? "（搜索中…）" : ` (${results.length})`}
-              </Button>
-            ) : null}
           </section>
         </section>
       )}
