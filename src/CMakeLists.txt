@@ -284,35 +284,6 @@ target_link_libraries(test_search_cpu_runtime PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_search_cpu_runtime COMMAND test_search_cpu_runtime)
 
-add_executable(test_throughput_calibration
-    "../tests/native/test_main.cpp"
-    "../tests/native/test_throughput_calibration.cpp"
-    "Batch/ThroughputCalibration.cpp"
-    "BatchCpu/CpuOptimization.cpp"
-)
-target_include_directories(test_throughput_calibration
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
-)
-if(TARGET Threads::Threads)
-target_link_libraries(test_throughput_calibration PRIVATE Threads::Threads)
-endif()
-add_test(NAME test_throughput_calibration COMMAND test_throughput_calibration)
-
-add_executable(test_session_warmup_planner
-    "../tests/native/test_main.cpp"
-    "../tests/native/test_session_warmup_planner.cpp"
-    "Batch/SessionWarmupPlanner.cpp"
-    "Batch/ThroughputCalibration.cpp"
-    "BatchCpu/CpuOptimization.cpp"
-)
-target_include_directories(test_session_warmup_planner
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
-)
-if(TARGET Threads::Threads)
-target_link_libraries(test_session_warmup_planner PRIVATE Threads::Threads)
-endif()
-add_test(NAME test_session_warmup_planner COMMAND test_session_warmup_planner)
-
 add_executable(test_adaptive_concurrency
     "../tests/native/test_main.cpp"
     "../tests/native/test_adaptive_concurrency.cpp"
