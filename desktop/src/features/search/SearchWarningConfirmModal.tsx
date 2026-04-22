@@ -3,6 +3,7 @@ import { Button, Modal, Space, Typography } from "antd";
 
 import type { GeyserOption, SearchAnalysisPayload } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { formatSearchWarningProbabilityCopy } from "./searchProbabilityFormat";
 
 interface SearchWarningConfirmModalProps {
   open: boolean;
@@ -10,17 +11,6 @@ interface SearchWarningConfirmModalProps {
   geysers: readonly GeyserOption[];
   onContinue: () => void;
   onAbandon: () => void;
-}
-
-function formatProbability(probability: number): string {
-  if (!Number.isFinite(probability) || probability <= 0) {
-    return "接近 0%";
-  }
-  const percent = probability * 100;
-  if (percent < 0.01) {
-    return "< 0.01%";
-  }
-  return `${percent.toFixed(3)}%`;
 }
 
 function formatBottlenecks(analysis: SearchAnalysisPayload, geysers: readonly GeyserOption[]): string {
@@ -64,9 +54,7 @@ export default function SearchWarningConfirmModal({
       }
     >
       <div className="search-warning-modal-body">
-        <Typography.Paragraph>
-          乐观估计找到目标结果的概率为 {formatProbability(analysis.predictedBottleneckProbability)}。
-        </Typography.Paragraph>
+        <Typography.Paragraph>{formatSearchWarningProbabilityCopy(analysis.predictedBottleneckProbability)}</Typography.Paragraph>
         <Typography.Paragraph>
           主要瓶颈在于：{formatBottlenecks(analysis, geysers)}。
         </Typography.Paragraph>
