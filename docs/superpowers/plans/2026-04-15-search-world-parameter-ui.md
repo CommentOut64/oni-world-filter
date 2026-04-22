@@ -4,7 +4,7 @@
 
 **Goal:** 把桌面端搜索参数页的世界参数从“后端字段直出”改成用户可理解、可操作的世界分类与 mixing 分组表单，同时保持提交给后端的仍然只有 `worldType` 和 `mixing`。
 
-**Architecture:** 本次只做前端组织层重构，不改 sidecar 协议。`worldType` 继续使用现有 catalog 的 world id，但在前端派生“世界分类 -> 具体世界”两级选择；`mixing` 继续存储为 base-5 编码整数，但在前端改为“DLC 包复选框 + 槽位复选框 + 普通/保证”交互，并保留只读编码值作为高级调试信息。
+**Architecture:** 本次只做前端组织层重构，不改 sidecar 协议。`worldType` 继续使用现有 catalog 的 world id，但在前端派生“世界分类 -> 具体世界”两级选择；`mixing` 继续存储为 base-5 编码整数，但在前端改为“DLC 包复选框 + 槽位复选框 + 可能/确保”交互，并保留只读编码值作为高级调试信息。
 
 **Tech Stack:** React 19、TypeScript、react-hook-form、Zustand、Vite、现有 Tauri search catalog/analyze API
 
@@ -19,7 +19,7 @@
   - 目标：改为“世界分类 + 具体世界列表”两级 UI。
 - `desktop/src/features/search/MixingSelector.tsx`
   - 现状：直接展示 `mixing` 数字和 11 个槽位等级下拉。
-  - 目标：改为 DLC 包卡片、包复选框、槽位复选框、普通/保证选择器、高级信息折叠区。
+  - 目标：改为 DLC 包卡片、包复选框、槽位复选框、可能/确保选择器、高级信息折叠区。
 - `desktop/src/features/search/SearchPanel.tsx`
   - 现状：只负责组合现有 `WorldSelector` 和 `MixingSelector`。
   - 目标：接入新的说明文案、必要 props、世界参数区域结构调整。
@@ -52,9 +52,9 @@
 - `worldType` 最终仍然是现有 catalog world id。
 - `mixing` 最终仍然是现有 base-5 编码整数。
 - `0 = 禁用`
-- `1 = 普通`
-- `2 = 保证`
-- `3/4` 不在主 UI 单独暴露，统一按“普通启用”回写 `1`。
+- `1 = 可能`
+- `2 = 确保`
+- `3/4` 不在主 UI 单独暴露，统一按“可能启用”回写 `1`。
 - 当前世界禁用的 slot 必须显示但禁用，不能隐藏。
 
 ## World Classification Rules
@@ -151,8 +151,8 @@ export function applyChildMode(levels: readonly number[], slot: number, mode: Mi
 规则：
 
 - 包关闭时，包自身和子槽位全部回写 `0`
-- 包开启普通时，包自身默认 `1`，已勾选的子槽位保持现状
-- 包开启保证时，包自身写 `2`
+- 包开启可能时，包自身默认 `1`，已勾选的子槽位保持现状
+- 包开启确保时，包自身写 `2`
 
 - [ ] **Step 6: Sanity-check helper file with TypeScript build**
 
@@ -250,7 +250,7 @@ Expected:
 - 包名称
 - 包说明
 - 包级复选框
-- 包级 `普通/保证` 选择器，仅在勾选后显示
+- 包级 `可能/确保` 选择器，仅在勾选后显示
 - 子槽位列表
 
 `DLC3_ID` 无子项时也按同一结构渲染，只是列表为空。
@@ -262,7 +262,7 @@ Expected:
 - 复选框
 - 名称
 - 简短说明
-- `普通/保证` 选择器，仅在已勾选且未禁用时显示
+- `可能/确保` 选择器，仅在已勾选且未禁用时显示
 
 禁用态要求：
 
@@ -275,7 +275,7 @@ Expected:
 如果当前 level 是 `3/4`：
 
 - UI 显示为已勾选
-- 模式显示为 `普通`
+- 模式显示为 `可能`
 - 用户一旦改动，统一回写到 `1`
 
 - [ ] **Step 6: Keep disabled slot auto-clear compatibility**
@@ -337,7 +337,7 @@ Expected:
 要求：
 
 - 沿用现有深色面板风格
-- 选中态、禁用态、保证态有明显区分
+- 选中态、禁用态、确保态有明显区分
 - 不改变搜索页整体双栏布局
 
 - [ ] **Step 4: Optional analysis hint copy adjustment**
@@ -386,8 +386,8 @@ Expected:
 手工检查：
 
 - 三个 DLC 包能正确分组
-- 包复选框勾选后出现 `普通/保证`
-- 子槽位勾选后出现 `普通/保证`
+- 包复选框勾选后出现 `可能/确保`
+- 子槽位勾选后出现 `可能/确保`
 - 取消勾选后对应 level 回到 `0`
 
 - [ ] **Step 4: Verify disabled slot behavior**
@@ -404,7 +404,7 @@ Expected:
 通过加载已有 draft 或手动构造值检查：
 
 - 若某 slot 初始值为 `3/4`
-- UI 仍表现为“已启用 + 普通”
+- UI 仍表现为“已启用 + 可能”
 - 用户保存后不再写回 `3/4`
 
 - [ ] **Step 6: Verify request integrity**
@@ -428,7 +428,7 @@ Expected:
 - 搜索参数页首屏不再暴露 `worldType`/`mixing` 的裸实现细节。
 - 用户能先按世界分类理解，再选择具体世界。
 - 用户能按 DLC 包理解 mixing，而不是面对 11 个匿名 slot。
-- mixing 主交互为复选框；勾选后可选 `普通/保证`。
+- mixing 主交互为复选框；勾选后可选 `可能/确保`。
 - 当前世界禁用的 slot 会显示并禁用，不会静默隐藏。
 - 当前世界禁用的 slot 不再被前端静默改写；用户可见、可主动关闭、提交前有明确阻止提示。
 - 提交给后端的协议仍然只有现有 `worldType` 和 `mixing`。

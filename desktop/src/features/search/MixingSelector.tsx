@@ -75,9 +75,9 @@ function getUngroupedSlots(
 function renderModeLabel(mode: MixingUiMode): string {
   switch (mode) {
     case "guaranteed":
-      return "保证";
+      return "确保";
     case "normal":
-      return "普通";
+      return "可能";
     default:
       return "禁用";
   }
@@ -98,8 +98,8 @@ function ModeSelect({
       size="small"
       value={value}
       options={[
-        { label: "普通", value: "normal" },
-        { label: "保证", value: "guaranteed" },
+        { label: "可能", value: "normal" },
+        { label: "确保", value: "guaranteed" },
       ]}
       onChange={(nextValue) => {
         onChange(nextValue as MixingUiMode);
@@ -139,7 +139,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
         <header className="mixing-package-header">
           <Typography.Title level={5}>世界混搭</Typography.Title>
           <Typography.Paragraph>
-            按 DLC 包理解混搭内容。勾选后可选普通或保证，未勾选即为禁用。
+            按 DLC 包理解混搭内容。勾选后可选可能或确保，未勾选即为禁用。
           </Typography.Paragraph>
         </header>
 
