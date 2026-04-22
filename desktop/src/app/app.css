@@ -932,28 +932,36 @@ textarea {
 }
 
 .preview-legend-card {
-  margin-top: 8px;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 9;
+  width: 132px;
+  margin-top: 0;
   border: 1px solid rgba(97, 144, 181, 0.3);
   border-radius: 10px;
-  background: rgba(8, 18, 30, 0.75);
+  background: rgba(8, 18, 30, 0.88);
   box-shadow: none;
 }
 
 .preview-legend-card.ant-card .ant-card-body {
-  padding: 10px 12px;
+  padding: 10px;
 }
 
 .preview-legend {
-  margin-top: 0px;
+  margin-top: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  align-items: center;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: stretch;
 }
 
 .legend-item {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
+  width: 100%;
   color: var(--text-muted);
   font-size: 12px;
   white-space: nowrap;
@@ -1039,6 +1047,16 @@ textarea {
   color: var(--text-main);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.preview-detail-focus-value {
+  display: inline;
+  color: var(--text-main);
+  font-size: 12px;
+  line-height: 1.5;
+  background: transparent;
+  padding: 0;
+  border: 0;
 }
 
 .preview-details-empty .ant-empty {
