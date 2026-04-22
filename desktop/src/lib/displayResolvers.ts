@@ -2,6 +2,7 @@ import type { GeyserOption, GeyserSummary, MixingSlotMeta, WorldOption } from ".
 import {
   GEYSER_DISPLAY_NAMES,
   MIXING_SLOT_DISPLAY_NAMES,
+  PLAYER_ZONE_TYPE_DISPLAY_NAMES,
   WORLD_DISPLAY_NAMES,
   ZONE_TYPE_DISPLAY_NAMES,
   type DisplayName,
@@ -61,4 +62,9 @@ export function formatMixingSlotName(slot: MixingSlotMeta): string {
 export function formatZoneTypeName(zoneType: number): string {
   const displayName = ZONE_TYPE_DISPLAY_NAMES[zoneType];
   return displayName ? formatDisplayName(displayName) : `zone#${zoneType}`;
+}
+
+export function formatPlayerBiomeNameByZoneType(zoneType: number): string | null {
+  const displayName = PLAYER_ZONE_TYPE_DISPLAY_NAMES[zoneType];
+  return displayName ? formatDisplayName(displayName) : null;
 }

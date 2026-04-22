@@ -233,7 +233,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                               }}
                             >
                               <span className="mixing-child-name">
-                                [{child.slot}] {child.displayName}
+                                {child.displayName}
                               </span>
                             </Checkbox>
 
@@ -285,7 +285,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
             <ul className="mixing-ungrouped-list">
               {ungroupedSlots.map((slot) => (
                 <li key={`${slot.slot}-${slot.path}`}>
-                  [{slot.slot}] {slot.displayName}
+                  {slot.displayName}
                 </li>
               ))}
             </ul>
@@ -310,7 +310,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                         .filter((slot) => disabledMixingSlots.has(slot.slot))
                         .map((slot) => (
                           <li key={`disabled-${slot.slot}`}>
-                            [{slot.slot}] {slot.displayName}
+                            {slot.displayName}
                           </li>
                         ))}
                     </ul>

@@ -9,6 +9,10 @@ export interface GeyserDisplayName extends DisplayName {}
 
 export interface MixingSlotDisplayName extends DisplayName {}
 
+export interface PlayerBiomeDisplayName extends DisplayName {
+  key: string;
+}
+
 export const WORLD_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
   "SNDST-A-": { zh: "类地星体", en: "Terra" },
   "OCAN-A-": { zh: "海洋星体", en: "Oceania" },
@@ -101,6 +105,63 @@ export const MIXING_SLOT_DISPLAY_NAMES: Record<string, MixingSlotDisplayName> = 
 
 export const FALLBACK_MIXING_SLOT_PATHS = Object.keys(MIXING_SLOT_DISPLAY_NAMES);
 
+// 玩家可见生态目录，和内部 ZoneType 解耦，避免把内部类型直接暴露给用户。
+export const PLAYER_BIOME_DISPLAY_NAMES: PlayerBiomeDisplayName[] = [
+  { key: "FrozenWastes", zh: "苔原生态", en: "Tundra Biome" },
+  { key: "BoggyMarsh", zh: "湿地生态", en: "Marsh Biome" },
+  { key: "Sandstone", zh: "砂岩生态", en: "Sandstone Biome" },
+  { key: "ToxicJungle", zh: "丛林生态", en: "Jungle Biome" },
+  { key: "MagmaCore", zh: "岩浆生态", en: "Magma Biome" },
+  { key: "OilField", zh: "油质生态", en: "Oily Biome" },
+  { key: "Space", zh: "太空生态", en: "Space Biome" },
+  { key: "Ocean", zh: "海洋生态", en: "Ocean Biome" },
+  { key: "Rust", zh: "铁锈生态", en: "Rust Biome" },
+  { key: "Forest", zh: "森林生态", en: "Forest Biome" },
+  { key: "Radioactive", zh: "辐射生态", en: "Radioactive Biome" },
+  { key: "Swamp", zh: "沼泽生态", en: "Swampy Biome" },
+  { key: "Wasteland", zh: "荒地生态", en: "Wasteland Biome" },
+  { key: "Metallic", zh: "金属生态", en: "Metallic Biome" },
+  { key: "Barren", zh: "浮土生态", en: "Barren Biome" },
+  { key: "Moo", zh: "海牛生态", en: "Moo Biome" },
+  { key: "IceCaves", zh: "冰窟生态", en: "Ice Cave Biome" },
+  { key: "CarrotQuarry", zh: "冷池生态", en: "Cool Pool Biome" },
+  { key: "SugarWoods", zh: "花蜜生态", en: "Nectar Biome" },
+  { key: "Aquatic", zh: "水域生态", en: "Aquatic Biome" },
+  { key: "Niobium", zh: "铌质生态", en: "Niobium Biome" },
+  { key: "Regolith", zh: "岩漠生态", en: "Regolith Biome" },
+  { key: "PrehistoricGarden", zh: "花园生态", en: "Garden Biome" },
+  { key: "PrehistoricRaptor", zh: "寒羽生态", en: "Feather Biome" },
+  { key: "PrehistoricWetlands", zh: "险沼生态", en: "Wetlands Biome" },
+];
+
+// 用户可见的 ZoneType 映射。内部类型保留在后端，但不直接展示给桌面端用户。
+export const PLAYER_ZONE_TYPE_DISPLAY_NAMES: Array<DisplayName | null> = [
+  { zh: "苔原生态", en: "Tundra Biome" },
+  null,
+  { zh: "湿地生态", en: "Marsh Biome" },
+  { zh: "砂岩生态", en: "Sandstone Biome" },
+  { zh: "丛林生态", en: "Jungle Biome" },
+  { zh: "岩浆生态", en: "Magma Biome" },
+  { zh: "油质生态", en: "Oily Biome" },
+  { zh: "太空生态", en: "Space Biome" },
+  { zh: "海洋生态", en: "Ocean Biome" },
+  { zh: "铁锈生态", en: "Rust Biome" },
+  { zh: "森林生态", en: "Forest Biome" },
+  { zh: "辐射生态", en: "Radioactive Biome" },
+  { zh: "沼泽生态", en: "Swampy Biome" },
+  { zh: "荒地生态", en: "Wasteland Biome" },
+  null,
+  { zh: "金属生态", en: "Metallic Biome" },
+  { zh: "浮土生态", en: "Barren Biome" },
+  { zh: "海牛生态", en: "Moo Biome" },
+  { zh: "冰窟生态", en: "Ice Cave Biome" },
+  { zh: "冷池生态", en: "Cool Pool Biome" },
+  { zh: "花蜜生态", en: "Nectar Biome" },
+  { zh: "花园生态", en: "Garden Biome" },
+  { zh: "寒羽生态", en: "Feather Biome" },
+  { zh: "险沼生态", en: "Wetlands Biome" },
+];
+
 // 区域类型名称，索引对应 C++ ZoneType 枚举值
 export const ZONE_TYPE_DISPLAY_NAMES: DisplayName[] = [
   { zh: "苔原生态", en: "Tundra Biome" },
@@ -119,7 +180,7 @@ export const ZONE_TYPE_DISPLAY_NAMES: DisplayName[] = [
   { zh: "荒地生态", en: "Wasteland Biome" },
   { zh: "火箭内部", en: "Rocket Interior" },
   { zh: "金属生态", en: "Metallic Biome" },
-  { zh: "岩漠生态", en: "Barren Biome" },
+  { zh: "浮土生态", en: "Barren Biome" },
   { zh: "海牛生态", en: "Moo Biome" },
   { zh: "冰窟生态", en: "Ice Cave Biome" },
   { zh: "冷池生态", en: "Cool Pool Biome" },
