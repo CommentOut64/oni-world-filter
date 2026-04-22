@@ -1,7 +1,7 @@
 import React from "react";
-import { Card, Descriptions, Empty, Tag, Typography } from "antd";
+import { Card, Descriptions, Empty, Tag } from "antd";
 
-import { formatGeyserNameFromSummary, formatZoneTypeName } from "../../lib/displayResolvers";
+import { formatGeyserNameFromSummary, formatPlayerBiomeNameByZoneType } from "../../lib/displayResolvers";
 import type { PreviewPayload } from "../../lib/contracts";
 import { useSearchStore } from "../../state/searchStore";
 
@@ -38,6 +38,8 @@ export default function PreviewDetails({
 
   const focusIndex = selectedGeyserIndex ?? hoverGeyserIndex;
   const focusRegion = hoveredRegion ?? selectedRegion;
+  const focusRegionName =
+    focusRegion === null ? null : formatPlayerBiomeNameByZoneType(focusRegion.zoneType);
   const focusGeyser =
     focusIndex === null ? null : preview.summary.geysers[focusIndex] ?? null;
   const focusDistance =
@@ -88,8 +90,10 @@ export default function PreviewDetails({
           {
             key: "region",
             label: "板块",
-            children: focusRegion ? (
-              <Tag>{formatZoneTypeName(focusRegion.zoneType)}</Tag>
+            children: focusRegionName ? (
+              <span className="preview-detail-focus-value">
+                {focusRegionName}
+              </span>
             ) : (
               "-"
             ),
@@ -98,9 +102,9 @@ export default function PreviewDetails({
             key: "geyser",
             label: "喷口",
             children: focusGeyser ? (
-              <Typography.Text>
+              <span className="preview-detail-focus-value">
                 {formatGeyserNameFromSummary(focusGeyser, geysers)} ({focusGeyser.x}, {focusGeyser.y})
-              </Typography.Text>
+              </span>
             ) : (
               "-"
             ),

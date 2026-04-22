@@ -1,4 +1,4 @@
-import { formatGeyserNameFromSummary, formatZoneTypeName } from "../../lib/displayResolvers";
+import { formatGeyserNameFromSummary, formatPlayerBiomeNameByZoneType } from "../../lib/displayResolvers";
 import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
 
 export interface PreviewRegion {
@@ -131,13 +131,16 @@ export function toPreviewViewModel(
       centroid: center,
     });
     bounds.push(regionBounds(id, points));
-    labels.push({
-      id: `${id}-label`,
-      x: center.x,
-      y: center.y,
-      text: formatZoneTypeName(polygon.zoneType),
-      kind: "region",
-    });
+    const regionText = formatPlayerBiomeNameByZoneType(polygon.zoneType);
+    if (regionText) {
+      labels.push({
+        id: `${id}-label`,
+        x: center.x,
+        y: center.y,
+        text: regionText,
+        kind: "region",
+      });
+    }
   });
 
   const start = preview.summary.start;

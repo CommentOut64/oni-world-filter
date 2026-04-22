@@ -94,6 +94,7 @@ export default function PreviewPane() {
           onHoverGeyserChange={setHoverGeyserIndex}
           onSelectedGeyserChange={setSelectedGeyserIndex}
         />
+        <PreviewLegend />
         {showGeyserList && preview ? (
           <GeyserListOverlay
             geysersData={preview.summary.geysers}
@@ -101,7 +102,6 @@ export default function PreviewPane() {
           />
         ) : null}
       </div>
-      <PreviewLegend />
       <PreviewDetails
         preview={preview}
         hoveredRegion={hoveredRegion}
