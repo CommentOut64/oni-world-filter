@@ -36,7 +36,6 @@ NormalizedSearchRequest NormalizeSearchRequest(const SearchAnalysisRequest &requ
     normalized.seedStart = request.seedStart;
     normalized.seedEnd = request.seedEnd;
     normalized.mixing = request.mixing;
-    normalized.threads = request.threads;
     normalized.cpu = request.cpu;
 
     std::unordered_map<std::string, size_t> indexById;

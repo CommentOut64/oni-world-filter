@@ -11,7 +11,6 @@ function buildValidFormValues() {
     mixing: 625,
     seedStart: 100000,
     seedEnd: 120000,
-    threads: 0,
     cpuMode: "balanced" as const,
     cpuAllowSmt: true,
     cpuAllowLowPerf: false,
@@ -73,8 +72,12 @@ test("search schema rejects distance rule on forbidden geyser", () => {
 test("toSearchDraft disables warmup for desktop balanced mode", () => {
   const draft = toSearchDraft(buildValidFormValues());
 
-  assert.equal(draft.cpu.mode, "balanced");
-  assert.equal(draft.cpu.enableWarmup, false);
+  assert.deepEqual(draft.cpu, {
+    mode: "balanced",
+    allowSmt: true,
+    allowLowPerf: false,
+    placement: "strict",
+  });
 });
 
 test("toSearchDraft disables warmup for desktop turbo mode", () => {
@@ -83,17 +86,33 @@ test("toSearchDraft disables warmup for desktop turbo mode", () => {
     cpuMode: "turbo",
   });
 
-  assert.equal(draft.cpu.mode, "turbo");
-  assert.equal(draft.cpu.enableWarmup, false);
+  assert.deepEqual(draft.cpu, {
+    mode: "turbo",
+    allowSmt: true,
+    allowLowPerf: false,
+    placement: "strict",
+  });
 });
 
-test("toSearchDraft disables warmup for desktop custom mode", () => {
-  const draft = toSearchDraft({
+test("search schema rejects legacy custom cpu mode", () => {
+  const result = schema.safeParse({
     ...buildValidFormValues(),
     cpuMode: "custom",
-    threads: 6,
   });
 
-  assert.equal(draft.cpu.mode, "custom");
-  assert.equal(draft.cpu.enableWarmup, false);
+  assert.equal(result.success, false);
+  if (result.success) {
+    return;
+  }
+
+  assert.equal(result.error.issues[0]?.path.join("."), "cpuMode");
+});
+
+test("toSearchDraft keeps unified cpu surface for turbo mode", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    cpuMode: "turbo",
+  });
+
+  assert.equal(Object.keys(draft.cpu).sort().join(","), "allowLowPerf,allowSmt,mode,placement");
 });

@@ -2,9 +2,9 @@
 
 namespace Batch {
 
-CpuTopology DetectCpuTopology()
+CpuTopologyFacts DetectCpuTopologyFacts()
 {
-    return BatchCpu::CpuTopologyDetector::Detect();
+    return BatchCpu::CpuTopologyDetector::DetectFacts();
 }
 
 } // namespace Batch

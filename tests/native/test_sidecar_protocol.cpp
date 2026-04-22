@@ -74,14 +74,14 @@ int RunAllTests()
         Expect(result.request.search.seedStart == 100000, "search request seedStart mismatch", failures);
         Expect(result.request.search.seedEnd == 101000, "search request seedEnd mismatch", failures);
         Expect(result.request.search.mixing == 625, "search request mixing mismatch", failures);
-        Expect(result.request.search.threads == 8, "search request threads mismatch", failures);
         Expect(result.request.search.cpu.hasValue, "search request cpu should exist", failures);
-        Expect(result.request.search.cpu.mode == "custom", "search request cpu mode mismatch", failures);
-        Expect(result.request.search.cpu.workers == 8, "search request cpu workers mismatch", failures);
+        Expect(result.request.search.cpu.mode == "turbo", "search request cpu mode mismatch", failures);
         Expect(!result.request.search.cpu.allowSmt, "search request cpu allowSmt mismatch", failures);
-        Expect(result.request.search.cpu.chunkSize == 32, "search request cpu chunkSize mismatch", failures);
-        Expect(result.request.search.cpu.progressInterval == 400,
-               "search request cpu progressInterval mismatch",
+        Expect(!result.request.search.cpu.allowLowPerf,
+               "search request cpu allowLowPerf mismatch",
+               failures);
+        Expect(result.request.search.cpu.placement == "preferred",
+               "search request cpu placement mismatch",
                failures);
         Expect(result.request.search.constraints.required.size() == 2,
                "search request required size mismatch",
@@ -116,6 +116,30 @@ int RunAllTests()
         Expect(result.request.preview.worldType == 13, "preview request worldType mismatch", failures);
         Expect(result.request.preview.seed == 100123, "preview request seed mismatch", failures);
         Expect(result.request.preview.mixing == 625, "preview request mixing mismatch", failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"search","jobId":"job-binding-001","worldType":13,"seedStart":1,"seedEnd":1,"cpu":{"mode":"balanced","allowSmt":true,"allowLowPerf":true,"binding":"strict"}})");
+        Expect(result.Ok(), "search request with binding alias should parse", failures);
+        Expect(result.request.search.cpu.hasValue,
+               "search request with binding alias should set cpu",
+               failures);
+        Expect(result.request.search.cpu.placement == "strict",
+               "search request binding alias should map to placement",
+               failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"search","jobId":"job-placement-default-001","worldType":13,"seedStart":1,"seedEnd":1,"cpu":{"mode":"balanced"}})");
+        Expect(result.Ok(), "search request with default placement should parse", failures);
+        Expect(result.request.search.cpu.hasValue,
+               "search request with default placement should set cpu",
+               failures);
+        Expect(result.request.search.cpu.placement == "strict",
+               "search request should default placement to strict when omitted",
+               failures);
     }
 
     {
@@ -157,6 +181,9 @@ int RunAllTests()
                failures);
         Expect(result.request.analyze.constraints.count[0].maxCount == 2,
                "analyze_search_request maxCount mismatch",
+               failures);
+        Expect(!result.request.analyze.cpu.hasValue,
+               "analyze_search_request should not require cpu section",
                failures);
     }
 
@@ -444,6 +471,9 @@ int RunAllTests()
                failures);
         Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["groups"].size() == 1,
                "search analysis normalized groups size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["threads"].isNull(),
+               "search analysis normalized request should not serialize legacy threads",
                failures);
         Expect(searchAnalysisJson["analysis"]["worldProfile"]["valid"].asBool(),
                "search analysis worldProfile valid mismatch",

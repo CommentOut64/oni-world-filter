@@ -44,19 +44,9 @@ const DEFAULT_CONSTRAINTS: SearchConstraints = {
 
 const DEFAULT_CPU_CONFIG: SearchCpuConfig = {
   mode: "balanced",
-  workers: 0,
   allowSmt: true,
   allowLowPerf: false,
-  placement: "preferred",
-  enableWarmup: false,
-  enableAdaptiveDown: true,
-  chunkSize: 64,
-  progressInterval: 1000,
-  sampleWindowMs: 2000,
-  adaptiveMinWorkers: 1,
-  adaptiveDropThreshold: 0.12,
-  adaptiveDropWindows: 3,
-  adaptiveCooldownMs: 8000,
+  placement: "strict",
 };
 
 export interface SearchDraft {
@@ -64,7 +54,6 @@ export interface SearchDraft {
   seedStart: number;
   seedEnd: number;
   mixing: number;
-  threads: number;
   cpu: SearchCpuConfig;
   constraints: SearchConstraints;
 }
@@ -74,7 +63,6 @@ export const DEFAULT_SEARCH_DRAFT: SearchDraft = {
   seedStart: 100000,
   seedEnd: 120000,
   mixing: 625,
-  threads: 0,
   cpu: DEFAULT_CPU_CONFIG,
   constraints: DEFAULT_CONSTRAINTS,
 };
@@ -354,7 +342,6 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       seedStart: draft.seedStart,
       seedEnd: draft.seedEnd,
       mixing: draft.mixing,
-      threads: draft.threads,
       constraints: {
         required: [...draft.constraints.required],
         forbidden: [...draft.constraints.forbidden],
@@ -435,7 +422,6 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         seedStart: draft.seedStart,
         seedEnd: draft.seedEnd,
         mixing: draft.mixing,
-        threads: draft.threads,
         cpu: draft.cpu,
         required: draft.constraints.required,
         forbidden: draft.constraints.forbidden,

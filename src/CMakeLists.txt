@@ -53,12 +53,6 @@ set(ONI_BASE_SOURCES
     "Batch/CpuTopology.cpp"
     "Batch/ThreadPolicy.hpp"
     "Batch/ThreadPolicy.cpp"
-    "Batch/DesktopSearchPolicy.hpp"
-    "Batch/DesktopSearchPolicy.cpp"
-    "Batch/ThroughputCalibration.hpp"
-    "Batch/ThroughputCalibration.cpp"
-    "Batch/SessionWarmupPlanner.hpp"
-    "Batch/SessionWarmupPlanner.cpp"
     "Batch/BatchMatcher.hpp"
     "Batch/BatchMatcher.cpp"
     "Batch/SearchRequest.hpp"
@@ -114,6 +108,10 @@ set(ONI_BASE_SOURCES
     "WorldGen.hpp"
     "WorldGen.cpp"
     "TemplateSpawning.cpp"
+    "BatchCpu/SearchCpuPlan.hpp"
+    "BatchCpu/SearchCpuPlan.cpp"
+    "BatchCpu/SearchCpuGovernor.hpp"
+    "BatchCpu/SearchCpuGovernor.cpp"
     "BatchCpu/CpuOptimization.hpp"
     "BatchCpu/CpuOptimization.cpp"
 )
@@ -217,6 +215,8 @@ add_executable(test_batch_search_smoke
     "../tests/native/test_main.cpp"
     "../tests/native/test_batch_search_smoke.cpp"
     "Batch/BatchSearchService.cpp"
+    "BatchCpu/SearchCpuPlan.cpp"
+    "BatchCpu/SearchCpuGovernor.cpp"
     "BatchCpu/CpuOptimization.cpp"
 )
 target_include_directories(test_batch_search_smoke
@@ -231,7 +231,6 @@ add_executable(test_cpu_topology
     "../tests/native/test_main.cpp"
     "../tests/native/test_cpu_topology.cpp"
     "Batch/CpuTopology.cpp"
-    "Batch/ThreadPolicy.cpp"
     "BatchCpu/CpuOptimization.cpp"
 )
 target_include_directories(test_cpu_topology
@@ -242,52 +241,55 @@ target_link_libraries(test_cpu_topology PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_cpu_topology COMMAND test_cpu_topology)
 
-add_executable(test_throughput_calibration
+add_executable(test_search_cpu_plan
     "../tests/native/test_main.cpp"
-    "../tests/native/test_throughput_calibration.cpp"
-    "Batch/ThroughputCalibration.cpp"
+    "../tests/native/test_search_cpu_plan.cpp"
+    "BatchCpu/SearchCpuPlan.cpp"
     "BatchCpu/CpuOptimization.cpp"
 )
-target_include_directories(test_throughput_calibration
+target_include_directories(test_search_cpu_plan
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 if(TARGET Threads::Threads)
-target_link_libraries(test_throughput_calibration PRIVATE Threads::Threads)
+target_link_libraries(test_search_cpu_plan PRIVATE Threads::Threads)
 endif()
-add_test(NAME test_throughput_calibration COMMAND test_throughput_calibration)
+add_test(NAME test_search_cpu_plan COMMAND test_search_cpu_plan)
 
-add_executable(test_session_warmup_planner
+add_executable(test_search_cpu_governor
     "../tests/native/test_main.cpp"
-    "../tests/native/test_session_warmup_planner.cpp"
-    "Batch/SessionWarmupPlanner.cpp"
-    "Batch/ThroughputCalibration.cpp"
+    "../tests/native/test_search_cpu_governor.cpp"
+    "BatchCpu/SearchCpuPlan.cpp"
+    "BatchCpu/SearchCpuGovernor.cpp"
+)
+target_include_directories(test_search_cpu_governor
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+if(TARGET Threads::Threads)
+target_link_libraries(test_search_cpu_governor PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_search_cpu_governor COMMAND test_search_cpu_governor)
+
+add_executable(test_search_cpu_runtime
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_search_cpu_runtime.cpp"
+    "Batch/ThreadPolicy.cpp"
+    "BatchCpu/SearchCpuPlan.cpp"
     "BatchCpu/CpuOptimization.cpp"
 )
-target_include_directories(test_session_warmup_planner
+target_include_directories(test_search_cpu_runtime
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 if(TARGET Threads::Threads)
-target_link_libraries(test_session_warmup_planner PRIVATE Threads::Threads)
+target_link_libraries(test_search_cpu_runtime PRIVATE Threads::Threads)
 endif()
-add_test(NAME test_session_warmup_planner COMMAND test_session_warmup_planner)
-
-add_executable(test_desktop_search_policy
-    "../tests/native/test_main.cpp"
-    "../tests/native/test_desktop_search_policy.cpp"
-    "Batch/DesktopSearchPolicy.cpp"
-)
-target_include_directories(test_desktop_search_policy
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
-)
-if(TARGET Threads::Threads)
-target_link_libraries(test_desktop_search_policy PRIVATE Threads::Threads)
-endif()
-add_test(NAME test_desktop_search_policy COMMAND test_desktop_search_policy)
+add_test(NAME test_search_cpu_runtime COMMAND test_search_cpu_runtime)
 
 add_executable(test_adaptive_concurrency
     "../tests/native/test_main.cpp"
     "../tests/native/test_adaptive_concurrency.cpp"
     "Batch/BatchSearchService.cpp"
+    "BatchCpu/SearchCpuPlan.cpp"
+    "BatchCpu/SearchCpuGovernor.cpp"
     "BatchCpu/CpuOptimization.cpp"
 )
 target_include_directories(test_adaptive_concurrency

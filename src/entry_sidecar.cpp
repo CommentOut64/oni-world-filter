@@ -18,10 +18,8 @@
 #include "Batch/BatchMatcher.hpp"
 #include "Batch/BatchSearchService.hpp"
 #include "Batch/CpuTopology.hpp"
-#include "Batch/DesktopSearchPolicy.hpp"
 #include "Batch/DesktopSearchRuntimeMode.hpp"
 #include "Batch/FilterConfig.hpp"
-#include "Batch/SessionWarmupPlanner.hpp"
 #include "Batch/SidecarProtocol.hpp"
 #include "Batch/ThreadPolicy.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
@@ -42,6 +40,7 @@ struct ActiveSearchState {
     std::string jobId;
     std::shared_ptr<std::atomic<bool>> cancelToken;
     std::shared_ptr<std::atomic<int>> activeWorkerCap;
+    BatchCpu::CompiledSearchCpuPlan cpuPlan{};
     std::thread worker;
 };
 
@@ -73,6 +72,7 @@ void JoinInactiveSearchWorker()
             g_activeSearch.jobId.clear();
             g_activeSearch.cancelToken.reset();
             g_activeSearch.activeWorkerCap.reset();
+            g_activeSearch.cpuPlan = {};
         }
     }
     if (worker.joinable()) {
@@ -91,6 +91,7 @@ void MarkSearchFinished(const std::string &jobId)
 bool StartSearchWorker(const std::string &jobId,
                        const std::shared_ptr<std::atomic<bool>> &cancelToken,
                        const std::shared_ptr<std::atomic<int>> &activeWorkerCap,
+                       const BatchCpu::CompiledSearchCpuPlan &cpuPlan,
                        std::thread &&worker,
                        std::string *errorMessage)
 {
@@ -106,6 +107,7 @@ bool StartSearchWorker(const std::string &jobId,
     g_activeSearch.jobId = jobId;
     g_activeSearch.cancelToken = cancelToken;
     g_activeSearch.activeWorkerCap = activeWorkerCap;
+    g_activeSearch.cpuPlan = cpuPlan;
     g_activeSearch.worker = std::move(worker);
     return true;
 }
@@ -132,7 +134,10 @@ bool RequestSearchActiveWorkers(const std::string &jobId, int activeWorkers)
     if (!jobId.empty() && g_activeSearch.jobId != jobId) {
         return false;
     }
-    g_activeSearch.activeWorkerCap->store(activeWorkers, std::memory_order_relaxed);
+    const int activePhysicalCoreCap = Batch::ResolveActivePhysicalCoreCapFromWorkerLimit(
+        g_activeSearch.cpuPlan,
+        activeWorkers);
+    g_activeSearch.activeWorkerCap->store(activePhysicalCoreCap, std::memory_order_relaxed);
     return true;
 }
 
@@ -148,6 +153,7 @@ void ShutdownSearchWorker()
         g_activeSearch.jobId.clear();
         g_activeSearch.cancelToken.reset();
         g_activeSearch.activeWorkerCap.reset();
+        g_activeSearch.cpuPlan = {};
     }
     if (worker.joinable()) {
         worker.join();
@@ -317,7 +323,7 @@ private:
 };
 
 Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
-                                        const BatchCpu::ThreadPolicy &policy,
+                                        const Batch::CompiledSearchCpuRuntime &runtime,
                                         std::atomic<bool> *cancelRequested,
                                         std::atomic<int> *activeWorkerCap)
 {
@@ -325,32 +331,17 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
     Batch::SearchRequest request;
     request.seedStart = cfg.seedStart;
     request.seedEnd = cfg.seedEnd;
-    request.workerCount = std::max<uint32_t>(1u, policy.workerCount);
-    request.chunkSize = cfg.hasCpuSection ? cfg.cpu.chunkSize : 64;
     const auto totalSeeds = std::max(1, cfg.seedEnd - cfg.seedStart + 1);
-    const auto configuredProgressInterval =
-        cfg.hasCpuSection ? cfg.cpu.progressInterval : 1000;
     const auto smallRangeProgressInterval = std::max(1, totalSeeds / 20);
-    request.progressInterval = std::max(
-        1, std::min(configuredProgressInterval, smallRangeProgressInterval));
-    request.sampleWindow = std::chrono::milliseconds(
-        cfg.hasCpuSection ? cfg.cpu.sampleWindowMs : 2000);
-    request.maxRunDuration = std::chrono::milliseconds(0);
-    request.enableAdaptive = cfg.hasCpuSection && cfg.cpu.enableAdaptiveDown;
-    request.adaptiveConfig.enabled = cfg.hasCpuSection && cfg.cpu.enableAdaptiveDown;
-    request.adaptiveConfig.minWorkers = static_cast<uint32_t>(std::max(1, cfg.cpu.adaptiveMinWorkers));
-    request.adaptiveConfig.dropThreshold = cfg.cpu.adaptiveDropThreshold;
-    request.adaptiveConfig.consecutiveDropWindows = cfg.cpu.adaptiveDropWindows;
-    request.adaptiveConfig.cooldown = std::chrono::milliseconds(cfg.cpu.adaptiveCooldownMs);
+    request.cpuPlan = runtime.cpuPlan;
+    request.cpuGovernorConfig = runtime.cpuGovernorConfig;
+    request.progressInterval = std::max(1, std::min(request.progressInterval, smallRangeProgressInterval));
     request.cancelRequested = cancelRequested;
     request.activeWorkerCap = activeWorkerCap;
 
     request.initializeWorker = [cfg, runtimeMode]() {
         auto *runtime = AppRuntime::Instance();
         PrepareSearchRuntime(runtime, runtimeMode, cfg);
-    };
-    request.applyThreadPlacement = [policy](uint32_t workerIndex, std::string *errorMessage) {
-        return BatchCpu::ApplyThreadPlacement(policy, workerIndex, errorMessage);
     };
     request.evaluateSeed = [&cfg, runtimeMode](int seed) {
         return EvaluateSearchSeed(cfg, seed, runtimeMode);
@@ -359,81 +350,10 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
     return request;
 }
 
-Batch::DesktopSearchExecutionPlan BuildSinglePolicyExecutionPlan(
-    const BatchCpu::ThreadPolicy &policy)
+Batch::CompiledSearchCpuRuntime CompileSearchRuntime(const Batch::FilterConfig &cfg)
 {
-    Batch::DesktopSearchExecutionPlan plan;
-    plan.runtimePolicy = policy;
-    plan.initialActiveWorkers = std::max<uint32_t>(1u, policy.workerCount);
-    return plan;
-}
-
-Batch::DesktopSearchExecutionPlan SelectPolicy(const Batch::FilterConfig &cfg)
-{
-    const auto topology = Batch::DetectCpuTopology();
-    const auto policyRequest = Batch::BuildThreadPolicyRequestFromFilter(cfg);
-    const auto plannerInput = Batch::BuildPlannerInput(policyRequest, topology);
-    const auto candidates = Batch::BuildThreadPolicyCandidates(policyRequest, topology);
-    if (candidates.empty()) {
-        return BuildSinglePolicyExecutionPlan(BatchCpu::ThreadPolicy{});
-    }
-
-    const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
-    const bool shouldUseStaticDesktopPolicy =
-        cfg.hasCpuSection &&
-        !cfg.cpu.enableWarmup &&
-        !legacyThreadsOnly &&
-        plannerInput.mode != BatchCpu::CpuMode::Custom &&
-        plannerInput.mode != BatchCpu::CpuMode::Conservative &&
-        candidates.size() > 1;
-    if (shouldUseStaticDesktopPolicy) {
-        return Batch::BuildDesktopSearchExecutionPlan(policyRequest, topology, candidates);
-    }
-
-    bool enableWarmup = cfg.cpu.enableWarmup && !legacyThreadsOnly &&
-                        plannerInput.mode != BatchCpu::CpuMode::Custom &&
-                        plannerInput.mode != BatchCpu::CpuMode::Conservative &&
-                        candidates.size() > 1;
-    if (cfg.seedStart >= cfg.seedEnd) {
-        enableWarmup = false;
-    }
-    if (!enableWarmup) {
-        return BuildSinglePolicyExecutionPlan(candidates.front());
-    }
-
-    const int warmupEnd =
-        std::min(cfg.seedEnd, cfg.seedStart + std::max(1, cfg.cpu.warmupSeedCount) - 1);
-    const int warmupTotalSeeds = warmupEnd - cfg.seedStart + 1;
-
-    Batch::SessionWarmupPlannerOptions warmupConfig;
-    warmupConfig.enableWarmup = true;
-    warmupConfig.warmupSeedCount = cfg.cpu.warmupSeedCount;
-    warmupConfig.minProcessedSeeds = static_cast<uint64_t>(std::min(
-        warmupTotalSeeds,
-        std::max(1, cfg.cpu.warmupMinSampledSeeds)));
-    warmupConfig.totalBudget = std::chrono::milliseconds(cfg.cpu.warmupTotalMs);
-    warmupConfig.perCandidateBudget = std::chrono::milliseconds(cfg.cpu.warmupPerCandidateMs);
-    warmupConfig.tieToleranceRatio = cfg.cpu.warmupTieTolerance;
-
-    const auto calibration = Batch::SelectThreadPolicyWithSessionWarmup(
-        "sidecar-session",
-        cfg.seedStart,
-        warmupEnd,
-        candidates,
-        warmupConfig,
-        [&](const BatchCpu::ThreadPolicy &policy,
-            const Batch::WarmupSampleSegment &segment,
-            std::chrono::milliseconds budget) {
-            auto warmupRequest = BuildSearchRequest(cfg, policy, nullptr, nullptr);
-            warmupRequest.seedStart = segment.seedStart;
-            warmupRequest.seedEnd = segment.seedEnd;
-            warmupRequest.enableAdaptive = false;
-            warmupRequest.adaptiveConfig.enabled = false;
-            warmupRequest.maxRunDuration = budget;
-            const auto run = Batch::BatchSearchService::Run(warmupRequest);
-            return run.throughput;
-        });
-    return BuildSinglePolicyExecutionPlan(calibration.selectedPolicy);
+    const auto topology = Batch::DetectCpuTopologyFacts();
+    return Batch::CompileSearchCpuRuntime(cfg, topology);
 }
 
 void RunSearchCommand(const Batch::SidecarSearchRequest &request)
@@ -452,11 +372,11 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
         return;
     }
 
-    const auto selectedPlan = SelectPolicy(cfg);
+    const auto runtimePlan = CompileSearchRuntime(cfg);
     auto cancelRequested = std::make_shared<std::atomic<bool>>(false);
     auto activeWorkerCap = std::make_shared<std::atomic<int>>(0);
 
-    std::thread worker([cfg, request, selectedPlan, cancelRequested, activeWorkerCap]() {
+    std::thread worker([cfg, request, runtimePlan, cancelRequested, activeWorkerCap]() {
         try {
             Batch::SearchEventCallbacks callbacks;
             callbacks.onStarted = [&](const Batch::SearchStartedEvent &event) {
@@ -479,16 +399,9 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
             };
 
             auto searchRequest = BuildSearchRequest(cfg,
-                                                    selectedPlan.runtimePolicy,
+                                                    runtimePlan,
                                                     cancelRequested.get(),
                                                     activeWorkerCap.get());
-            searchRequest.initialActiveWorkers = selectedPlan.initialActiveWorkers;
-            searchRequest.enableRecovery = selectedPlan.enableRecovery;
-            searchRequest.recoveryConfig = selectedPlan.recoveryConfig;
-            if (selectedPlan.enableRecovery) {
-                searchRequest.sampleWindow =
-                    std::min(searchRequest.sampleWindow, std::chrono::milliseconds(500));
-            }
             (void)Batch::BatchSearchService::Run(searchRequest, callbacks);
         } catch (const std::exception &ex) {
             EmitLine(Batch::SerializeFailedEvent(request.jobId, ex.what()));
@@ -502,6 +415,7 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
     if (!StartSearchWorker(request.jobId,
                            cancelRequested,
                            activeWorkerCap,
+                           runtimePlan.cpuPlan,
                            std::move(worker),
                            &startError)) {
         if (worker.joinable()) {
@@ -560,22 +474,11 @@ SearchAnalysis::SearchAnalysisRequest BuildAnalysisRequest(
     analysisRequest.seedStart = request.seedStart;
     analysisRequest.seedEnd = request.seedEnd;
     analysisRequest.mixing = request.mixing;
-    analysisRequest.threads = request.threads;
     analysisRequest.cpu.hasValue = request.cpu.hasValue;
     analysisRequest.cpu.mode = request.cpu.mode;
-    analysisRequest.cpu.workers = request.cpu.workers;
     analysisRequest.cpu.allowSmt = request.cpu.allowSmt;
     analysisRequest.cpu.allowLowPerf = request.cpu.allowLowPerf;
     analysisRequest.cpu.placement = request.cpu.placement;
-    analysisRequest.cpu.enableWarmup = request.cpu.enableWarmup;
-    analysisRequest.cpu.enableAdaptiveDown = request.cpu.enableAdaptiveDown;
-    analysisRequest.cpu.chunkSize = request.cpu.chunkSize;
-    analysisRequest.cpu.progressInterval = request.cpu.progressInterval;
-    analysisRequest.cpu.sampleWindowMs = request.cpu.sampleWindowMs;
-    analysisRequest.cpu.adaptiveMinWorkers = request.cpu.adaptiveMinWorkers;
-    analysisRequest.cpu.adaptiveDropThreshold = request.cpu.adaptiveDropThreshold;
-    analysisRequest.cpu.adaptiveDropWindows = request.cpu.adaptiveDropWindows;
-    analysisRequest.cpu.adaptiveCooldownMs = request.cpu.adaptiveCooldownMs;
 
     analysisRequest.constraints.required = request.constraints.required;
     analysisRequest.constraints.forbidden = request.constraints.forbidden;

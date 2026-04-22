@@ -120,8 +120,6 @@ pub struct SearchRequestPayload {
     #[serde(default)]
     pub mixing: i32,
     #[serde(default)]
-    pub threads: i32,
-    #[serde(default)]
     pub constraints: SearchConstraints,
     #[serde(default)]
     pub cpu: Option<SearchCpuConfig>,
@@ -145,32 +143,12 @@ pub struct SearchConstraints {
 pub struct SearchCpuConfig {
     #[serde(default = "default_cpu_mode")]
     pub mode: String,
-    #[serde(default)]
-    pub workers: i32,
     #[serde(default = "default_true")]
     pub allow_smt: bool,
     #[serde(default)]
     pub allow_low_perf: bool,
     #[serde(default = "default_placement")]
     pub placement: String,
-    #[serde(default = "default_true")]
-    pub enable_warmup: bool,
-    #[serde(default = "default_true")]
-    pub enable_adaptive_down: bool,
-    #[serde(default = "default_chunk_size")]
-    pub chunk_size: i32,
-    #[serde(default = "default_progress_interval")]
-    pub progress_interval: i32,
-    #[serde(default = "default_sample_window")]
-    pub sample_window_ms: i32,
-    #[serde(default = "default_adaptive_min_workers")]
-    pub adaptive_min_workers: i32,
-    #[serde(default = "default_adaptive_drop_threshold")]
-    pub adaptive_drop_threshold: f64,
-    #[serde(default = "default_adaptive_drop_windows")]
-    pub adaptive_drop_windows: i32,
-    #[serde(default = "default_adaptive_cooldown")]
-    pub adaptive_cooldown_ms: i32,
 }
 
 fn default_true() -> bool {
@@ -182,35 +160,7 @@ fn default_cpu_mode() -> String {
 }
 
 fn default_placement() -> String {
-    "preferred".to_string()
-}
-
-fn default_chunk_size() -> i32 {
-    64
-}
-
-fn default_progress_interval() -> i32 {
-    1000
-}
-
-fn default_sample_window() -> i32 {
-    2000
-}
-
-fn default_adaptive_min_workers() -> i32 {
-    1
-}
-
-fn default_adaptive_drop_threshold() -> f64 {
-    0.12
-}
-
-fn default_adaptive_drop_windows() -> i32 {
-    3
-}
-
-fn default_adaptive_cooldown() -> i32 {
-    8000
+    "strict".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -328,7 +278,6 @@ pub struct NormalizedSearchRequestPayload {
     pub seed_start: i32,
     pub seed_end: i32,
     pub mixing: i32,
-    pub threads: i32,
     pub groups: Vec<NormalizedConstraintGroup>,
 }
 
@@ -966,19 +915,9 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
     let cpu = request.cpu.clone().map(|cpu| {
         json!({
             "mode": cpu.mode,
-            "workers": cpu.workers,
             "allowSmt": cpu.allow_smt,
             "allowLowPerf": cpu.allow_low_perf,
             "placement": cpu.placement,
-            "enableWarmup": cpu.enable_warmup,
-            "enableAdaptiveDown": cpu.enable_adaptive_down,
-            "chunkSize": cpu.chunk_size,
-            "progressInterval": cpu.progress_interval,
-            "sampleWindowMs": cpu.sample_window_ms,
-            "adaptiveMinWorkers": cpu.adaptive_min_workers,
-            "adaptiveDropThreshold": cpu.adaptive_drop_threshold,
-            "adaptiveDropWindows": cpu.adaptive_drop_windows,
-            "adaptiveCooldownMs": cpu.adaptive_cooldown_ms,
         })
     });
     json!({
@@ -988,7 +927,6 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
         "seedStart": request.seed_start,
         "seedEnd": request.seed_end,
         "mixing": request.mixing,
-        "threads": request.threads,
         "constraints": {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
@@ -1045,7 +983,6 @@ pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Va
         "seedStart": request.seed_start,
         "seedEnd": request.seed_end,
         "mixing": request.mixing,
-        "threads": request.threads,
         "constraints": {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
@@ -1778,7 +1715,6 @@ mod tests {
             "seedStart": 100000,
             "seedEnd": 100000,
             "mixing": 625,
-            "threads": 1,
             "constraints": {
                 "required": [],
                 "forbidden": [],
@@ -1819,7 +1755,6 @@ mod tests {
             "seedStart": 100030,
             "seedEnd": 100030,
             "mixing": 625,
-            "threads": 1,
             "constraints": {
                 "required": [],
                 "forbidden": [],

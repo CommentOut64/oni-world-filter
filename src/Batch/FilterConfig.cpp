@@ -95,7 +95,6 @@ FilterConfigLoadResult LoadFilterConfig(const std::string &path)
     cfg.seedStart = root.get("seedStart", cfg.seedStart).asInt();
     cfg.seedEnd = root.get("seedEnd", cfg.seedEnd).asInt();
     cfg.mixing = root.get("mixing", cfg.mixing).asInt();
-    cfg.threads = std::max(0, root.get("threads", cfg.threads).asInt());
     if (cfg.seedStart > cfg.seedEnd) {
         AddError(result,
                  FilterErrorCode::InvalidSeedRange,
@@ -107,44 +106,14 @@ FilterConfigLoadResult LoadFilterConfig(const std::string &path)
     if (cpu.isObject()) {
         cfg.hasCpuSection = true;
         cfg.cpu.mode = cpu.get("mode", cfg.cpu.mode).asString();
-        cfg.cpu.workers = std::max(0, cpu.get("workers", cfg.cpu.workers).asInt());
         cfg.cpu.allowSmt = cpu.get("allowSmt", cfg.cpu.allowSmt).asBool();
         cfg.cpu.allowLowPerf = cpu.get("allowLowPerf", cfg.cpu.allowLowPerf).asBool();
-        cfg.cpu.placement = cpu.get("placement", cfg.cpu.placement).asString();
-        cfg.cpu.enableWarmup = cpu.get("enableWarmup", cfg.cpu.enableWarmup).asBool();
-        cfg.cpu.warmupTotalMs = cpu.get("warmupTotalMs", cfg.cpu.warmupTotalMs).asInt();
-        cfg.cpu.warmupPerCandidateMs = cpu.get("warmupPerCandidateMs", cfg.cpu.warmupPerCandidateMs).asInt();
-        cfg.cpu.warmupSeedCount = cpu.get("warmupSeedCount", cfg.cpu.warmupSeedCount).asInt();
-        cfg.cpu.warmupTieTolerance = cpu.get("warmupTieTolerance", cfg.cpu.warmupTieTolerance).asDouble();
-        cfg.cpu.warmupMinSampledSeeds = cpu.get("warmupMinSampledSeeds", cfg.cpu.warmupMinSampledSeeds).asInt();
-        cfg.cpu.warmupMaxRetry = cpu.get("warmupMaxRetry", cfg.cpu.warmupMaxRetry).asInt();
-        cfg.cpu.enableAdaptiveDown = cpu.get("enableAdaptiveDown", cfg.cpu.enableAdaptiveDown).asBool();
-        cfg.cpu.adaptiveMinWorkers = cpu.get("adaptiveMinWorkers", cfg.cpu.adaptiveMinWorkers).asInt();
-        cfg.cpu.adaptiveDropThreshold = cpu.get("adaptiveDropThreshold", cfg.cpu.adaptiveDropThreshold).asDouble();
-        cfg.cpu.adaptiveDropWindows = cpu.get("adaptiveDropWindows", cfg.cpu.adaptiveDropWindows).asInt();
-        cfg.cpu.adaptiveCooldownMs = cpu.get("adaptiveCooldownMs", cfg.cpu.adaptiveCooldownMs).asInt();
-        cfg.cpu.sampleWindowMs = cpu.get("sampleWindowMs", cfg.cpu.sampleWindowMs).asInt();
-        cfg.cpu.chunkSize = cpu.get("chunkSize", cfg.cpu.chunkSize).asInt();
-        cfg.cpu.progressInterval = cpu.get("progressInterval", cfg.cpu.progressInterval).asInt();
+        cfg.cpu.placement = cpu.get("binding", cpu.get("placement", cfg.cpu.placement)).asString();
         cfg.cpu.printMatches = cpu.get("printMatches", cfg.cpu.printMatches).asBool();
         cfg.cpu.printProgress = cpu.get("printProgress", cfg.cpu.printProgress).asBool();
         cfg.cpu.benchmarkSilent = cpu.get("benchmarkSilent", cfg.cpu.benchmarkSilent).asBool();
         cfg.cpu.printDiagnostics = cpu.get("printDiagnostics", cfg.cpu.printDiagnostics).asBool();
     }
-
-    cfg.cpu.warmupTotalMs = ClampValue(cfg.cpu.warmupTotalMs, 1000, 30000);
-    cfg.cpu.warmupPerCandidateMs = ClampValue(cfg.cpu.warmupPerCandidateMs, 500, 8000);
-    cfg.cpu.warmupSeedCount = ClampValue(cfg.cpu.warmupSeedCount, 256, 200000);
-    cfg.cpu.warmupTieTolerance = ClampValue(cfg.cpu.warmupTieTolerance, 0.0, 0.2);
-    cfg.cpu.warmupMinSampledSeeds = ClampValue(cfg.cpu.warmupMinSampledSeeds, 32, 200000);
-    cfg.cpu.warmupMaxRetry = ClampValue(cfg.cpu.warmupMaxRetry, 0, 5);
-    cfg.cpu.adaptiveMinWorkers = ClampValue(cfg.cpu.adaptiveMinWorkers, 1, 1024);
-    cfg.cpu.adaptiveDropThreshold = ClampValue(cfg.cpu.adaptiveDropThreshold, 0.0, 0.5);
-    cfg.cpu.adaptiveDropWindows = ClampValue(cfg.cpu.adaptiveDropWindows, 1, 10);
-    cfg.cpu.adaptiveCooldownMs = ClampValue(cfg.cpu.adaptiveCooldownMs, 1000, 60000);
-    cfg.cpu.sampleWindowMs = ClampValue(cfg.cpu.sampleWindowMs, 200, 10000);
-    cfg.cpu.chunkSize = ClampValue(cfg.cpu.chunkSize, 1, 2048);
-    cfg.cpu.progressInterval = ClampValue(cfg.cpu.progressInterval, 1, 1000000);
 
     for (const auto &value : root["required"]) {
         const std::string geyserId = value.asString();

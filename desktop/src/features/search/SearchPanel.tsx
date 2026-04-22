@@ -61,7 +61,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
   } | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
-  const watchCpuMode = methods.watch("cpuMode");
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +72,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
           seedStart: 0,
           seedEnd: 0,
           mixing: Number.isFinite(watchMixing) ? watchMixing : draft.mixing,
-          threads: 0,
           constraints: {
             required: [],
             forbidden: [],
@@ -118,7 +116,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
         seedStart: nextDraft.seedStart,
         seedEnd: nextDraft.seedEnd,
         mixing: nextDraft.mixing,
-        threads: nextDraft.threads,
         cpu: nextDraft.cpu,
         constraints: nextDraft.constraints,
       });
@@ -168,7 +165,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
         mixing: nextDraft.mixing,
         seedStart: nextDraft.seedStart,
         seedEnd: nextDraft.seedEnd,
-        threads: nextDraft.threads,
         cpu: nextDraft.cpu,
         constraints: nextDraft.constraints,
       },
@@ -218,7 +214,7 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
             <section className="search-section">
               <header className="search-section-header">
                 <h4>性能参数</h4>
-                <p>CPU 模式、线程数与调度策略。</p>
+                <p>CPU 模式与调度策略。</p>
               </header>
               <div className="field-grid">
                 <label className="field">
@@ -226,25 +222,9 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
                   <select {...methods.register("cpuMode")}>
                     <option value="balanced">平衡</option>
                     <option value="turbo">极速</option>
-                    <option value="custom">自定义</option>
                   </select>
                   {methods.formState.errors.cpuMode ? (
                     <small className="error">{methods.formState.errors.cpuMode.message}</small>
-                  ) : null}
-                </label>
-                <label className="field">
-                  <span>线程数</span>
-                  <input
-                    type="number"
-                    placeholder={
-                      watchCpuMode === "custom"
-                        ? "自定义模式下必填"
-                        : "非自定义模式忽略该值"
-                    }
-                    {...methods.register("threads", { valueAsNumber: true })}
-                  />
-                  {methods.formState.errors.threads ? (
-                    <small className="error">{methods.formState.errors.threads.message}</small>
                   ) : null}
                 </label>
               </div>

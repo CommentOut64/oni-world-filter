@@ -1,6 +1,6 @@
 #include "Batch/ThreadPolicy.hpp"
 
-#include <algorithm>
+#include <sstream>
 
 #include "Batch/FilterConfig.hpp"
 
@@ -8,88 +8,100 @@ namespace Batch {
 
 namespace {
 
-BatchCpu::CpuMode ToCpuMode(ThreadPolicyMode mode)
-{
-    switch (mode) {
-    case ThreadPolicyMode::Throughput:
-        return BatchCpu::CpuMode::Turbo;
-    case ThreadPolicyMode::Custom:
-        return BatchCpu::CpuMode::Custom;
-    case ThreadPolicyMode::Conservative:
-        return BatchCpu::CpuMode::Conservative;
-    case ThreadPolicyMode::Balanced:
-    default:
-        return BatchCpu::CpuMode::Balanced;
-    }
-}
-
-ThreadPolicyMode ParseThreadPolicyMode(const FilterConfig &cfg)
+BatchCpu::CpuMode NormalizeSearchCpuMode(const FilterConfig &cfg)
 {
     if (!cfg.hasCpuSection) {
-        return ThreadPolicyMode::Balanced;
+        return BatchCpu::CpuMode::Balanced;
     }
-    const auto mode = BatchCpu::ParseCpuMode(cfg.cpu.mode);
-    switch (mode) {
-    case BatchCpu::CpuMode::Turbo:
-        return ThreadPolicyMode::Throughput;
-    case BatchCpu::CpuMode::Custom:
-        return ThreadPolicyMode::Custom;
-    case BatchCpu::CpuMode::Conservative:
-        return ThreadPolicyMode::Conservative;
-    case BatchCpu::CpuMode::Balanced:
-    default:
-        return ThreadPolicyMode::Balanced;
+
+    return BatchCpu::ParseCpuMode(cfg.cpu.mode);
+}
+
+std::vector<uint32_t> BuildCumulativeWorkersByPhysicalCoreCount(
+    const BatchCpu::CompiledSearchCpuPlan &plan)
+{
+    std::vector<uint32_t> cumulative;
+    cumulative.reserve(plan.placement.plannedCoresByPriority.size() + 1);
+    cumulative.push_back(0);
+
+    uint32_t runningTotal = 0;
+    for (const auto &core : plan.placement.plannedCoresByPriority) {
+        runningTotal += static_cast<uint32_t>(core.allowedLogicalThreads.size());
+        cumulative.push_back(runningTotal);
     }
+    return cumulative;
 }
 
 } // namespace
 
-BatchCpu::PlannerInput BuildPlannerInput(const ThreadPolicyRequest &request,
-                                         const CpuTopology &topology)
+CompiledSearchCpuRuntime CompileSearchCpuRuntime(const FilterConfig &cfg,
+                                                 const CpuTopologyFacts &topology)
 {
-    BatchCpu::PlannerInput input;
-    input.topology = &topology;
-    input.mode = ToCpuMode(request.mode);
-    input.legacyThreadOverride = request.legacyThreads;
-    input.customWorkers = request.customWorkers;
-    input.customAllowSmt = request.customAllowSmt;
-    input.customAllowLowPerf = request.customAllowLowPerf;
-    input.customPlacement = request.customPlacement;
-    return input;
+    BatchCpu::CpuPolicySpec spec;
+    spec.mode = NormalizeSearchCpuMode(cfg);
+    spec.allowSmt = cfg.hasCpuSection ? cfg.cpu.allowSmt : true;
+    spec.allowLowPerf = cfg.hasCpuSection ? cfg.cpu.allowLowPerf : false;
+    spec.binding = cfg.hasCpuSection
+        ? BatchCpu::ParsePlacementMode(cfg.cpu.placement)
+        : BatchCpu::PlacementMode::Strict;
+
+    CompiledSearchCpuRuntime runtime;
+    runtime.cpuPlan = BatchCpu::CompileSearchCpuPlan(topology, spec);
+    return runtime;
 }
 
-std::vector<BatchCpu::ThreadPolicy> BuildThreadPolicyCandidates(
-    const ThreadPolicyRequest &request,
-    const CpuTopology &topology)
+int ResolveActivePhysicalCoreCapFromWorkerLimit(const BatchCpu::CompiledSearchCpuPlan &plan,
+                                                int requestedActiveWorkers)
 {
-    const auto plannerInput = BuildPlannerInput(request, topology);
-    auto candidates = BatchCpu::ThreadPolicyPlanner::BuildCandidates(plannerInput);
-    if (candidates.empty()) {
-        candidates.push_back(BatchCpu::ThreadPolicyPlanner::BuildConservativePolicy(topology));
+    if (requestedActiveWorkers <= 0) {
+        return 0;
     }
-    return candidates;
+
+    const auto cumulativeWorkers = BuildCumulativeWorkersByPhysicalCoreCount(plan);
+    if (cumulativeWorkers.size() <= 1) {
+        return 1;
+    }
+
+    int bestPhysicalCoreCap = 0;
+    for (size_t coreCount = 1; coreCount < cumulativeWorkers.size(); ++coreCount) {
+        if (static_cast<int>(cumulativeWorkers[coreCount]) <= requestedActiveWorkers) {
+            bestPhysicalCoreCap = static_cast<int>(coreCount);
+        }
+    }
+
+    return bestPhysicalCoreCap > 0 ? bestPhysicalCoreCap : 1;
 }
 
-ThreadPolicyRequest BuildThreadPolicyRequestFromFilter(const FilterConfig &cfg)
+std::string DescribeCompiledSearchCpuPlan(const BatchCpu::CompiledSearchCpuPlan &plan)
 {
-    ThreadPolicyRequest request;
+    std::ostringstream stream;
+    stream << "mode=" << BatchCpu::ToString(plan.policy.mode)
+           << " binding=" << BatchCpu::ToString(plan.policy.binding)
+           << " eligible_phys=" << plan.envelope.eligiblePhysicalCoreCount
+           << " reserved_phys=" << plan.envelope.reservedPhysicalCoreCount
+           << " phys_cap=" << plan.envelope.absolutePhysicalCoreCap
+           << " startup_phys=" << plan.envelope.startupPhysicalCoreCount
+           << " workers=" << plan.envelope.absoluteWorkerCap;
 
-    const bool legacyThreadsOnly = !cfg.hasCpuSection && cfg.threads > 0;
-    if (legacyThreadsOnly) {
-        request.mode = ThreadPolicyMode::Custom;
-        request.customWorkers = static_cast<uint32_t>(cfg.threads);
-        request.customAllowSmt = true;
-        request.customAllowLowPerf = true;
-        request.customPlacement = BatchCpu::PlacementMode::Preferred;
-        return request;
+    stream << " cores=[";
+    bool firstCore = true;
+    for (const auto &core : plan.placement.plannedCoresByPriority) {
+        if (!firstCore) {
+            stream << ", ";
+        }
+        firstCore = false;
+        stream << "g" << core.group << ":c" << core.coreIndex << "->";
+        bool firstThread = true;
+        for (const auto &thread : core.allowedLogicalThreads) {
+            if (!firstThread) {
+                stream << '+';
+            }
+            firstThread = false;
+            stream << thread.logicalIndex;
+        }
     }
-
-    request.mode = ParseThreadPolicyMode(cfg);
-    request.customWorkers = static_cast<uint32_t>(std::max(0, cfg.cpu.workers));
-    request.customAllowSmt = cfg.cpu.allowSmt;
-    request.customAllowLowPerf = cfg.cpu.allowLowPerf;
-    request.customPlacement = BatchCpu::ParsePlacementMode(cfg.cpu.placement);
-    return request;
+    stream << "]";
+    return stream.str();
 }
 
 } // namespace Batch

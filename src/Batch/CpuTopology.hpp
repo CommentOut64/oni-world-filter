@@ -4,9 +4,9 @@
 
 namespace Batch {
 
-using CpuTopology = BatchCpu::CpuTopology;
+using CpuTopologyFacts = BatchCpu::CpuTopologyFacts;
 
-CpuTopology DetectCpuTopology();
+CpuTopologyFacts DetectCpuTopologyFacts();
 
 } // namespace Batch
 
