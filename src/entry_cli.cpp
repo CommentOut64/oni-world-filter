@@ -271,8 +271,7 @@ static Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
         [cpuPlan = runtime.cpuPlan, printDiagnostics = options.printDiagnostics, outputMutex](
             uint32_t workerIndex, std::string *errorMessage) {
             const bool applied =
-                BatchCpu::ApplyThreadPlacement(cpuPlan.placement,
-                                              cpuPlan.policy.binding,
+                BatchCpu::ApplyThreadPlacement(cpuPlan,
                                               workerIndex,
                                               errorMessage);
             if (!applied &&

@@ -9,9 +9,7 @@ namespace BatchCpu {
 
 enum class CpuMode {
     Balanced,
-    Turbo,
-    Custom,
-    Conservative
+    Turbo
 };
 
 enum class PlacementMode {
@@ -25,6 +23,7 @@ struct LogicalThreadFacts {
     uint16_t group = 0;
     uint16_t coreIndex = 0;
     uint16_t numaNodeIndex = 0;
+    std::optional<uint32_t> cpuSetId;
     uint8_t efficiencyClass = 0;
     bool parked = false;
     bool allocated = false;
@@ -82,6 +81,7 @@ struct WorkerBindingSlot {
     uint16_t group = 0;
     uint16_t coreIndex = 0;
     uint16_t numaNodeIndex = 0;
+    std::optional<uint32_t> cpuSetId;
     bool isPrimaryThread = false;
 };
 
@@ -91,6 +91,7 @@ struct CpuPlacementPlan {
 };
 
 struct CompiledSearchCpuPlan {
+    bool isHeterogeneous = false;
     CpuPolicySpec policy{};
     CpuExecutionEnvelope envelope{};
     CpuPlacementPlan placement{};

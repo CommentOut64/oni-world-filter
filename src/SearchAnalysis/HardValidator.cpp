@@ -71,14 +71,6 @@ void ValidateLayer1(const SearchAnalysisRequest &request,
                  "mixing",
                  "mixing 超出有效范围");
     }
-    if (request.threads < 0) {
-        AddIssue(errors,
-                 "layer1",
-                 "range.threads_negative",
-                 "threads",
-                 "threads 不能为负数");
-    }
-
     for (size_t i = 0; i < request.constraints.distance.size(); ++i) {
         const auto &rule = request.constraints.distance[i];
         if (rule.minDist < 0.0) {

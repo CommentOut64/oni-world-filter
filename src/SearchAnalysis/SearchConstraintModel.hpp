@@ -25,7 +25,7 @@ struct SearchCpuConfig {
     std::string mode = "balanced";
     bool allowSmt = true;
     bool allowLowPerf = false;
-    std::string placement = "preferred";
+    std::string placement = "strict";
 };
 
 struct SearchConstraints {
@@ -41,7 +41,6 @@ struct SearchAnalysisRequest {
     int seedStart = 0;
     int seedEnd = 0;
     int mixing = 0;
-    int threads = 0;
     SearchCpuConfig cpu;
     SearchConstraints constraints;
 };
@@ -62,7 +61,6 @@ struct NormalizedSearchRequest {
     int seedStart = 0;
     int seedEnd = 0;
     int mixing = 0;
-    int threads = 0;
     SearchCpuConfig cpu;
     std::vector<ConstraintGroup> groups;
 };

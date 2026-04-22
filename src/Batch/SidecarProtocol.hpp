@@ -45,7 +45,7 @@ struct SidecarCpuConfig {
     std::string mode = "balanced";
     bool allowSmt = true;
     bool allowLowPerf = false;
-    std::string placement = "preferred";
+    std::string placement = "strict";
 };
 
 struct SidecarSearchRequest {
@@ -54,7 +54,6 @@ struct SidecarSearchRequest {
     int seedStart = 1;
     int seedEnd = 100000;
     int mixing = 0;
-    int threads = 0;
     SidecarConstraints constraints;
     SidecarCpuConfig cpu;
 };
@@ -85,7 +84,6 @@ struct SidecarAnalyzeSearchRequest {
     int seedStart = 1;
     int seedEnd = 100000;
     int mixing = 0;
-    int threads = 0;
     SidecarConstraints constraints;
     SidecarCpuConfig cpu;
 };

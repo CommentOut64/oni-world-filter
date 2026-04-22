@@ -72,7 +72,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
           seedStart: 0,
           seedEnd: 0,
           mixing: Number.isFinite(watchMixing) ? watchMixing : draft.mixing,
-          threads: 0,
           constraints: {
             required: [],
             forbidden: [],
@@ -117,7 +116,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
         seedStart: nextDraft.seedStart,
         seedEnd: nextDraft.seedEnd,
         mixing: nextDraft.mixing,
-        threads: nextDraft.threads,
         cpu: nextDraft.cpu,
         constraints: nextDraft.constraints,
       });
@@ -167,7 +165,6 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
         mixing: nextDraft.mixing,
         seedStart: nextDraft.seedStart,
         seedEnd: nextDraft.seedEnd,
-        threads: nextDraft.threads,
         cpu: nextDraft.cpu,
         constraints: nextDraft.constraints,
       },

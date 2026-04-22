@@ -32,7 +32,6 @@ export interface SearchRequest {
   seedStart: number;
   seedEnd: number;
   mixing: number;
-  threads: number;
   constraints: SearchConstraints;
   cpu?: SearchCpuConfig;
 }
@@ -64,7 +63,6 @@ export interface NormalizedSearchRequestPayload {
   seedStart: number;
   seedEnd: number;
   mixing: number;
-  threads: number;
   groups: NormalizedConstraintGroup[];
 }
 

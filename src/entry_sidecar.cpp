@@ -474,7 +474,6 @@ SearchAnalysis::SearchAnalysisRequest BuildAnalysisRequest(
     analysisRequest.seedStart = request.seedStart;
     analysisRequest.seedEnd = request.seedEnd;
     analysisRequest.mixing = request.mixing;
-    analysisRequest.threads = request.threads;
     analysisRequest.cpu.hasValue = request.cpu.hasValue;
     analysisRequest.cpu.mode = request.cpu.mode;
     analysisRequest.cpu.allowSmt = request.cpu.allowSmt;

@@ -33,8 +33,6 @@ uint32_t ComputeReservedPhysicalCores(CpuMode mode, uint32_t eligiblePhysicalCor
     case CpuMode::Balanced:
         return 1;
     case CpuMode::Turbo:
-    case CpuMode::Custom:
-    case CpuMode::Conservative:
     default:
         return 0;
     }
@@ -46,8 +44,6 @@ double ResolveModeRatio(CpuMode mode)
     case CpuMode::Balanced:
         return 0.8;
     case CpuMode::Turbo:
-    case CpuMode::Custom:
-    case CpuMode::Conservative:
     default:
         return 1.0;
     }
@@ -106,6 +102,7 @@ CompiledSearchCpuPlan CompileSearchCpuPlan(const CpuTopologyFacts &topology,
                                            const CpuPolicySpec &spec)
 {
     CompiledSearchCpuPlan plan;
+    plan.isHeterogeneous = topology.isHeterogeneous;
     plan.policy = spec;
 
     const auto eligible = CollectEligibleCores(topology, spec);
@@ -143,6 +140,7 @@ CompiledSearchCpuPlan CompileSearchCpuPlan(const CpuTopologyFacts &topology,
             slot.group = thread.group;
             slot.coreIndex = thread.coreIndex;
             slot.numaNodeIndex = thread.numaNodeIndex;
+            slot.cpuSetId = thread.cpuSetId;
             slot.isPrimaryThread = thread.isPrimaryThread;
             plan.placement.workerSlotsByPriority.push_back(slot);
         }

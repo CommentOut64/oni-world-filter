@@ -428,7 +428,6 @@ Json::Value BuildNormalizedSearchRequestJson(const SearchAnalysis::NormalizedSea
     root["seedStart"] = request.seedStart;
     root["seedEnd"] = request.seedEnd;
     root["mixing"] = request.mixing;
-    root["threads"] = request.threads;
 
     Json::Value groups(Json::arrayValue);
     for (const auto &group : request.groups) {
@@ -596,7 +595,6 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
         request.mixing = root.get("mixing", request.mixing).asInt();
-        request.threads = std::max(0, root.get("threads", request.threads).asInt());
         if (request.seedEnd < request.seedStart) {
             SetParseError(result, "seedEnd must be >= seedStart");
             return result;
@@ -684,7 +682,6 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
         request.mixing = root.get("mixing", request.mixing).asInt();
-        request.threads = std::max(0, root.get("threads", request.threads).asInt());
         if (!ParseCpuConfig(root, &request.cpu, &result)) {
             return result;
         }
@@ -706,7 +703,6 @@ FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &requ
     cfg.seedStart = request.seedStart;
     cfg.seedEnd = request.seedEnd;
     cfg.mixing = request.mixing;
-    cfg.threads = std::max(0, request.threads);
     if (request.cpu.hasValue) {
         cfg.hasCpuSection = true;
         cfg.cpu.mode = request.cpu.mode;

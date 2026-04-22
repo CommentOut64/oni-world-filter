@@ -51,10 +51,10 @@ function normalizeCpuMode(value: unknown): SearchCpuConfig["mode"] {
 }
 
 function normalizePlacement(value: unknown): SearchCpuConfig["placement"] {
-  if (value === "strict" || value === "none" || value === "preferred") {
+  if (value === "none") {
     return value;
   }
-  return "preferred";
+  return "strict";
 }
 
 function normalizeSearchCpuConfig(cpu: unknown): SearchCpuConfig {
@@ -74,24 +74,23 @@ function normalizeSearchCpuConfig(cpu: unknown): SearchCpuConfig {
 }
 
 function normalizeSearchDraft(draft: SearchDraft): SearchDraft {
+  const { threads: _legacyThreads, ...rest } = draft as SearchDraft & { threads?: unknown };
   return {
-    ...draft,
-    threads: 0,
-    cpu: normalizeSearchCpuConfig(draft.cpu),
+    ...rest,
+    cpu: normalizeSearchCpuConfig(rest.cpu),
   };
 }
 
 function normalizeSearchRequest(request: SearchRequest): SearchRequest {
+  const { threads: _legacyThreads, ...rest } = request as SearchRequest & { threads?: unknown };
   if (!request.cpu) {
     return {
-      ...request,
-      threads: 0,
+      ...rest,
     };
   }
   return {
-    ...request,
-    threads: 0,
-    cpu: normalizeSearchCpuConfig(request.cpu),
+    ...rest,
+    cpu: normalizeSearchCpuConfig(rest.cpu),
   };
 }
 

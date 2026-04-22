@@ -11,22 +11,10 @@ namespace {
 BatchCpu::CpuMode NormalizeSearchCpuMode(const FilterConfig &cfg)
 {
     if (!cfg.hasCpuSection) {
-        return cfg.threads > 0 ? BatchCpu::CpuMode::Turbo : BatchCpu::CpuMode::Balanced;
+        return BatchCpu::CpuMode::Balanced;
     }
 
-    switch (BatchCpu::ParseCpuMode(cfg.cpu.mode)) {
-    case BatchCpu::CpuMode::Turbo:
-        return BatchCpu::CpuMode::Turbo;
-    case BatchCpu::CpuMode::Custom:
-        // 旧 custom 模式在统一模型里不再公开，兼容阶段向 turbo 归一化。
-        return BatchCpu::CpuMode::Turbo;
-    case BatchCpu::CpuMode::Conservative:
-        // 旧 conservative 模式在统一模型里不再公开，兼容阶段向 balanced 归一化。
-        return BatchCpu::CpuMode::Balanced;
-    case BatchCpu::CpuMode::Balanced:
-    default:
-        return BatchCpu::CpuMode::Balanced;
-    }
+    return BatchCpu::ParseCpuMode(cfg.cpu.mode);
 }
 
 std::vector<uint32_t> BuildCumulativeWorkersByPhysicalCoreCount(
@@ -55,7 +43,7 @@ CompiledSearchCpuRuntime CompileSearchCpuRuntime(const FilterConfig &cfg,
     spec.allowLowPerf = cfg.hasCpuSection ? cfg.cpu.allowLowPerf : false;
     spec.binding = cfg.hasCpuSection
         ? BatchCpu::ParsePlacementMode(cfg.cpu.placement)
-        : BatchCpu::PlacementMode::Preferred;
+        : BatchCpu::PlacementMode::Strict;
 
     CompiledSearchCpuRuntime runtime;
     runtime.cpuPlan = BatchCpu::CompileSearchCpuPlan(topology, spec);

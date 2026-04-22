@@ -10,7 +10,7 @@ struct FilterConfig {
         std::string mode = "balanced";
         bool allowSmt = true;
         bool allowLowPerf = false;
-        std::string placement = "preferred";
+        std::string placement = "strict";
         bool printMatches = true;
         bool printProgress = true;
         bool benchmarkSilent = false;
@@ -33,7 +33,6 @@ struct FilterConfig {
     int seedStart = 1;
     int seedEnd = 100000;
     int mixing = 0;
-    int threads = 0;
     bool hasCpuSection = false;
     CpuConfig cpu;
     std::vector<int> required;

@@ -95,7 +95,6 @@ FilterConfigLoadResult LoadFilterConfig(const std::string &path)
     cfg.seedStart = root.get("seedStart", cfg.seedStart).asInt();
     cfg.seedEnd = root.get("seedEnd", cfg.seedEnd).asInt();
     cfg.mixing = root.get("mixing", cfg.mixing).asInt();
-    cfg.threads = std::max(0, root.get("threads", cfg.threads).asInt());
     if (cfg.seedStart > cfg.seedEnd) {
         AddError(result,
                  FilterErrorCode::InvalidSeedRange,

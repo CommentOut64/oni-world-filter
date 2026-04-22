@@ -120,8 +120,6 @@ pub struct SearchRequestPayload {
     #[serde(default)]
     pub mixing: i32,
     #[serde(default)]
-    pub threads: i32,
-    #[serde(default)]
     pub constraints: SearchConstraints,
     #[serde(default)]
     pub cpu: Option<SearchCpuConfig>,
@@ -162,7 +160,7 @@ fn default_cpu_mode() -> String {
 }
 
 fn default_placement() -> String {
-    "preferred".to_string()
+    "strict".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -280,7 +278,6 @@ pub struct NormalizedSearchRequestPayload {
     pub seed_start: i32,
     pub seed_end: i32,
     pub mixing: i32,
-    pub threads: i32,
     pub groups: Vec<NormalizedConstraintGroup>,
 }
 
@@ -930,7 +927,6 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
         "seedStart": request.seed_start,
         "seedEnd": request.seed_end,
         "mixing": request.mixing,
-        "threads": request.threads,
         "constraints": {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
@@ -987,7 +983,6 @@ pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Va
         "seedStart": request.seed_start,
         "seedEnd": request.seed_end,
         "mixing": request.mixing,
-        "threads": request.threads,
         "constraints": {
             "required": request.constraints.required,
             "forbidden": request.constraints.forbidden,
@@ -1720,7 +1715,6 @@ mod tests {
             "seedStart": 100000,
             "seedEnd": 100000,
             "mixing": 625,
-            "threads": 1,
             "constraints": {
                 "required": [],
                 "forbidden": [],
@@ -1761,7 +1755,6 @@ mod tests {
             "seedStart": 100030,
             "seedEnd": 100030,
             "mixing": 625,
-            "threads": 1,
             "constraints": {
                 "required": [],
                 "forbidden": [],

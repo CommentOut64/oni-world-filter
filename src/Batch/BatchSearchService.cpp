@@ -1,12 +1,16 @@
 #include "Batch/BatchSearchService.hpp"
 
+#include "BatchCpu/CpuOptimization.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cmath>
 #include <exception>
 #include <mutex>
 #include <numeric>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -54,6 +58,7 @@ BatchCpu::CompiledSearchCpuPlan BuildFallbackCpuPlan()
         .group = 0,
         .coreIndex = 0,
         .numaNodeIndex = 0,
+        .cpuSetId = std::nullopt,
         .efficiencyClass = 0,
         .parked = false,
         .allocated = false,
@@ -67,10 +72,50 @@ BatchCpu::CompiledSearchCpuPlan BuildFallbackCpuPlan()
         .group = 0,
         .coreIndex = 0,
         .numaNodeIndex = 0,
+        .cpuSetId = std::nullopt,
         .isPrimaryThread = true,
     });
     return plan;
 }
+
+class ScopedProcessCpuSetFilter
+{
+public:
+    ~ScopedProcessCpuSetFilter()
+    {
+        if (!m_applied) {
+            return;
+        }
+
+        std::string ignoredError;
+        (void)BatchCpu::SetProcessDefaultCpuSets(m_previousCpuSetIds, &ignoredError);
+    }
+
+    bool Apply(const BatchCpu::CompiledSearchCpuPlan &plan, std::string *errorMessage)
+    {
+        const auto requiredCpuSetIds = BatchCpu::ResolveAllowedCpuSetIds(plan);
+        if (requiredCpuSetIds.empty()) {
+            return true;
+        }
+
+        auto previousCpuSetIds = BatchCpu::GetProcessDefaultCpuSetIds(errorMessage);
+        if (!previousCpuSetIds.has_value()) {
+            return false;
+        }
+
+        if (!BatchCpu::SetProcessDefaultCpuSets(requiredCpuSetIds, errorMessage)) {
+            return false;
+        }
+
+        m_previousCpuSetIds = std::move(*previousCpuSetIds);
+        m_applied = true;
+        return true;
+    }
+
+private:
+    bool m_applied = false;
+    std::vector<uint32_t> m_previousCpuSetIds;
+};
 
 } // namespace
 
@@ -101,6 +146,24 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
         request.cpuPlan.envelope.absoluteWorkerCap > 0
             ? request.cpuPlan
             : fallbackCpuPlan;
+    ScopedProcessCpuSetFilter processCpuSetFilter;
+    {
+        std::string processCpuSetError;
+        if (!processCpuSetFilter.Apply(cpuPlan, &processCpuSetError)) {
+            result.failed = true;
+            result.failureMessage = processCpuSetError.empty()
+                ? "process cpu set filter failed"
+                : processCpuSetError;
+            if (callbacks.onFailed) {
+                SearchFailedEvent event;
+                event.message = result.failureMessage;
+                event.processedSeeds = 0;
+                event.totalSeeds = result.totalSeeds;
+                callbacks.onFailed(event);
+            }
+            return result;
+        }
+    }
     BatchCpu::SearchCpuGovernor governor(cpuPlan, request.cpuGovernorConfig);
     const int workerCount = std::max<int>(
         1,
@@ -123,6 +186,10 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
     std::atomic<bool> cancelled{false};
     std::string failureMessage;
     std::mutex failureMutex;
+    std::mutex startupMutex;
+    std::condition_variable startupCv;
+    int readyWorkers = 0;
+    bool processingStarted = false;
     std::vector<double> sampledThroughput;
     sampledThroughput.reserve(64);
 
@@ -150,11 +217,8 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
         return cap > 0 && cap < activePhysicalCores.load(std::memory_order_relaxed);
     };
 
-    const auto startedAt = std::chrono::steady_clock::now();
+    auto startedAt = std::chrono::steady_clock::now();
     auto deadline = startedAt;
-    if (request.maxRunDuration.count() > 0) {
-        deadline = startedAt + request.maxRunDuration;
-    }
 
     auto markFailure = [&](const std::string &message) {
         failed.store(true, std::memory_order_relaxed);
@@ -163,18 +227,30 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
         if (failureMessage.empty()) {
             failureMessage = message.empty() ? "search execution failed" : message;
         }
+        startupCv.notify_all();
     };
 
-    if (callbacks.onStarted) {
-        SearchStartedEvent event;
-        event.seedStart = request.seedStart;
-        event.seedEnd = request.seedEnd;
-        event.totalSeeds = result.totalSeeds;
-        event.workerCount = workerCount;
-        callbacks.onStarted(event);
-    }
-
     auto worker = [&](int workerIndex) {
+        if (request.applyThreadPlacement) {
+            std::string placementError;
+            const bool applied =
+                request.applyThreadPlacement(static_cast<uint32_t>(workerIndex), &placementError);
+            if (!applied && cpuPlan.policy.binding == BatchCpu::PlacementMode::Strict) {
+                markFailure(placementError.empty() ? "thread placement failed" : placementError);
+                return;
+            }
+        } else if (!cpuPlan.placement.workerSlotsByPriority.empty()) {
+            std::string placementError;
+            const bool applied = BatchCpu::ApplyThreadPlacement(
+                cpuPlan,
+                static_cast<uint32_t>(workerIndex),
+                &placementError);
+            if (!applied && cpuPlan.policy.binding == BatchCpu::PlacementMode::Strict) {
+                markFailure(placementError.empty() ? "thread placement failed" : placementError);
+                return;
+            }
+        }
+
         try {
             if (request.initializeWorker) {
                 request.initializeWorker();
@@ -187,20 +263,16 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
             return;
         }
 
-        if (request.applyThreadPlacement) {
-            std::string placementError;
-            request.applyThreadPlacement(static_cast<uint32_t>(workerIndex), &placementError);
-        } else if (!cpuPlan.placement.workerSlotsByPriority.empty()) {
-            std::string placementError;
-            const bool applied = BatchCpu::ApplyThreadPlacement(
-                cpuPlan.placement,
-                cpuPlan.policy.binding,
-                static_cast<uint32_t>(workerIndex),
-                &placementError);
-            if (!applied && cpuPlan.policy.binding == BatchCpu::PlacementMode::Strict) {
-                markFailure(placementError.empty() ? "thread placement failed" : placementError);
-                return;
-            }
+        {
+            std::unique_lock<std::mutex> lock(startupMutex);
+            ++readyWorkers;
+            startupCv.notify_all();
+            startupCv.wait(lock, [&]() {
+                return processingStarted || stopRequested.load(std::memory_order_relaxed);
+            });
+        }
+        if (stopRequested.load(std::memory_order_relaxed)) {
+            return;
         }
 
         while (true) {
@@ -284,86 +356,121 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
         }
     };
 
-    std::thread monitor([&] {
-        int lastProcessed = 0;
-        auto lastTs = std::chrono::steady_clock::now();
-        double peakSeedsPerSecond = 0.0;
-
-        while (!stopRequested.load(std::memory_order_relaxed)) {
-            if (processed.load(std::memory_order_relaxed) >= result.totalSeeds) {
-                break;
-            }
-
-            const bool externallyCappedAtWindowStart = isExternallyCapped();
-            std::this_thread::sleep_for(sampleWindow);
-            const auto now = std::chrono::steady_clock::now();
-
-            if (IsCancellationRequested(request)) {
-                cancelled.store(true, std::memory_order_relaxed);
-                stopRequested.store(true, std::memory_order_relaxed);
-            }
-            if (request.maxRunDuration.count() > 0 && now >= deadline) {
-                stopRequested.store(true, std::memory_order_relaxed);
-                hitBudget.store(true, std::memory_order_relaxed);
-            }
-
-            const int current = processed.load(std::memory_order_relaxed);
-            const int delta = current - lastProcessed;
-            const double seconds = std::chrono::duration<double>(now - lastTs).count();
-            if (seconds <= 0.0 || delta <= 0) {
-                continue;
-            }
-
-            const double seedsPerSecond = static_cast<double>(delta) / seconds;
-            sampledThroughput.push_back(seedsPerSecond);
-
-            bool reduced = false;
-            const bool cappedDuringWindow =
-                externallyCappedAtWindowStart || isExternallyCapped();
-            peakSeedsPerSecond = std::max(peakSeedsPerSecond, seedsPerSecond);
-            if (!cappedDuringWindow) {
-                const int effectivePhysicalCores = currentActivePhysicalCores();
-                const auto nextPhysicalCores = governor.Observe(
-                    seedsPerSecond,
-                    static_cast<uint32_t>(effectivePhysicalCores),
-                    now);
-                if (nextPhysicalCores.has_value() &&
-                    static_cast<int>(nextPhysicalCores.value()) <
-                        activePhysicalCores.load(std::memory_order_relaxed)) {
-                    activePhysicalCores.store(static_cast<int>(nextPhysicalCores.value()),
-                                              std::memory_order_relaxed);
-                    autoFallbackCount.fetch_add(1, std::memory_order_relaxed);
-                    reduced = true;
-                } else if (nextPhysicalCores.has_value() &&
-                           static_cast<int>(nextPhysicalCores.value()) >
-                               activePhysicalCores.load(std::memory_order_relaxed)) {
-                    activePhysicalCores.store(static_cast<int>(nextPhysicalCores.value()),
-                                              std::memory_order_relaxed);
-                }
-            }
-
-            if (callbacks.onProgress) {
-                SearchProgressEvent event;
-                event.processedSeeds = current;
-                event.totalSeeds = result.totalSeeds;
-                event.totalMatches = totalMatches.load(std::memory_order_relaxed);
-                event.activeWorkers = currentActiveWorkers();
-                event.windowSeedsPerSecond = seedsPerSecond;
-                event.hasWindowSample = true;
-                event.activeWorkersReduced = reduced;
-                event.peakSeedsPerSecond = peakSeedsPerSecond;
-                callbacks.onProgress(event);
-            }
-
-            lastProcessed = current;
-            lastTs = now;
-        }
-    });
-
     std::vector<std::thread> workers;
     workers.reserve(static_cast<size_t>(workerCount));
     for (int i = 0; i < workerCount; ++i) {
         workers.emplace_back(worker, i);
+    }
+
+    std::thread monitor;
+    {
+        std::unique_lock<std::mutex> lock(startupMutex);
+        while (readyWorkers < workerCount && !stopRequested.load(std::memory_order_relaxed)) {
+            if (IsCancellationRequested(request)) {
+                cancelled.store(true, std::memory_order_relaxed);
+                stopRequested.store(true, std::memory_order_relaxed);
+                break;
+            }
+            startupCv.wait_for(lock, std::chrono::milliseconds(1));
+        }
+
+        if (!stopRequested.load(std::memory_order_relaxed)) {
+            startedAt = std::chrono::steady_clock::now();
+            deadline = startedAt;
+            if (request.maxRunDuration.count() > 0) {
+                deadline = startedAt + request.maxRunDuration;
+            }
+            processingStarted = true;
+            startupCv.notify_all();
+
+            if (callbacks.onStarted) {
+                SearchStartedEvent event;
+                event.seedStart = request.seedStart;
+                event.seedEnd = request.seedEnd;
+                event.totalSeeds = result.totalSeeds;
+                event.workerCount = workerCount;
+                callbacks.onStarted(event);
+            }
+
+            monitor = std::thread([&] {
+                int lastProcessed = 0;
+                auto lastTs = startedAt;
+                double peakSeedsPerSecond = 0.0;
+
+                while (!stopRequested.load(std::memory_order_relaxed)) {
+                    if (processed.load(std::memory_order_relaxed) >= result.totalSeeds) {
+                        break;
+                    }
+
+                    const bool externallyCappedAtWindowStart = isExternallyCapped();
+                    std::this_thread::sleep_for(sampleWindow);
+                    const auto now = std::chrono::steady_clock::now();
+
+                    if (IsCancellationRequested(request)) {
+                        cancelled.store(true, std::memory_order_relaxed);
+                        stopRequested.store(true, std::memory_order_relaxed);
+                    }
+                    if (request.maxRunDuration.count() > 0 && now >= deadline) {
+                        stopRequested.store(true, std::memory_order_relaxed);
+                        hitBudget.store(true, std::memory_order_relaxed);
+                    }
+
+                    const int current = processed.load(std::memory_order_relaxed);
+                    const int delta = current - lastProcessed;
+                    const double seconds = std::chrono::duration<double>(now - lastTs).count();
+                    if (seconds <= 0.0 || delta <= 0) {
+                        continue;
+                    }
+
+                    const double seedsPerSecond = static_cast<double>(delta) / seconds;
+                    sampledThroughput.push_back(seedsPerSecond);
+
+                    bool reduced = false;
+                    const bool cappedDuringWindow =
+                        externallyCappedAtWindowStart || isExternallyCapped();
+                    peakSeedsPerSecond = std::max(peakSeedsPerSecond, seedsPerSecond);
+                    if (!cappedDuringWindow) {
+                        const int effectivePhysicalCores = currentActivePhysicalCores();
+                        const auto nextPhysicalCores = governor.Observe(
+                            seedsPerSecond,
+                            static_cast<uint32_t>(effectivePhysicalCores),
+                            now);
+                        if (nextPhysicalCores.has_value() &&
+                            static_cast<int>(nextPhysicalCores.value()) <
+                                activePhysicalCores.load(std::memory_order_relaxed)) {
+                            activePhysicalCores.store(static_cast<int>(nextPhysicalCores.value()),
+                                                      std::memory_order_relaxed);
+                            autoFallbackCount.fetch_add(1, std::memory_order_relaxed);
+                            reduced = true;
+                        } else if (nextPhysicalCores.has_value() &&
+                                   static_cast<int>(nextPhysicalCores.value()) >
+                                       activePhysicalCores.load(std::memory_order_relaxed)) {
+                            activePhysicalCores.store(static_cast<int>(nextPhysicalCores.value()),
+                                                      std::memory_order_relaxed);
+                        }
+                    }
+
+                    if (callbacks.onProgress) {
+                        SearchProgressEvent event;
+                        event.processedSeeds = current;
+                        event.totalSeeds = result.totalSeeds;
+                        event.totalMatches = totalMatches.load(std::memory_order_relaxed);
+                        event.activeWorkers = currentActiveWorkers();
+                        event.windowSeedsPerSecond = seedsPerSecond;
+                        event.hasWindowSample = true;
+                        event.activeWorkersReduced = reduced;
+                        event.peakSeedsPerSecond = peakSeedsPerSecond;
+                        callbacks.onProgress(event);
+                    }
+
+                    lastProcessed = current;
+                    lastTs = now;
+                }
+            });
+        } else {
+            processingStarted = true;
+            startupCv.notify_all();
+        }
     }
 
     for (auto &thread : workers) {

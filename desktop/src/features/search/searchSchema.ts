@@ -189,12 +189,11 @@ export function toSearchDraft(values: SearchFormValues): SearchDraft {
     mixing: values.mixing,
     seedStart: values.seedStart,
     seedEnd: values.seedEnd,
-    threads: 0,
     cpu: {
       mode: values.cpuMode,
       allowSmt: values.cpuAllowSmt,
       allowLowPerf: values.cpuAllowLowPerf,
-      placement: "preferred",
+      placement: "strict",
     },
     constraints: {
       required: values.required.map((item) => item.geyser),
