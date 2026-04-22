@@ -18,6 +18,8 @@ import {
 
 const worlds: WorldOption[] = [
   { id: 0, code: "SNDST-A-" },
+  { id: 2, code: "S-FRZ-" },
+  { id: 5, code: "VOLCA-" },
   { id: 12, code: "PRES-A-" },
   { id: 13, code: "V-SNDST-C-" },
   { id: 26, code: "V-PRES-C-" },
@@ -53,6 +55,8 @@ const mixingSlots: MixingSlotMeta[] = [
 
 test("classifyWorld and getCategoryForWorld map current world codes to UI categories", () => {
   assert.equal(classifyWorld("SNDST-A-"), "baseAsteroid");
+  assert.equal(classifyWorld("S-FRZ-"), "baseAsteroid");
+  assert.equal(classifyWorld("VOLCA-"), "baseAsteroid");
   assert.equal(classifyWorld("PRES-A-"), "baseAsteroid");
   assert.equal(classifyWorld("V-SNDST-C-"), "classicCluster");
   assert.equal(classifyWorld("V-PRES-C-"), "classicCluster");
@@ -61,7 +65,7 @@ test("classifyWorld and getCategoryForWorld map current world codes to UI catego
   const grouped = groupWorldsByCategory(worlds);
   assert.deepEqual(
     grouped.baseAsteroid.map((item) => item.id),
-    [0]
+    [0, 2, 5]
   );
   assert.deepEqual(
     grouped.classicCluster.map((item) => item.id),

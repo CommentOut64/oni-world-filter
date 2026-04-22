@@ -263,3 +263,44 @@ test("terminal events should clear cancelling state and active job", async () =>
   assert.equal(useSearchStore.getState().stats.currentSeedsPerSecond, 0);
   assert.equal(useSearchStore.getState().stats.peakSeedsPerSecond, 456);
 });
+
+test("cancelled event should not roll processed seeds back to zero", async () => {
+  mockIPC(() => {
+    throw new Error("unexpected IPC call");
+  });
+
+  const module = await loadSearchStoreModule();
+  const { useSearchStore } = module;
+
+  useSearchStore.setState({
+    ...createBaseState(module, "job-cancel-zero"),
+    isCancelling: true,
+    stats: {
+      startedAtMs: 123,
+      processedSeeds: 12,
+      totalSeeds: 20,
+      totalMatches: 2,
+      activeWorkers: 3,
+      currentSeedsPerSecond: 321,
+      peakSeedsPerSecond: 456,
+    },
+  });
+
+  useSearchStore.getState().ingestSidecarEvent({
+    event: "cancelled",
+    jobId: "job-cancel-zero",
+    processedSeeds: 0,
+    totalSeeds: 20,
+    totalMatches: 2,
+    finalActiveWorkers: 0,
+  });
+
+  const finalState = useSearchStore.getState();
+  assert.equal(finalState.isSearching, false);
+  assert.equal(finalState.isCancelling, false);
+  assert.equal(finalState.activeJobId, null);
+  assert.equal(finalState.stats.processedSeeds, 12);
+  assert.equal(finalState.stats.totalSeeds, 20);
+  assert.equal(finalState.stats.totalMatches, 2);
+  assert.equal(finalState.stats.currentSeedsPerSecond, 0);
+});

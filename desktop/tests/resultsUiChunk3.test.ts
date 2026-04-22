@@ -6,6 +6,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ResultSummaryCards from "../src/features/results/ResultSummaryCards.tsx";
 import ResultsTable from "../src/features/results/ResultsTable.tsx";
 import ResultToolbar from "../src/features/results/ResultToolbar.tsx";
+import { copyCoordCode, createResultColumns } from "../src/features/results/resultColumns.tsx";
+import { formatGeyserCountSummary } from "../src/features/results/resultSummary.ts";
 import { useSearchStore } from "../src/state/searchStore.ts";
 
 const BASE_STATE = {
@@ -85,8 +87,14 @@ test("ResultToolbar renders antd status shell", () => {
 
   const markup = renderToStaticMarkup(createElement(ResultToolbar));
 
-  assert.match(markup, /ant-tag|ant-badge/);
   assert.match(markup, /ant-btn/);
+  assert.match(markup, /取消搜索/);
+  assert.match(markup, /清空结果/);
+  assert.match(markup, /result-toolbar-actions/);
+  assert.doesNotMatch(markup, /ant-space-compact/);
+  assert.doesNotMatch(markup, /打开调试窗口/);
+  assert.doesNotMatch(markup, /结果总数/);
+  assert.doesNotMatch(markup, /状态:/);
 });
 
 test("ResultsTable renders antd table shell", () => {
@@ -99,6 +107,56 @@ test("ResultsTable renders antd table shell", () => {
   const markup = renderToStaticMarkup(createElement(ResultsTable));
 
   assert.match(markup, /ant-table/);
+  assert.match(markup, /ant-table-virtual/);
   assert.match(markup, /ant-table-body/);
   assert.match(markup, /max-height:\d+px/);
+});
+
+test("geyser summary prioritizes constrained geysers before other overview items", () => {
+  const summary = formatGeyserCountSummary(
+    [
+      { type: 0, x: 11, y: 21 },
+      { type: 6, x: 15, y: 25 },
+      { type: 0, x: 17, y: 27 },
+    ],
+    BASE_STATE.geysers,
+    4,
+    ["salt_water"]
+  );
+
+  assert.equal(summary, "盐水泉, 低温蒸汽喷孔 x2");
+});
+
+test("result columns rename nearest distance to geyser minimum distance", () => {
+  const columns = createResultColumns(BASE_STATE.geysers, []);
+  const nearestDistanceColumn = columns.find((column) => column.key === "nearestDistance");
+
+  assert.ok(nearestDistanceColumn);
+  assert.equal(nearestDistanceColumn.title, "喷口最小距离");
+});
+
+test("result columns add copy action and remove trait summary", () => {
+  const columns = createResultColumns(BASE_STATE.geysers, []);
+
+  const copyColumn = columns.find((column) => column.key === "copyCoord");
+  const traitColumn = columns.find((column) => column.key === "traitSummary");
+
+  assert.ok(copyColumn);
+  assert.equal(copyColumn.title, "");
+  assert.equal(traitColumn, undefined);
+});
+
+test("copyCoordCode writes coord text and reports success", async () => {
+  const calls: string[] = [];
+
+  await copyCoordCode("SNDST-A-100001-0-D3-HD", {
+    writeText: async (value) => {
+      calls.push(`write:${value}`);
+    },
+    notifySuccess: (value) => {
+      calls.push(`success:${value}`);
+    },
+  });
+
+  assert.deepEqual(calls, ["write:SNDST-A-100001-0-D3-HD", "success:复制成功"]);
 });

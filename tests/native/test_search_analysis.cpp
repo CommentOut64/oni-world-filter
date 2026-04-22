@@ -140,6 +140,36 @@ int RunAllTests()
 
     {
         SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 80.0},
+        };
+
+        const auto normalized = SearchAnalysis::NormalizeSearchRequest(request);
+        Expect(normalized.groups.size() == 1,
+               "distance-only normalize should keep one geyser group",
+               failures);
+        if (!normalized.groups.empty()) {
+            const auto &group = normalized.groups.front();
+            Expect(group.minCount == 1,
+                   "distance-only normalize should require at least one geyser",
+                   failures);
+            Expect(group.maxCount == std::numeric_limits<int>::max(),
+                   "distance-only normalize should preserve open upper bound",
+                   failures);
+            Expect(!group.hasRequired,
+                   "distance-only normalize should not mark required",
+                   failures);
+            Expect(group.distanceRules.size() == 1,
+                   "distance-only normalize should preserve distance rule",
+                   failures);
+        }
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
         request.worldType = 99;
         request.seedStart = 100;
         request.seedEnd = 50;
@@ -479,6 +509,57 @@ int RunAllTests()
         }
         Expect(!hasLowProbabilityWarning,
                "source-conditioned envelope should avoid false low-probability warning",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 80.0},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 400.0;
+        profile.possibleMaxCountByType["hot_water"] = 3;
+        profile.genericTypeUpperById["hot_water"] = 0.01;
+        profile.genericSlotUpper = 1;
+        profile.genericSourceSummary.push_back(SearchAnalysis::SourceSummary{
+            .ruleId = "rule-generic",
+            .templateName = "geysers/generic",
+            .geyserId = "geysers/generic",
+            .upperBound = 1,
+            .sourceKind = "generic",
+            .poolId = "generic",
+        });
+        profile.sourcePools.push_back(SearchAnalysis::SourcePool{
+            .poolId = "generic",
+            .sourceKind = "generic",
+            .capacityUpper = 1,
+        });
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(result.errors.empty(),
+               "distance-only low probability case should not have hard errors",
+               failures);
+        Expect(result.predictedBottleneckProbability < 0.05,
+               "distance-only analysis should not overestimate to certainty",
+               failures);
+        bool hasLowProbabilityWarning = false;
+        for (const auto &issue : result.warnings) {
+            if (issue.code.rfind("predict.low_probability", 0) == 0) {
+                hasLowProbabilityWarning = true;
+                break;
+            }
+        }
+        Expect(hasLowProbabilityWarning,
+               "distance-only low probability case should emit low-probability warning",
                failures);
     }
 

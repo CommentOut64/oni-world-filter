@@ -39,10 +39,9 @@ function renderSearchActions(): string {
   return renderToStaticMarkup(
     createElement(SearchActions, {
       isSearching: false,
-      isCancelling: false,
-      onCancel: () => undefined,
-      onClear: () => undefined,
-      onCopy: () => undefined,
+      hasResults: true,
+      resultsCount: 3,
+      onViewResults: () => undefined,
     })
   );
 }
@@ -157,6 +156,15 @@ test("SearchActions renders antd buttons", () => {
   const markup = renderSearchActions();
 
   assert.match(markup, /ant-btn/);
+  assert.match(markup, /开始搜索/);
+  assert.match(markup, /查看结果/);
+  assert.match(markup, /search-actions-row/);
+  assert.match(markup, /search-action-primary/);
+  assert.match(markup, /search-action-secondary/);
+  assert.doesNotMatch(markup, /ant-space-compact/);
+  assert.doesNotMatch(markup, /取消搜索/);
+  assert.doesNotMatch(markup, /清空结果/);
+  assert.doesNotMatch(markup, /复制协议 JSON/);
 });
 
 test("WorldSelector renders antd segmented navigation", () => {
@@ -192,6 +200,10 @@ test("Search section title clears default heading margins", () => {
     APP_CSS,
     /\.search-rule-grid\s*\{\s*min-height:\s*0;\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);\s*gap:\s*12px;\s*align-content:\s*start;\s*flex:\s*1\s+1\s+auto;\s*overflow:\s*auto;\s*padding-right:\s*4px;\s*padding-bottom:\s*88px;\s*scroll-padding-bottom:\s*88px;\s*\}/
   );
+  assert.match(
+    APP_CSS,
+    /\.search-actions\s*\{\s*position:\s*absolute;\s*left:\s*16px;\s*bottom:\s*16px;\s*z-index:\s*10;\s*width:\s*calc\(100%\s*-\s*32px\);\s*\}/
+  );
 });
 
 test("MixingSelector renders antd grouping shell", () => {
@@ -205,6 +217,7 @@ test("MixingSelector renders antd grouping shell", () => {
   assert.doesNotMatch(markup, /DLC2_ID/);
   assert.doesNotMatch(markup, /STRINGS\.SUBWORLDS\.GARDEN\.DESC/);
   assert.doesNotMatch(markup, /STRINGS\.SUBWORLDS\.RADIOACTIVE\.DESC/);
+  assert.doesNotMatch(markup, /\[\d+\]\s*(森林|Forest|冰窟生态|Ice Cave Biome|放射生态|Radioactive)/);
 });
 
 test("GeyserConstraintEditor renders antd controls", () => {

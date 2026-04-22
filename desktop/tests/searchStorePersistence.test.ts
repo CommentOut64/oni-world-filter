@@ -9,6 +9,7 @@ import {
   type SearchSessionStorage,
 } from "../src/state/searchStorePersistence.ts";
 import { DEFAULT_SEARCH_DRAFT } from "../src/state/searchStore.ts";
+import { decodeMixingToLevels } from "../src/features/search/searchSchema.ts";
 
 const SAMPLE_DRAFT = {
   worldType: 13,
@@ -199,4 +200,10 @@ test("restoreSearchSessionSnapshot migrates legacy preferred placement to strict
 test("desktop default draft starts from seed 0 to 10000", () => {
   assert.equal(DEFAULT_SEARCH_DRAFT.seedStart, 0);
   assert.equal(DEFAULT_SEARCH_DRAFT.seedEnd, 10000);
+});
+
+test("desktop default draft keeps prehistoric package unchecked", () => {
+  const levels = decodeMixingToLevels(DEFAULT_SEARCH_DRAFT.mixing, 11);
+
+  assert.equal(levels[6], 0);
 });
