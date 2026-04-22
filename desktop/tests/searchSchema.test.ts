@@ -11,7 +11,6 @@ function buildValidFormValues() {
     mixing: 625,
     seedStart: 100000,
     seedEnd: 120000,
-    threads: 0,
     cpuMode: "balanced" as const,
     cpuAllowSmt: true,
     cpuAllowLowPerf: false,
@@ -77,7 +76,7 @@ test("toSearchDraft disables warmup for desktop balanced mode", () => {
     mode: "balanced",
     allowSmt: true,
     allowLowPerf: false,
-    placement: "preferred",
+    placement: "strict",
   });
 });
 
@@ -91,7 +90,7 @@ test("toSearchDraft disables warmup for desktop turbo mode", () => {
     mode: "turbo",
     allowSmt: true,
     allowLowPerf: false,
-    placement: "preferred",
+    placement: "strict",
   });
 });
 

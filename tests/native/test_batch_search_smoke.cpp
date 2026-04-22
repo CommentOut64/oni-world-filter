@@ -217,6 +217,75 @@ int RunAllTests()
     }
 
     {
+        const auto plan = BuildBalancedPlan(BuildNonSmtTopology(), false);
+        auto request = BuildBaseRequest(plan);
+        request.seedEnd = 32;
+        request.chunkSize = 1;
+        request.progressInterval = 1;
+        request.sampleWindow = std::chrono::milliseconds(5);
+        std::atomic<int> initializedWorkers{0};
+        std::atomic<int> startedObservedInitializedWorkers{-1};
+        request.initializeWorker = [&]() {
+            initializedWorkers.fetch_add(1, std::memory_order_relaxed);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        };
+        request.evaluateSeed = [](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            return evaluation;
+        };
+
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onStarted = [&](const Batch::SearchStartedEvent &) {
+            startedObservedInitializedWorkers.store(
+                initializedWorkers.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+        };
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+
+        Expect(!result.failed, "startup barrier run should not fail", failures);
+        Expect(!result.cancelled, "startup barrier run should not cancel", failures);
+        Expect(result.processedSeeds == result.totalSeeds,
+               "startup barrier run should process all seeds",
+               failures);
+        Expect(startedObservedInitializedWorkers.load(std::memory_order_relaxed) ==
+                   static_cast<int>(plan.envelope.absoluteWorkerCap),
+               "started event should fire after every worker finishes initialization",
+               failures);
+    }
+
+    {
+        const auto plan = BuildBalancedPlan(BuildNonSmtTopology(), false);
+        auto request = BuildBaseRequest(plan);
+        request.seedEnd = 16;
+        std::atomic<bool> placementApplied{false};
+        request.applyThreadPlacement = [&](uint32_t, std::string *) {
+            placementApplied.store(true, std::memory_order_relaxed);
+            return true;
+        };
+        request.initializeWorker = [&]() {
+            if (!placementApplied.load(std::memory_order_relaxed)) {
+                throw std::runtime_error("placement should run before initializeWorker");
+            }
+        };
+        request.evaluateSeed = [](int) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            return evaluation;
+        };
+
+        const auto result = Batch::BatchSearchService::Run(request, {});
+
+        Expect(!result.failed,
+               "thread placement should run before initializeWorker",
+               failures);
+        Expect(result.processedSeeds == result.totalSeeds,
+               "placement-before-init run should process all seeds",
+               failures);
+    }
+
+    {
         const auto plan = BuildBalancedPlan(BuildSmt2Topology(), true);
         auto request = BuildBaseRequest(plan);
         request.seedEnd = 500;

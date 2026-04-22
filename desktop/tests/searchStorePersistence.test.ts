@@ -14,12 +14,11 @@ const SAMPLE_DRAFT = {
   seedStart: 100000,
   seedEnd: 120000,
   mixing: 625,
-  threads: 0,
   cpu: {
     mode: "balanced" as const,
     allowSmt: true,
     allowLowPerf: false,
-    placement: "preferred" as const,
+    placement: "strict" as const,
   },
   constraints: {
     required: [],
@@ -65,7 +64,6 @@ function createRequest(): SearchRequest {
     seedStart: 100000,
     seedEnd: 120000,
     mixing: 625,
-    threads: 0,
     cpu: { ...SAMPLE_DRAFT.cpu },
     constraints: {
       required: [],
@@ -122,14 +120,13 @@ test("restoreSearchSessionSnapshot removes corrupted session payload", () => {
   assert.equal(storage.getItem(SEARCH_SESSION_STORAGE_KEY), null);
 });
 
-test("restoreSearchSessionSnapshot normalizes legacy warmup flag to desktop default", () => {
+test("restoreSearchSessionSnapshot normalizes legacy cpu fields to unified surface", () => {
   const storage = createMemoryStorage();
   const request = createRequest();
 
   persistSearchSessionSnapshot(storage, {
     draft: {
       ...SAMPLE_DRAFT,
-      threads: 6,
       cpu: {
         ...SAMPLE_DRAFT.cpu,
         mode: "custom" as never,
@@ -142,7 +139,6 @@ test("restoreSearchSessionSnapshot normalizes legacy warmup flag to desktop defa
     selectedSeed: 100123,
     lastSubmittedRequest: {
       ...request,
-      threads: 6,
       cpu: {
         ...request.cpu,
         mode: "custom" as never,
@@ -155,8 +151,11 @@ test("restoreSearchSessionSnapshot normalizes legacy warmup flag to desktop defa
 
   const restored = restoreSearchSessionSnapshot(storage);
   assert.ok(restored);
-  assert.equal(restored.draft.threads, 0);
-  assert.equal(restored.lastSubmittedRequest?.threads, 0);
+  assert.equal("threads" in restored.draft, false);
+  assert.equal(
+    restored.lastSubmittedRequest ? "threads" in restored.lastSubmittedRequest : false,
+    false
+  );
   assert.deepEqual(restored.draft.cpu, {
     ...SAMPLE_DRAFT.cpu,
     mode: "turbo",
@@ -165,4 +164,33 @@ test("restoreSearchSessionSnapshot normalizes legacy warmup flag to desktop defa
     ...SAMPLE_DRAFT.cpu,
     mode: "turbo",
   });
+});
+
+test("restoreSearchSessionSnapshot migrates legacy preferred placement to strict", () => {
+  const storage = createMemoryStorage();
+  const request = createRequest();
+
+  persistSearchSessionSnapshot(storage, {
+    draft: {
+      ...SAMPLE_DRAFT,
+      cpu: {
+        ...SAMPLE_DRAFT.cpu,
+        placement: "preferred" as never,
+      },
+    },
+    results: [createMatch(100123)],
+    selectedSeed: 100123,
+    lastSubmittedRequest: {
+      ...request,
+      cpu: {
+        ...request.cpu,
+        placement: "preferred" as never,
+      },
+    },
+  });
+
+  const restored = restoreSearchSessionSnapshot(storage);
+  assert.ok(restored);
+  assert.equal(restored.draft.cpu.placement, "strict");
+  assert.equal(restored.lastSubmittedRequest?.cpu?.placement, "strict");
 });

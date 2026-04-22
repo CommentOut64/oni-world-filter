@@ -89,14 +89,13 @@ int RunAllTests()
 
     {
         Batch::FilterConfig cfg;
-        cfg.threads = 3;
 
         const auto runtime = Batch::CompileSearchCpuRuntime(cfg, topology);
-        Expect(runtime.cpuPlan.policy.mode == BatchCpu::CpuMode::Turbo,
-               "legacy threads-only config should normalize to turbo",
+        Expect(runtime.cpuPlan.policy.mode == BatchCpu::CpuMode::Balanced,
+               "config without cpu section should use balanced mode",
                failures);
-        Expect(runtime.cpuPlan.policy.binding == BatchCpu::PlacementMode::Preferred,
-               "threads-only config should use preferred binding",
+        Expect(runtime.cpuPlan.policy.binding == BatchCpu::PlacementMode::Strict,
+               "config without cpu section should use strict binding",
                failures);
     }
 

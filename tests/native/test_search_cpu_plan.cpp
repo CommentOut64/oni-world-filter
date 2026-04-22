@@ -27,41 +27,41 @@ BatchCpu::CpuTopologyFacts BuildSyntheticHeterogeneousTopology()
         {
             .physicalCoreIndex = 0,
             .group = 1,
-            .efficiencyClass = 0,
+            .efficiencyClass = 8,
             .isHighPerformance = true,
             .logicalThreads = {
-                {.logicalIndex = 8, .group = 1, .isPrimaryThread = true},
-                {.logicalIndex = 9, .group = 1, .isPrimaryThread = false},
+                {.logicalIndex = 8, .group = 1, .cpuSetId = 108, .isPrimaryThread = true},
+                {.logicalIndex = 9, .group = 1, .cpuSetId = 109, .isPrimaryThread = false},
             },
         },
         {
             .physicalCoreIndex = 1,
             .group = 0,
-            .efficiencyClass = 0,
+            .efficiencyClass = 8,
             .isHighPerformance = true,
             .logicalThreads = {
-                {.logicalIndex = 0, .group = 0, .isPrimaryThread = true},
-                {.logicalIndex = 1, .group = 0, .isPrimaryThread = false},
+                {.logicalIndex = 0, .group = 0, .cpuSetId = 100, .isPrimaryThread = true},
+                {.logicalIndex = 1, .group = 0, .cpuSetId = 101, .isPrimaryThread = false},
             },
         },
         {
             .physicalCoreIndex = 2,
             .group = 1,
-            .efficiencyClass = 0,
+            .efficiencyClass = 8,
             .isHighPerformance = true,
             .logicalThreads = {
-                {.logicalIndex = 10, .group = 1, .isPrimaryThread = true},
-                {.logicalIndex = 11, .group = 1, .isPrimaryThread = false},
+                {.logicalIndex = 10, .group = 1, .cpuSetId = 110, .isPrimaryThread = true},
+                {.logicalIndex = 11, .group = 1, .cpuSetId = 111, .isPrimaryThread = false},
             },
         },
         {
             .physicalCoreIndex = 3,
             .group = 0,
-            .efficiencyClass = 8,
+            .efficiencyClass = 0,
             .isHighPerformance = false,
             .logicalThreads = {
-                {.logicalIndex = 2, .group = 0, .isPrimaryThread = true},
-                {.logicalIndex = 3, .group = 0, .isPrimaryThread = false},
+                {.logicalIndex = 2, .group = 0, .cpuSetId = 200, .isPrimaryThread = true},
+                {.logicalIndex = 3, .group = 0, .cpuSetId = 201, .isPrimaryThread = false},
             },
         },
     };
@@ -82,7 +82,7 @@ BatchCpu::CpuTopologyFacts BuildSyntheticNonSmtTopology()
             .efficiencyClass = 0,
             .isHighPerformance = true,
             .logicalThreads = {
-                {.logicalIndex = 4, .group = 0, .isPrimaryThread = true},
+                {.logicalIndex = 4, .group = 0, .cpuSetId = 304, .isPrimaryThread = true},
             },
         },
         {
@@ -91,7 +91,7 @@ BatchCpu::CpuTopologyFacts BuildSyntheticNonSmtTopology()
             .efficiencyClass = 0,
             .isHighPerformance = true,
             .logicalThreads = {
-                {.logicalIndex = 0, .group = 0, .isPrimaryThread = true},
+                {.logicalIndex = 0, .group = 0, .cpuSetId = 300, .isPrimaryThread = true},
             },
         },
         {
@@ -100,7 +100,7 @@ BatchCpu::CpuTopologyFacts BuildSyntheticNonSmtTopology()
             .efficiencyClass = 0,
             .isHighPerformance = true,
             .logicalThreads = {
-                {.logicalIndex = 8, .group = 1, .isPrimaryThread = true},
+                {.logicalIndex = 8, .group = 1, .cpuSetId = 308, .isPrimaryThread = true},
             },
         },
     };
@@ -118,6 +118,21 @@ void ExpectLogicalOrder(const std::vector<BatchCpu::WorkerBindingSlot> &slots,
     for (size_t i = 0; i < count; ++i) {
         Expect(slots[i].logicalIndex == expectedLogicalIndices[i],
                "worker slot logical order should preserve physical-core-first order",
+               failures);
+    }
+}
+
+void ExpectCpuSetOrder(const std::vector<uint32_t> &cpuSetIds,
+                       const std::vector<uint32_t> &expectedCpuSetIds,
+                       int &failures)
+{
+    Expect(cpuSetIds.size() == expectedCpuSetIds.size(),
+           "cpu set count should match expected size",
+           failures);
+    const size_t count = std::min(cpuSetIds.size(), expectedCpuSetIds.size());
+    for (size_t i = 0; i < count; ++i) {
+        Expect(cpuSetIds[i] == expectedCpuSetIds[i],
+               "cpu set order should preserve planned logical thread order",
                failures);
     }
 }
@@ -148,6 +163,18 @@ void ExpectBindingTarget(const BatchCpu::CpuPlacementPlan &plan,
 int RunAllTests()
 {
     int failures = 0;
+
+    {
+        Expect(BatchCpu::IsHighPerformanceEfficiencyClass(true, 8, 8),
+               "heterogeneous topology should treat highest efficiency class as high performance",
+               failures);
+        Expect(!BatchCpu::IsHighPerformanceEfficiencyClass(true, 0, 8),
+               "heterogeneous topology should not treat lower efficiency class as high performance",
+               failures);
+        Expect(BatchCpu::IsHighPerformanceEfficiencyClass(false, 0, 8),
+               "homogeneous topology should treat all cores as high performance",
+               failures);
+    }
 
     {
         const auto topology = BuildSyntheticHeterogeneousTopology();
@@ -183,6 +210,28 @@ int RunAllTests()
                "placement should preserve second physical core order",
                failures);
         ExpectLogicalOrder(plan.placement.workerSlotsByPriority, {8, 9, 0, 1}, failures);
+        Expect(plan.placement.workerSlotsByPriority[0].cpuSetId.has_value() &&
+                   plan.placement.workerSlotsByPriority[0].cpuSetId.value() == 108,
+               "worker slot should preserve first cpu set id",
+               failures);
+        const auto allowedCpuSetIds = BatchCpu::ResolveAllowedCpuSetIds(plan);
+        ExpectCpuSetOrder(allowedCpuSetIds, {108, 109, 100, 101}, failures);
+        const auto workerCpuSetId = BatchCpu::ResolveWorkerCpuSetId(plan.placement, 2);
+        Expect(workerCpuSetId.has_value() && workerCpuSetId.value() == 100,
+               "worker cpu set lookup should preserve slot cpu set id",
+               failures);
+        const auto directive = BatchCpu::ResolveThreadPlacementDirective(plan, 2);
+        Expect(directive.has_value(),
+               "heterogeneous strict placement should resolve directive for selected worker",
+               failures);
+        if (directive.has_value()) {
+            ExpectCpuSetOrder(directive->selectedCpuSetIds, {100}, failures);
+            Expect(directive->bindingTarget.has_value() &&
+                       directive->bindingTarget->group == 0 &&
+                       directive->bindingTarget->logicalIndex == 0,
+                   "heterogeneous strict placement should keep exact binding target together with cpu set",
+                   failures);
+        }
         ExpectBindingTarget(plan.placement, 0, 1, 8, failures);
         ExpectBindingTarget(plan.placement, 2, 0, 0, failures);
     }
@@ -226,6 +275,23 @@ int RunAllTests()
                "non-SMT topology should contribute one worker per physical core",
                failures);
         ExpectLogicalOrder(plan.placement.workerSlotsByPriority, {4, 0, 8}, failures);
+        Expect(BatchCpu::ResolveAllowedCpuSetIds(plan).empty(),
+               "homogeneous topology should not emit low-perf cpu set restrictions",
+               failures);
+        const auto directive = BatchCpu::ResolveThreadPlacementDirective(plan, 1);
+        Expect(directive.has_value(),
+               "homogeneous placement should still resolve directive",
+               failures);
+        if (directive.has_value()) {
+            Expect(directive->selectedCpuSetIds.empty(),
+                   "homogeneous placement should not add cpu set restrictions",
+                   failures);
+            Expect(directive->bindingTarget.has_value() &&
+                       directive->bindingTarget->group == 0 &&
+                       directive->bindingTarget->logicalIndex == 0,
+                   "homogeneous placement should keep binding target only",
+                   failures);
+        }
     }
 
     {

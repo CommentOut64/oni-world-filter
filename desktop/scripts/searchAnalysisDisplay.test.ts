@@ -33,7 +33,6 @@ const draft: SearchDraft = {
     1,
     ...new Array<number>(MIXING_SLOT_COUNT - 2).fill(0),
   ]),
-  threads: 0,
   cpu: {
     mode: "balanced",
     allowSmt: true,
@@ -74,7 +73,6 @@ function createAnalysis(issue: ValidationIssue): SearchAnalysisPayload {
       seedStart: 100000,
       seedEnd: 120000,
       mixing: draft.mixing,
-      threads: 0,
       groups: [],
     },
     errors: [issue],
