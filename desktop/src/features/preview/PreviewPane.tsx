@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Typography } from "antd";
 
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
@@ -9,10 +10,12 @@ import PreviewLegend from "./PreviewLegend";
 import PreviewToolbar from "./PreviewToolbar";
 
 export default function PreviewPane() {
+  void React;
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
   const results = useSearchStore((state) => state.results);
   const geysers = useSearchStore((state) => state.geysers);
 
+  const previewSessionKey = usePreviewStore((state) => state.activeKey);
   const loadByMatch = usePreviewStore((state) => state.loadByMatch);
   const preview = usePreviewStore((state) => state.activePreview);
   const isLoading = usePreviewStore((state) => state.isLoading);
@@ -50,14 +53,20 @@ export default function PreviewPane() {
   return (
     <section className="preview-pane">
       <header>
-        <h3>地图预览</h3>
-        <p>仅在选中结果后按需请求 preview，不影响左侧批量搜索。</p>
+        <Typography.Title level={3}>地图预览</Typography.Title>
       </header>
-      {isLoading ? <p className="hint">预览加载中...</p> : null}
+      {isLoading ? (
+        <Alert className="preview-pane-alert" type="info" showIcon title="预览加载中..." />
+      ) : null}
       {lastError ? (
-        <p className="error-inline" onClick={clearError}>
-          预览失败: {lastError}
-        </p>
+        <Alert
+          className="preview-pane-alert"
+          type="error"
+          showIcon
+          closable
+          title={`预览失败: ${lastError}`}
+          onClose={clearError}
+        />
       ) : null}
       <PreviewToolbar
         showBoundaries={showBoundaries}
@@ -74,6 +83,7 @@ export default function PreviewPane() {
       <div className="preview-canvas-container">
         <PreviewCanvas
           ref={canvasRef}
+          sessionKey={previewSessionKey}
           preview={preview}
           geysers={geysers}
           showBoundaries={showBoundaries}

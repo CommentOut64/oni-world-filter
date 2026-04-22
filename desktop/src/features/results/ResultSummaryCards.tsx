@@ -1,3 +1,6 @@
+import React from "react";
+import { Card, Statistic } from "antd";
+
 import { useSearchStore } from "../../state/searchStore";
 
 function formatRuntime(startedAtMs: number | null): string {
@@ -11,26 +14,23 @@ function formatRuntime(startedAtMs: number | null): string {
 }
 
 export default function ResultSummaryCards() {
+  void React;
   const stats = useSearchStore((state) => state.stats);
 
   return (
     <section className="summary-cards">
-      <article>
-        <h4>已扫描种子</h4>
-        <p>{stats.processedSeeds.toLocaleString()}</p>
-      </article>
-      <article>
-        <h4>命中数</h4>
-        <p>{stats.totalMatches.toLocaleString()}</p>
-      </article>
-      <article>
-        <h4>当前 seeds/s</h4>
-        <p>{stats.currentSeedsPerSecond.toFixed(1)}</p>
-      </article>
-      <article>
-        <h4>运行时长</h4>
-        <p>{formatRuntime(stats.startedAtMs)}</p>
-      </article>
+      <Card size="small">
+        <Statistic title="已扫描种子" value={stats.processedSeeds.toLocaleString()} />
+      </Card>
+      <Card size="small">
+        <Statistic title="命中数" value={stats.totalMatches.toLocaleString()} />
+      </Card>
+      <Card size="small">
+        <Statistic title="当前 seeds/s" value={stats.currentSeedsPerSecond.toFixed(1)} />
+      </Card>
+      <Card size="small">
+        <Statistic title="运行时长" value={formatRuntime(stats.startedAtMs)} />
+      </Card>
     </section>
   );
 }

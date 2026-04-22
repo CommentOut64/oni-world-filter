@@ -60,8 +60,8 @@ export interface SearchDraft {
 
 export const DEFAULT_SEARCH_DRAFT: SearchDraft = {
   worldType: 13,
-  seedStart: 100000,
-  seedEnd: 120000,
+  seedStart: 0,
+  seedEnd: 10000,
   mixing: 625,
   cpu: DEFAULT_CPU_CONFIG,
   constraints: DEFAULT_CONSTRAINTS,

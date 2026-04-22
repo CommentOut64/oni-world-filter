@@ -1,3 +1,6 @@
+import React from "react";
+import { Button, Modal, Space, Typography } from "antd";
+
 import type { GeyserOption, SearchAnalysisPayload } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
 
@@ -39,30 +42,36 @@ export default function SearchWarningConfirmModal({
   onContinue,
   onAbandon,
 }: SearchWarningConfirmModalProps) {
+  void React;
   if (!open || !analysis) {
     return null;
   }
 
   return (
-    <div className="search-warning-modal-overlay" role="dialog" aria-modal="true">
-      <section className="search-warning-modal">
-        <header className="search-warning-modal-header">
-          <h4>搜索前提醒</h4>
-        </header>
-        <div className="search-warning-modal-body">
-          <p>乐观估计找到目标结果的概率为 {formatProbability(analysis.predictedBottleneckProbability)}。</p>
-          <p>主要瓶颈在于：{formatBottlenecks(analysis, geysers)}。</p>
-          <p>是否继续搜索？</p>
-        </div>
-        <footer className="search-warning-modal-actions">
-          <button type="button" className="primary" onClick={onContinue}>
+    <Modal
+      centered
+      open={open}
+      getContainer={false}
+      title="搜索前提醒"
+      onCancel={onAbandon}
+      footer={
+        <Space>
+          <Button onClick={onAbandon}>放弃</Button>
+          <Button type="primary" onClick={onContinue}>
             继续
-          </button>
-          <button type="button" onClick={onAbandon}>
-            放弃
-          </button>
-        </footer>
-      </section>
-    </div>
+          </Button>
+        </Space>
+      }
+    >
+      <div className="search-warning-modal-body">
+        <Typography.Paragraph>
+          乐观估计找到目标结果的概率为 {formatProbability(analysis.predictedBottleneckProbability)}。
+        </Typography.Paragraph>
+        <Typography.Paragraph>
+          主要瓶颈在于：{formatBottlenecks(analysis, geysers)}。
+        </Typography.Paragraph>
+        <Typography.Paragraph>是否继续搜索？</Typography.Paragraph>
+      </div>
+    </Modal>
   );
 }

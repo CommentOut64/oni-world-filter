@@ -10,7 +10,7 @@ export interface GeyserDisplayName extends DisplayName {}
 export interface MixingSlotDisplayName extends DisplayName {}
 
 export const WORLD_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
-  "SNDST-A-": { zh: "Terra", en: "Terra" },
+  "SNDST-A-": { zh: "类地星体", en: "Terra" },
   "OCAN-A-": { zh: "海洋星体", en: "Oceania" },
   "S-FRZ-": { zh: "冰霜星体", en: "Rime" },
   "LUSH-A-": { zh: "翠绿星体", en: "Verdante" },

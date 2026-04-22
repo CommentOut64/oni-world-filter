@@ -33,6 +33,8 @@ export const WORLD_CATEGORY_OPTIONS: readonly WorldCategoryOption[] = [
   },
 ];
 
+const HIDDEN_WORLD_CODES = new Set(["PRES-A-", "V-PRES-C-"]);
+
 const MIXING_PACKAGE_ORDER = ["DLC2_ID", "DLC3_ID", "DLC4_ID"] as const;
 
 type MixingPackagePath = (typeof MIXING_PACKAGE_ORDER)[number];
@@ -62,17 +64,41 @@ export function groupWorldsByCategory(
     moonletCluster: [],
   };
   for (const world of worlds) {
+    // 历史遗留命名异常的世界先从前端候选中隐藏，后端枚举保持不变。
+    if (HIDDEN_WORLD_CODES.has(world.code)) {
+      continue;
+    }
     grouped[classifyWorld(world.code)].push(world);
   }
   return grouped;
+}
+
+export function findCategoryForWorld(
+  worlds: readonly WorldOption[],
+  worldType: number
+): WorldCategory | null {
+  if (!Number.isFinite(worldType)) {
+    return null;
+  }
+  const world = worlds.find(
+    (item) => item.id === worldType && !HIDDEN_WORLD_CODES.has(item.code)
+  );
+  return world ? classifyWorld(world.code) : null;
 }
 
 export function getCategoryForWorld(
   worlds: readonly WorldOption[],
   worldType: number
 ): WorldCategory {
-  const world = worlds.find((item) => item.id === worldType);
-  return world ? classifyWorld(world.code) : "classicCluster";
+  return findCategoryForWorld(worlds, worldType) ?? "classicCluster";
+}
+
+export function isWorldTypeVisibleInCategory(
+  worlds: readonly WorldOption[],
+  worldType: number,
+  category: WorldCategory
+): boolean {
+  return findCategoryForWorld(worlds, worldType) === category;
 }
 
 function isChildOfPackage(path: string, packagePath: MixingPackagePath): boolean {

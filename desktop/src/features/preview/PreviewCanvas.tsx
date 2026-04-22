@@ -5,9 +5,16 @@ import { Circle, Layer, Line, Rect, Stage, Text } from "react-konva";
 import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
 import { previewPalette, zoneFillColor } from "./previewPalette";
 import { toPreviewViewModel } from "./previewModel";
-import { resetViewport, zoomAtPoint, type ViewportState } from "./viewport";
+import {
+  reconcileViewportOnStageResize,
+  resetViewport,
+  shouldResetPreviewInteractionState,
+  zoomAtPoint,
+  type ViewportState,
+} from "./viewport";
 
 interface PreviewCanvasProps {
+  sessionKey: string | null;
   preview: PreviewPayload | null;
   geysers: readonly GeyserOption[];
   showBoundaries: boolean;
@@ -169,6 +176,7 @@ function resolveVisibleLabels(
 
 const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(function PreviewCanvas(
   {
+    sessionKey,
     preview,
     geysers,
     showBoundaries,
@@ -183,6 +191,8 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
 ) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<import("konva/lib/Stage").Stage | null>(null);
+  const lastSessionKeyRef = useRef<string | null>(null);
+  const initializedViewportSessionKeyRef = useRef<string | null>(null);
   const [stageSize, setStageSize] = useState(DEFAULT_STAGE);
   const [viewport, setViewport] = useState<ViewportState>({
     scale: 1,
@@ -193,8 +203,15 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [hoverGeyserIndex, setHoverGeyserIndex] = useState<number | null>(null);
   const [selectedGeyserIndex, setSelectedGeyserIndex] = useState<number | null>(null);
+  const [hasManualViewportInteraction, setHasManualViewportInteraction] = useState(false);
 
   const model = useMemo(() => (preview ? toPreviewViewModel(preview, geysers) : null), [geysers, preview]);
+  const fittedViewport = useMemo(() => {
+    if (!model) {
+      return null;
+    }
+    return resetViewport(model, stageSize.width, stageSize.height);
+  }, [model, stageSize.height, stageSize.width]);
 
   const resolvedLabels = useMemo(() => {
     if (!model) return new Map<string, ResolvedLabel>();
@@ -225,10 +242,17 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
   }, []);
 
   useEffect(() => {
-    if (!model) {
+    if (
+      !shouldResetPreviewInteractionState({
+        previousSessionKey: lastSessionKeyRef.current,
+        nextSessionKey: sessionKey,
+      })
+    ) {
       return;
     }
-    setViewport(resetViewport(model, stageSize.width, stageSize.height));
+    lastSessionKeyRef.current = sessionKey;
+    initializedViewportSessionKeyRef.current = null;
+    setHasManualViewportInteraction(false);
     setHoverRegionId(null);
     setSelectedRegionId(null);
     setHoverGeyserIndex(null);
@@ -237,7 +261,31 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
     onSelectedRegionChange(null);
     onHoverGeyserChange(null);
     onSelectedGeyserChange(null);
-  }, [model, onHoverGeyserChange, onHoverRegionChange, onSelectedGeyserChange, onSelectedRegionChange, stageSize.height, stageSize.width]);
+  }, [onHoverGeyserChange, onHoverRegionChange, onSelectedGeyserChange, onSelectedRegionChange, sessionKey]);
+
+  useEffect(() => {
+    if (!sessionKey || !model) {
+      return;
+    }
+    if (initializedViewportSessionKeyRef.current === sessionKey) {
+      return;
+    }
+    initializedViewportSessionKeyRef.current = sessionKey;
+    setViewport(resetViewport(model, stageSize.width, stageSize.height));
+  }, [model, sessionKey, stageSize.height, stageSize.width]);
+
+  useEffect(() => {
+    if (!fittedViewport) {
+      return;
+    }
+    setViewport((current) =>
+      reconcileViewportOnStageResize({
+        hasManualViewportInteraction,
+        currentViewport: current,
+        fittedViewport,
+      })
+    );
+  }, [fittedViewport, hasManualViewportInteraction]);
 
   useImperativeHandle(
     ref,
@@ -246,6 +294,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
         if (!model) {
           return;
         }
+        setHasManualViewportInteraction(false);
         setViewport(resetViewport(model, stageSize.width, stageSize.height));
       },
       exportPng: () => {
@@ -277,6 +326,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
       return;
     }
     const direction = event.evt.deltaY > 0 ? 0.92 : 1.1;
+    setHasManualViewportInteraction(true);
     setViewport((current) => zoomAtPoint(current, pointer, current.scale * direction));
   };
 
@@ -293,6 +343,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
         draggable
         onWheel={handleWheel}
         onDragEnd={(event) => {
+          setHasManualViewportInteraction(true);
           setViewport((current) => ({
             ...current,
             x: event.target.x(),
@@ -320,6 +371,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
               stroke={showBoundaries ? previewPalette.boundary : "transparent"}
               strokeWidth={showBoundaries ? 1 / viewport.scale : 0}
               onMouseEnter={() => {
+                setHasManualViewportInteraction(true);
                 setHoverRegionId(region.id);
                 onHoverRegionChange({
                   id: region.id,
@@ -331,7 +383,10 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
                 onHoverRegionChange(null);
               }}
               onClick={() => {
+                setHasManualViewportInteraction(true);
                 setSelectedRegionId(region.id);
+                setHoverRegionId((current) => (current === region.id ? null : current));
+                onHoverRegionChange(null);
                 onSelectedRegionChange({
                   id: region.id,
                   zoneType: region.zoneType,
@@ -360,6 +415,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
                 radius={5 / viewport.scale}
                 fill={previewPalette.geyserMarker}
                 onMouseEnter={() => {
+                  setHasManualViewportInteraction(true);
                   setHoverGeyserIndex(geyser.index);
                   onHoverGeyserChange(geyser.index);
                 }}
@@ -370,7 +426,12 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
                   onHoverGeyserChange(null);
                 }}
                 onClick={() => {
+                  setHasManualViewportInteraction(true);
                   setSelectedGeyserIndex(geyser.index);
+                  setHoverGeyserIndex((current) =>
+                    current === geyser.index ? null : current
+                  );
+                  onHoverGeyserChange(null);
                   onSelectedGeyserChange(geyser.index);
                 }}
               />

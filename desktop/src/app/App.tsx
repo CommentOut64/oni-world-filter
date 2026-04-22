@@ -1,3 +1,4 @@
+import { Alert, Button } from "antd";
 import { useEffect, useState } from "react";
 
 import DesktopShell from "../components/layout/DesktopShell";
@@ -40,17 +41,22 @@ function App() {
           <section className="panel panel-results-list">
             <section className="results-pane">
               <header className="results-pane-header">
-                <button type="button" className="back-button" onClick={() => setActivePage("search")}>
+                <Button type="default" className="back-button" onClick={() => setActivePage("search")}>
                   返回参数页
-                </button>
+                </Button>
                 <div>
                   <h3>结果列表</h3>
                 </div>
               </header>
               {lastError ? (
-                <p className="error-inline" onClick={clearError}>
-                  后端事件: {lastError}
-                </p>
+                <Alert
+                  className="shell-inline-alert"
+                  type="error"
+                  showIcon
+                  title={`后端事件: ${lastError}`}
+                  closable
+                  onClose={clearError}
+                />
               ) : null}
               <ResultSummaryCards />
               <ResultToolbar />
@@ -70,13 +76,13 @@ function App() {
               }}
             />
             {hasResults ? (
-              <button
-                type="button"
+              <Button
+                type="primary"
                 className="back-to-results"
                 onClick={() => setActivePage("results")}
               >
                 查看结果{isSearching ? "（搜索中…）" : ` (${results.length})`}
-              </button>
+              </Button>
             ) : null}
           </section>
         </section>

@@ -1,3 +1,6 @@
+import React from "react";
+import { Card, Descriptions, Empty, Tag, Typography } from "antd";
+
 import { formatGeyserNameFromSummary, formatZoneTypeName } from "../../lib/displayResolvers";
 import type { PreviewPayload } from "../../lib/contracts";
 import { useSearchStore } from "../../state/searchStore";
@@ -21,14 +24,15 @@ export default function PreviewDetails({
   hoverGeyserIndex,
   selectedGeyserIndex,
 }: PreviewDetailsProps) {
+  void React;
   const geysers = useSearchStore((state) => state.geysers);
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
 
   if (!preview) {
     return (
-      <section className="preview-details">
-        <p className="hint">请选择一条搜索结果加载预览。</p>
-      </section>
+      <Card size="small" className="preview-details preview-details-empty">
+        <Empty description="请选择一条搜索结果加载预览。" />
+      </Card>
     );
   }
 
@@ -47,42 +51,67 @@ export default function PreviewDetails({
         );
 
   return (
-    <section className="preview-details">
-      <div className="preview-details-grid">
-        <div className="preview-details-col">
-          <p>
-            Seed:{" "}
-            {selectedSeed !== null && selectedSeed !== preview.summary.seed
-              ? `${preview.summary.seed} (选中 ${selectedSeed}，未同步)`
-              : preview.summary.seed}
-          </p>
-          <p>
-            尺寸: {preview.summary.worldSize.w} x {preview.summary.worldSize.h}
-          </p>
-          <p>
-            起点: ({preview.summary.start.x}, {preview.summary.start.y})
-          </p>
-          <p>
-            Traits:{" "}
-            {preview.summary.traits.length
+    <Card
+      size="small"
+      className="preview-details"
+      title="当前预览详情"
+      extra={
+        selectedSeed !== null && selectedSeed !== preview.summary.seed ? (
+          <Tag color="warning">选中 {selectedSeed}，预览仍为 {preview.summary.seed}</Tag>
+        ) : (
+          <Tag color="blue">Seed {preview.summary.seed}</Tag>
+        )
+      }
+    >
+      <Descriptions
+        className="preview-details-grid"
+        size="small"
+        column={3}
+        items={[
+          {
+            key: "world-size",
+            label: "尺寸",
+            children: `${preview.summary.worldSize.w} x ${preview.summary.worldSize.h}`,
+          },
+          {
+            key: "start",
+            label: "起点",
+            children: `(${preview.summary.start.x}, ${preview.summary.start.y})`,
+          },
+          {
+            key: "traits",
+            label: "Traits",
+            children: preview.summary.traits.length
               ? preview.summary.traits.map(traitLabel).join(", ")
-              : "-"}
-          </p>
-        </div>
-        <div className="preview-details-col">
-          <p>
-            板块:{" "}
-            {focusRegion ? formatZoneTypeName(focusRegion.zoneType) : "-"}
-          </p>
-          <p>
-            喷口:{" "}
-            {focusGeyser
-              ? `${formatGeyserNameFromSummary(focusGeyser, geysers)} (${focusGeyser.x}, ${focusGeyser.y})`
-              : "-"}
-          </p>
-          <p>距起点: {focusDistance === null ? "-" : focusDistance.toFixed(1)}</p>
-        </div>
-      </div>
-    </section>
+              : "-",
+          },
+          {
+            key: "region",
+            label: "板块",
+            children: focusRegion ? (
+              <Tag>{formatZoneTypeName(focusRegion.zoneType)}</Tag>
+            ) : (
+              "-"
+            ),
+          },
+          {
+            key: "geyser",
+            label: "喷口",
+            children: focusGeyser ? (
+              <Typography.Text>
+                {formatGeyserNameFromSummary(focusGeyser, geysers)} ({focusGeyser.x}, {focusGeyser.y})
+              </Typography.Text>
+            ) : (
+              "-"
+            ),
+          },
+          {
+            key: "distance",
+            label: "距起点",
+            children: focusDistance === null ? "-" : focusDistance.toFixed(1),
+          },
+        ]}
+      />
+    </Card>
   );
 }

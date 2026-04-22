@@ -65,6 +65,24 @@ export function zoomAtPoint(
   };
 }
 
+export function reconcileViewportOnStageResize(input: {
+  hasManualViewportInteraction: boolean;
+  currentViewport: ViewportState;
+  fittedViewport: ViewportState;
+}): ViewportState {
+  if (input.hasManualViewportInteraction) {
+    return input.currentViewport;
+  }
+  return input.fittedViewport;
+}
+
+export function shouldResetPreviewInteractionState(input: {
+  previousSessionKey: string | null;
+  nextSessionKey: string | null;
+}): boolean {
+  return input.previousSessionKey !== input.nextSessionKey;
+}
+
 export function pointerToWorld(
   pointer: { x: number; y: number },
   viewport: ViewportState
