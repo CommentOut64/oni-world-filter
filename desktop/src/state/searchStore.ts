@@ -62,7 +62,7 @@ export const DEFAULT_SEARCH_DRAFT: SearchDraft = {
   worldType: 13,
   seedStart: 0,
   seedEnd: 10000,
-  mixing: 625,
+  mixing: 0,
   cpu: DEFAULT_CPU_CONFIG,
   constraints: DEFAULT_CONSTRAINTS,
 };
@@ -502,9 +502,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         activeJobId: null,
         stats: {
           ...state.stats,
-          processedSeeds: event.processedSeeds,
-          totalSeeds: event.totalSeeds,
-          totalMatches: event.totalMatches,
+          processedSeeds: Math.max(state.stats.processedSeeds, event.processedSeeds),
+          totalSeeds: Math.max(state.stats.totalSeeds, event.totalSeeds),
+          totalMatches: Math.max(state.stats.totalMatches, event.totalMatches),
           activeWorkers: event.finalActiveWorkers,
           currentSeedsPerSecond: 0,
         },
