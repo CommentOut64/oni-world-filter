@@ -189,6 +189,13 @@ pub struct PreviewRequestPayload {
     pub mixing: i32,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoordPreviewRequestPayload {
+    pub job_id: String,
+    pub coord: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorldOption {
@@ -527,6 +534,34 @@ pub fn load_preview(
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or("preview 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("preview")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return Ok(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
+}
+
+pub fn load_preview_by_coord(
+    app: Option<&AppHandle>,
+    request: &CoordPreviewRequestPayload,
+) -> Result<Value, HostError> {
+    validate_preview_coord_request(request)?;
+    let sidecar_path = resolve_sidecar_path(app)?;
+    let payload = build_preview_coord_command(request);
+    let events =
+        run_sidecar_request_collect(&sidecar_path, &payload, sidecar_request_priority(&payload))?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("preview_coord 请求失败");
             return Err(HostError::InvalidRequest(message.to_string()));
         }
         if event.get("event").and_then(Value::as_str) == Some("preview")
@@ -949,6 +984,18 @@ pub(crate) fn validate_preview_request(request: &PreviewRequestPayload) -> Resul
     Ok(())
 }
 
+pub(crate) fn validate_preview_coord_request(
+    request: &CoordPreviewRequestPayload,
+) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    if request.coord.trim().is_empty() {
+        return Err(HostError::InvalidRequest("coord 不能为空".to_string()));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_analyze_search_request(
     request: &SearchRequestPayload,
 ) -> Result<(), HostError> {
@@ -965,6 +1012,14 @@ pub(crate) fn build_preview_command(request: &PreviewRequestPayload) -> Value {
         "worldType": request.world_type,
         "seed": request.seed,
         "mixing": request.mixing
+    })
+}
+
+pub(crate) fn build_preview_coord_command(request: &CoordPreviewRequestPayload) -> Value {
+    json!({
+        "command": "preview_coord",
+        "jobId": request.job_id,
+        "coord": request.coord
     })
 }
 
@@ -994,7 +1049,10 @@ pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Va
 }
 
 fn sidecar_request_priority(request: &Value) -> SidecarProcessPriority {
-    if request.get("command").and_then(Value::as_str) == Some("preview") {
+    if matches!(
+        request.get("command").and_then(Value::as_str),
+        Some("preview" | "preview_coord")
+    ) {
         return SidecarProcessPriority::LowPerfAffinity;
     }
     SidecarProcessPriority::Normal

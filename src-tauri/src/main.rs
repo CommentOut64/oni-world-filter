@@ -15,6 +15,7 @@ fn main() {
             commands::start_search,
             commands::cancel_search,
             commands::load_preview,
+            commands::load_preview_by_coord,
             commands::list_worlds,
             commands::list_geysers,
             commands::get_search_catalog,

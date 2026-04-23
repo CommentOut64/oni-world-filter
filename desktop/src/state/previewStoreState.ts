@@ -1,4 +1,4 @@
-import type { PreviewPayload } from "../lib/contracts";
+import type { PreviewPayload, SearchMatchSummary } from "../lib/contracts";
 
 export interface PreviewStoreSnapshot {
   activeKey: string | null;
@@ -6,6 +6,10 @@ export interface PreviewStoreSnapshot {
   cache: Record<string, PreviewPayload>;
   isLoading: boolean;
   lastError: string | null;
+}
+
+export function previewKey(match: SearchMatchSummary): string {
+  return `${match.worldType}:${match.seed}:${match.mixing}`;
 }
 
 export function beginPreviewLoad(
@@ -67,5 +71,24 @@ export function failPreviewLoad(
     ...state,
     isLoading: false,
     lastError: error,
+  };
+}
+
+export function primeResolvedPreviewState(
+  state: PreviewStoreSnapshot,
+  match: SearchMatchSummary,
+  preview: PreviewPayload
+): PreviewStoreSnapshot {
+  const key = previewKey(match);
+  return {
+    ...state,
+    activeKey: key,
+    activePreview: preview,
+    cache: {
+      ...state.cache,
+      [key]: preview,
+    },
+    isLoading: false,
+    lastError: null,
   };
 }

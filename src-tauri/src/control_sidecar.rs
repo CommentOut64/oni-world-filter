@@ -9,7 +9,8 @@ use tauri::AppHandle;
 
 use crate::error::HostError;
 use crate::sidecar::{
-    self, PreviewRequestPayload, SearchAnalysisPayload, SearchCatalogPayload, SearchRequestPayload,
+    self, CoordPreviewRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
+    SearchCatalogPayload, SearchRequestPayload,
 };
 
 #[derive(Clone)]
@@ -138,6 +139,33 @@ pub fn load_preview(
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or("preview 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("preview")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return Ok(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
+}
+
+pub fn load_preview_by_coord(
+    app: Option<&AppHandle>,
+    manager: &ControlSidecarManager,
+    request: &CoordPreviewRequestPayload,
+) -> Result<Value, HostError> {
+    sidecar::validate_preview_coord_request(request)?;
+    let payload = sidecar::build_preview_coord_command(request);
+    let events = manager.request_or_fallback(app, &payload)?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("preview_coord 请求失败");
             return Err(HostError::InvalidRequest(message.to_string()));
         }
         if event.get("event").and_then(Value::as_str) == Some("preview")
@@ -432,7 +460,7 @@ fn drain_stderr_into(stderr: ChildStderr, lines: Arc<Mutex<Vec<String>>>) {
 
 fn terminal_event_name(request: &Value) -> Result<&'static str, HostError> {
     match request.get("command").and_then(Value::as_str) {
-        Some("preview") => Ok("preview"),
+        Some("preview" | "preview_coord") => Ok("preview"),
         Some("get_search_catalog") => Ok("search_catalog"),
         Some("analyze_search_request") => Ok("search_analysis"),
         Some(other) => Err(HostError::InvalidRequest(format!(

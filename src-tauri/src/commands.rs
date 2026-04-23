@@ -2,8 +2,8 @@ use tauri::{AppHandle, State};
 
 use crate::control_sidecar;
 use crate::sidecar::{
-    self, GeyserOption, PreviewRequestPayload, SearchAnalysisPayload, SearchCatalogPayload,
-    SearchRequestPayload, WorldOption,
+    self, CoordPreviewRequestPayload, GeyserOption, PreviewRequestPayload,
+    SearchAnalysisPayload, SearchCatalogPayload, SearchRequestPayload, WorldOption,
 };
 use crate::state::AppState;
 
@@ -36,6 +36,22 @@ pub async fn load_preview(
     let control_sidecar = state.control_sidecar.clone();
     tauri::async_runtime::spawn_blocking(move || {
         control_sidecar::load_preview(Some(&app_handle), &control_sidecar, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn load_preview_by_coord(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    request: CoordPreviewRequestPayload,
+) -> Result<serde_json::Value, String> {
+    let app_handle = app.clone();
+    let control_sidecar = state.control_sidecar.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        control_sidecar::load_preview_by_coord(Some(&app_handle), &control_sidecar, &request)
     })
     .await
     .map_err(|error| error.to_string())?

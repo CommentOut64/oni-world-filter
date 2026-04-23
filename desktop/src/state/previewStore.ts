@@ -1,8 +1,14 @@
 import { create } from "zustand";
 
 import type { PreviewPayload, SearchMatchSummary } from "../lib/contracts";
-import { formatTauriError, loadPreview } from "../lib/tauri";
-import { beginPreviewLoad, completePreviewLoad, failPreviewLoad } from "./previewStoreState";
+import { formatTauriError, loadPreview } from "../lib/tauri.ts";
+import {
+  beginPreviewLoad,
+  completePreviewLoad,
+  failPreviewLoad,
+  previewKey,
+  primeResolvedPreviewState,
+} from "./previewStoreState";
 
 interface PreviewState {
   activeKey: string | null;
@@ -11,12 +17,9 @@ interface PreviewState {
   isLoading: boolean;
   lastError: string | null;
   loadByMatch: (match: SearchMatchSummary) => Promise<void>;
+  primeResolvedPreview: (match: SearchMatchSummary, preview: PreviewPayload) => void;
   clear: () => void;
   clearError: () => void;
-}
-
-function previewKey(match: SearchMatchSummary): string {
-  return `${match.worldType}:${match.seed}:${match.mixing}`;
 }
 
 export const usePreviewStore = create<PreviewState>((set, get) => ({
@@ -44,6 +47,9 @@ export const usePreviewStore = create<PreviewState>((set, get) => ({
     } catch (error) {
       set((state) => failPreviewLoad(state, key, formatTauriError(error)));
     }
+  },
+  primeResolvedPreview: (match, preview) => {
+    set((state) => primeResolvedPreviewState(state, match, preview));
   },
   clear: () => {
     set({
