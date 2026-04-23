@@ -1,22 +1,79 @@
-:root {
+html[data-theme="dark"] {
   --bg-main: #08111b;
   --bg-layout: #0b1624;
   --bg-panel: rgba(15, 27, 45, 0.94);
   --bg-panel-soft: rgba(19, 34, 53, 0.92);
+  --bg-panel-strong: rgba(7, 17, 29, 0.65);
+  --bg-card-soft: rgba(9, 20, 33, 0.76);
+  --bg-card-strong: rgba(9, 20, 33, 0.82);
+  --bg-active: rgba(25, 52, 79, 0.92);
+  --bg-row-selected: rgba(47, 143, 221, 0.2);
+  --bg-row-hover: rgba(74, 137, 194, 0.15);
+  --bg-overlay: rgba(10, 22, 38, 0.94);
+  --bg-chip: rgba(20, 38, 58, 0.92);
   --line: rgba(40, 68, 95, 0.88);
   --line-soft: rgba(54, 85, 111, 0.7);
+  --line-panel: rgba(96, 145, 183, 0.34);
+  --line-active: rgba(123, 198, 255, 0.58);
+  --line-overlay: rgba(97, 144, 181, 0.3);
   --text-main: #e7f0fa;
   --text-muted: #9fb4c9;
+  --text-soft: #cde1f6;
+  --text-strong: #d8e8f8;
+  --text-highlight: #f8ddb4;
   --error: #f87171;
   --accent: #3b82f6;
   --accent-strong: #2563eb;
+  --scroll-thumb: rgba(100, 148, 190, 0.35);
+  --scroll-thumb-hover: rgba(100, 148, 190, 0.55);
+  --bg-glow-1: rgba(25, 57, 93, 0.62);
+  --bg-glow-2: rgba(21, 77, 116, 0.42);
+  --bg-debug-glow-1: #18304a;
+  --bg-debug-glow-2: #113245;
+  --panel-shadow: 0 16px 36px rgba(2, 8, 16, 0.34);
+  --font-main: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html[data-theme="light"] {
+  --bg-main: #f5f5f7;
+  --bg-layout: #ececef;
+  --bg-panel: #ffffff;
+  --bg-panel-soft: #fafafa;
+  --bg-panel-strong: #f4f4f5;
+  --bg-card-soft: #fafafa;
+  --bg-card-strong: #ffffff;
+  --bg-active: #e4ebf7;
+  --bg-row-selected: rgba(37, 99, 235, 0.10);
+  --bg-row-hover: rgba(24, 24, 27, 0.05);
+  --bg-overlay: #ffffff;
+  --bg-chip: #f4f4f5;
+  --line: #d4d4d8;
+  --line-soft: #e4e4e7;
+  --line-panel: #e4e4e7;
+  --line-active: #2563eb;
+  --line-overlay: #e4e4e7;
+  --text-main: #18181b;
+  --text-muted: #52525b;
+  --text-soft: #3f3f46;
+  --text-strong: #09090b;
+  --text-highlight: #b45309;
+  --error: #b91c1c;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --scroll-thumb: rgba(24, 24, 27, 0.22);
+  --scroll-thumb-hover: rgba(24, 24, 27, 0.42);
+  --bg-glow-1: rgba(228, 228, 231, 0.85);
+  --bg-glow-2: rgba(244, 244, 245, 0.9);
+  --bg-debug-glow-1: rgba(228, 228, 231, 0.85);
+  --bg-debug-glow-2: rgba(244, 244, 245, 0.9);
+  --panel-shadow: 0 12px 28px rgba(15, 17, 21, 0.08);
   --font-main: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 148, 190, 0.35) transparent;
+  scrollbar-color: var(--scroll-thumb) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -29,20 +86,20 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(100, 148, 190, 0.35);
+  background: var(--scroll-thumb);
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 148, 190, 0.55);
+  background: var(--scroll-thumb-hover);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(1380px 820px at 12% 10%, rgba(25, 57, 93, 0.62) 0%, transparent 54%),
-    radial-gradient(1120px 760px at 88% 18%, rgba(21, 77, 116, 0.42) 0%, transparent 58%),
+    radial-gradient(1380px 820px at 12% 10%, var(--bg-glow-1) 0%, transparent 54%),
+    radial-gradient(1120px 760px at 88% 18%, var(--bg-glow-2) 0%, transparent 58%),
     var(--bg-main);
   color: var(--text-main);
   font-family: var(--font-main);
@@ -64,9 +121,17 @@ textarea {
 }
 
 .desktop-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   padding: 16px;
   overflow: hidden;
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: 14px;
+}
+
+.theme-toggle {
+  align-self: center;
 }
 
 .panel {
@@ -77,7 +142,7 @@ textarea {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 16px 36px rgba(2, 8, 16, 0.34);
+  box-shadow: var(--panel-shadow);
 }
 
 .search-panel,
@@ -104,7 +169,7 @@ textarea {
 
 .search-screen,
 .results-screen {
-  height: calc(100vh - 32px);
+  height: 100%;
   min-height: 0;
 }
 
@@ -128,6 +193,13 @@ textarea {
 .search-panel-header {
   display: grid;
   gap: 8px;
+}
+
+.search-panel-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .search-panel-alert {
@@ -159,9 +231,9 @@ textarea {
 }
 
 .search-section {
-  border: 1px solid rgba(96, 145, 183, 0.34);
+  border: 1px solid var(--line-panel);
   border-radius: 12px;
-  background: rgba(7, 17, 29, 0.58);
+  background: var(--bg-panel-strong);
   box-shadow: none;
 }
 
@@ -250,6 +322,13 @@ textarea {
   overflow: hidden;
 }
 
+.preview-pane-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .preview-pane-alert {
   margin-top: 10px;
 }
@@ -262,7 +341,7 @@ textarea {
 }
 
 .field-label {
-  color: #cde1f6;
+  color: var(--text-soft);
   font-size: 13px;
 }
 
@@ -290,15 +369,15 @@ textarea {
 
 .field-inline .ant-checkbox-wrapper {
   font-size: 13px;
-  color: #cde1f6;
+  color: var(--text-soft);
 }
 
 .constraint-editor {
   margin-top: 14px;
-  border: 1px solid rgba(96, 145, 183, 0.34);
+  border: 1px solid var(--line-panel);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(7, 17, 29, 0.65);
+  background: var(--bg-panel-strong);
 }
 
 .world-parameter-layout {
@@ -332,15 +411,15 @@ textarea {
 }
 
 .world-category-tabs {
-  display: flex;
+  display: inline-flex;
   gap: 4px;
+  justify-self: start;
 }
 
 .world-select {
   width: 100%;
 }
 
-.world-selector-compact .ant-segmented,
 .world-selector-compact .ant-select {
   width: 100%;
 }
@@ -348,9 +427,9 @@ textarea {
 .mixing-package-card.ant-card,
 .advanced-debug-panel.ant-card,
 .mixing-advanced-collapse.ant-collapse {
-  border: 1px solid rgba(96, 145, 183, 0.34);
+  border: 1px solid var(--line-panel);
   border-radius: 10px;
-  background: rgba(7, 17, 29, 0.65);
+  background: var(--bg-panel-strong);
   box-shadow: none;
 }
 
@@ -371,8 +450,8 @@ textarea {
 }
 
 .mixing-package-card.ant-card.active {
-  border-color: rgba(123, 198, 255, 0.58);
-  background: rgba(25, 52, 79, 0.92);
+  border-color: var(--line-active);
+  background: var(--bg-active);
 }
 
 .mixing-package-list {
@@ -407,7 +486,7 @@ textarea {
 
 .mixing-package-toggle.ant-checkbox-wrapper,
 .mixing-child-toggle.ant-checkbox-wrapper {
-  color: #d8e8f8;
+  color: var(--text-strong);
   font-size: 13px;
 }
 
@@ -436,12 +515,12 @@ textarea {
   align-items: center;
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid rgba(90, 134, 168, 0.25);
-  background: rgba(8, 18, 30, 0.75);
+  border: 1px solid var(--line-soft);
+  background: var(--bg-card-soft);
 }
 
 .mixing-child-name {
-  color: #dbeafb;
+  color: var(--text-strong);
 }
 
 .mixing-child-row .ant-select {
@@ -465,7 +544,7 @@ textarea {
   justify-self: end;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(102, 154, 198, 0.38);
+  border: 1px solid var(--line-soft);
   color: var(--text-muted);
   font-size: 12px;
   margin-inline-end: 0;
@@ -473,7 +552,7 @@ textarea {
 
 .mixing-disabled-note {
   grid-column: 1 / -1;
-  color: #f8ddb4;
+  color: var(--text-highlight);
   font-size: 12px;
 }
 
@@ -483,7 +562,7 @@ textarea {
 
 .mixing-advanced-collapse.ant-collapse > .ant-collapse-item > .ant-collapse-header {
   padding: 12px;
-  color: #d8e8f8;
+  color: var(--text-strong);
   font-size: 13px;
 }
 
@@ -579,10 +658,10 @@ textarea {
 
 .analysis-hints {
   margin-top: 14px;
-  border: 1px solid rgba(96, 145, 183, 0.34);
+  border: 1px solid var(--line-panel);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(7, 17, 29, 0.65);
+  background: var(--bg-card-soft);
   display: grid;
   gap: 6px;
 }
@@ -614,7 +693,7 @@ textarea {
 
 .analysis-bottlenecks {
   margin: 0;
-  color: #d8e9fb;
+  color: var(--text-strong);
   font-size: 12px;
 }
 
@@ -630,7 +709,7 @@ textarea {
 }
 
 .analysis-list-warning li {
-  color: #f8ddb4;
+  color: var(--text-highlight);
 }
 
 .analysis-list-error li {
@@ -644,7 +723,7 @@ textarea {
 
 .search-warning-modal-body p {
   margin: 0;
-  color: #d8e8f8;
+  color: var(--text-strong);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -657,9 +736,9 @@ textarea {
 }
 
 .summary-cards .ant-card {
-  border: 1px solid rgba(107, 154, 191, 0.33);
+  border: 1px solid var(--line-panel);
   border-radius: 10px;
-  background: rgba(9, 20, 33, 0.76);
+  background: var(--bg-card-soft);
   box-shadow: none;
 }
 
@@ -701,8 +780,8 @@ textarea {
   min-height: 100vh;
   padding: 18px;
   background:
-    radial-gradient(920px 620px at 12% 10%, #18304a 0%, transparent 52%),
-    radial-gradient(880px 640px at 88% 18%, #113245 0%, transparent 56%),
+    radial-gradient(920px 620px at 12% 10%, var(--bg-debug-glow-1) 0%, transparent 52%),
+    radial-gradient(880px 640px at 88% 18%, var(--bg-debug-glow-2) 0%, transparent 56%),
     var(--bg-main);
   display: grid;
   grid-template-rows: auto 1fr;
@@ -711,9 +790,9 @@ textarea {
 
 .host-debug-header,
 .host-debug-body {
-  border: 1px solid rgba(97, 143, 179, 0.34);
+  border: 1px solid var(--line-panel);
   border-radius: 12px;
-  background: rgba(9, 20, 33, 0.82);
+  background: var(--bg-card-strong);
   box-shadow: none;
 }
 
@@ -750,7 +829,7 @@ textarea {
 .host-debug-pre {
   margin: 0;
   padding: 8px 2px 2px;
-  color: #d7e8fa;
+  color: var(--text-strong);
   font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -761,10 +840,10 @@ textarea {
   margin-top: 10px;
   flex: 1;
   min-height: 0;
-  border: 1px solid rgba(97, 143, 179, 0.34);
+  border: 1px solid var(--line-panel);
   border-radius: 10px;
   overflow: hidden;
-  background: rgba(9, 20, 33, 0.76);
+  background: var(--bg-card-soft);
 }
 
 .results-table-wrap .ant-table-wrapper,
@@ -803,12 +882,12 @@ textarea {
 }
 
 .results-table-wrap .ant-table-tbody > tr.results-table-row-selected > td {
-  background: rgba(47, 143, 221, 0.2);
+  background: var(--bg-row-selected);
 }
 
 .results-table-wrap .ant-table-tbody > tr.results-table-row:hover > td,
 .results-table-wrap .ant-table-tbody > tr.results-table-row-selected:hover > td {
-  background: rgba(74, 137, 194, 0.15);
+  background: var(--bg-row-hover);
 }
 
 .preview-canvas-container {
@@ -821,10 +900,10 @@ textarea {
 .preview-canvas-wrap {
   position: absolute;
   inset: 0;
-  border: 1px solid rgba(97, 144, 181, 0.35);
+  border: 1px solid var(--line-panel);
   border-radius: 10px;
   overflow: hidden;
-  background: #0b1624;
+  background: var(--bg-layout);
 }
 
 .geyser-overlay {
@@ -833,20 +912,20 @@ textarea {
   left: 0;
   width: 240px;
   max-height: 100%;
-  border: 1px solid rgba(97, 144, 181, 0.45);
+  border: 1px solid var(--line-active);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   z-index: 10;
   overflow: hidden;
-  background: rgba(10, 22, 38, 0.94);
+  background: var(--bg-overlay);
   box-shadow: none;
 }
 
 .geyser-overlay.ant-card .ant-card-head {
   min-height: 42px;
   padding: 0 12px;
-  border-bottom-color: rgba(97, 144, 181, 0.3);
+  border-bottom-color: var(--line-overlay);
 }
 
 .geyser-overlay.ant-card .ant-card-head-title {
@@ -873,7 +952,7 @@ textarea {
 
 .geyser-overlay-item {
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(97, 144, 181, 0.18);
+  border-bottom: 1px solid var(--line-overlay);
 }
 
 .geyser-overlay-item:last-child {
@@ -920,9 +999,9 @@ textarea {
   justify-content: space-between;
   gap: 8px;
   padding: 0 10px;
-  border: 1px solid rgba(97, 144, 181, 0.3);
+  border: 1px solid var(--line-overlay);
   border-radius: 8px;
-  background: rgba(8, 18, 30, 0.75);
+  background: var(--bg-card-soft);
 }
 
 .preview-toolbar-toggle .ant-typography {
@@ -938,9 +1017,9 @@ textarea {
   z-index: 9;
   width: 132px;
   margin-top: 0;
-  border: 1px solid rgba(97, 144, 181, 0.3);
+  border: 1px solid var(--line-overlay);
   border-radius: 10px;
-  background: rgba(8, 18, 30, 0.88);
+  background: var(--bg-card-strong);
   box-shadow: none;
 }
 
@@ -966,8 +1045,8 @@ textarea {
   font-size: 12px;
   white-space: nowrap;
   margin-inline-end: 0;
-  background: rgba(20, 38, 58, 0.92);
-  border-color: rgba(97, 144, 181, 0.3);
+  background: var(--bg-chip);
+  border-color: var(--line-overlay);
 }
 
 .dot {
@@ -1000,16 +1079,16 @@ textarea {
 
 .preview-details {
   margin-top: 8px;
-  border: 1px solid rgba(97, 144, 181, 0.3);
+  border: 1px solid var(--line-overlay);
   border-radius: 10px;
-  background: rgba(8, 18, 30, 0.75);
+  background: var(--bg-card-soft);
   box-shadow: none;
 }
 
 .preview-details.ant-card .ant-card-head {
   min-height: 42px;
   padding: 0 12px;
-  border-bottom-color: rgba(97, 144, 181, 0.3);
+  border-bottom-color: var(--line-overlay);
 }
 
 .preview-details.ant-card .ant-card-body {
