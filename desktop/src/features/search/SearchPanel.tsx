@@ -15,6 +15,8 @@ import type { SearchAnalysisPayload } from "../../lib/contracts";
 import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
 import type { SearchDraft } from "../../state/searchStore";
 import { analyzeSearchRequest, formatTauriError } from "../../lib/tauri";
+import type { DesktopThemeMode } from "../../app/antdTheme";
+import ThemeModeToggle from "../../components/layout/ThemeModeToggle";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
 import CountRuleEditor from "./CountRuleEditor";
@@ -34,11 +36,18 @@ import {
 import WorldSelector from "./WorldSelector";
 
 interface SearchPanelProps {
+  themeMode: DesktopThemeMode;
+  onThemeModeChange: (mode: DesktopThemeMode) => void;
   onSearchStarted?: () => void;
   onViewResults?: () => void;
 }
 
-export default function SearchPanel({ onSearchStarted, onViewResults }: SearchPanelProps) {
+export default function SearchPanel({
+  themeMode,
+  onThemeModeChange,
+  onSearchStarted,
+  onViewResults,
+}: SearchPanelProps) {
   const worlds = useSearchStore((state) => state.worlds);
   const catalog = useSearchStore((state) => state.catalog);
   const geysers = useSearchStore((state) => state.geysers);
@@ -170,9 +179,12 @@ export default function SearchPanel({ onSearchStarted, onViewResults }: SearchPa
     <FormProvider {...methods}>
       <form className="search-panel" onSubmit={submit}>
         <header className="search-panel-header">
-          <Flex vertical gap={4}>
-            <Typography.Title level={3}>搜索参数</Typography.Title>
-          </Flex>
+          <div className="search-panel-header-row">
+            <Flex vertical gap={4}>
+              <Typography.Title level={3}>搜索参数</Typography.Title>
+            </Flex>
+            <ThemeModeToggle mode={themeMode} onModeChange={onThemeModeChange} />
+          </div>
           {lastError ? (
             <Alert
               className="search-panel-alert"

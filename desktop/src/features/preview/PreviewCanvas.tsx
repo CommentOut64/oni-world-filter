@@ -2,8 +2,9 @@ import type { KonvaEventObject } from "konva/lib/Node";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Circle, Layer, Line, Rect, Stage, Text } from "react-konva";
 
+import type { DesktopThemeMode } from "../../app/antdTheme";
 import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
-import { previewPalette, zoneFillColor } from "./previewPalette";
+import { createPreviewPalette, zoneFillColor } from "./previewPalette";
 import { toPreviewViewModel } from "./previewModel";
 import {
   reconcileViewportOnStageResize,
@@ -14,6 +15,7 @@ import {
 } from "./viewport";
 
 interface PreviewCanvasProps {
+  themeMode: DesktopThemeMode;
   sessionKey: string | null;
   preview: PreviewPayload | null;
   geysers: readonly GeyserOption[];
@@ -176,6 +178,7 @@ function resolveVisibleLabels(
 
 const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(function PreviewCanvas(
   {
+    themeMode,
     sessionKey,
     preview,
     geysers,
@@ -206,6 +209,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
   const [hasManualViewportInteraction, setHasManualViewportInteraction] = useState(false);
 
   const model = useMemo(() => (preview ? toPreviewViewModel(preview, geysers) : null), [geysers, preview]);
+  const previewPalette = useMemo(() => createPreviewPalette(themeMode), [themeMode]);
   const fittedViewport = useMemo(() => {
     if (!model) {
       return null;
@@ -313,7 +317,11 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
 
   if (!preview || !model) {
     return (
-      <section className="preview-canvas-wrap preview-empty" ref={wrapperRef}>
+      <section
+        className="preview-canvas-wrap preview-empty"
+        ref={wrapperRef}
+        style={{ backgroundColor: previewPalette.background }}
+      >
         <p className="hint">无预览数据</p>
       </section>
     );
@@ -331,7 +339,11 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
   };
 
   return (
-    <section className="preview-canvas-wrap" ref={wrapperRef}>
+    <section
+      className="preview-canvas-wrap"
+      ref={wrapperRef}
+      style={{ backgroundColor: previewPalette.background }}
+    >
       <Stage
         ref={stageRef}
         width={stageSize.width}
@@ -367,7 +379,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
               key={region.id}
               points={region.points}
               closed
-              fill={zoneFillColor(region.zoneType)}
+              fill={zoneFillColor(region.zoneType, themeMode)}
               stroke={showBoundaries ? previewPalette.boundary : "transparent"}
               strokeWidth={showBoundaries ? 1 / viewport.scale : 0}
               onMouseEnter={() => {

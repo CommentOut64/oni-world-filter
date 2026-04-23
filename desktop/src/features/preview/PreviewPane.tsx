@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Typography } from "antd";
 
+import type { DesktopThemeMode } from "../../app/antdTheme";
+import ThemeModeToggle from "../../components/layout/ThemeModeToggle";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
 import PreviewCanvas, { type PreviewCanvasHandle } from "./PreviewCanvas";
@@ -9,7 +11,12 @@ import GeyserListOverlay from "./GeyserListOverlay";
 import PreviewLegend from "./PreviewLegend";
 import PreviewToolbar from "./PreviewToolbar";
 
-export default function PreviewPane() {
+interface PreviewPaneProps {
+  themeMode: DesktopThemeMode;
+  onThemeModeChange: (mode: DesktopThemeMode) => void;
+}
+
+export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPaneProps) {
   void React;
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
   const results = useSearchStore((state) => state.results);
@@ -52,8 +59,9 @@ export default function PreviewPane() {
 
   return (
     <section className="preview-pane">
-      <header>
+      <header className="preview-pane-header">
         <Typography.Title level={3}>地图预览</Typography.Title>
+        <ThemeModeToggle mode={themeMode} onModeChange={onThemeModeChange} />
       </header>
       {isLoading ? (
         <Alert className="preview-pane-alert" type="info" showIcon title="预览加载中..." />
@@ -83,6 +91,7 @@ export default function PreviewPane() {
       <div className="preview-canvas-container">
         <PreviewCanvas
           ref={canvasRef}
+          themeMode={themeMode}
           sessionKey={previewSessionKey}
           preview={preview}
           geysers={geysers}

@@ -1,6 +1,7 @@
 import { Alert, Button } from "antd";
 import { useEffect, useState } from "react";
 
+import type { DesktopThemeMode } from "./antdTheme";
 import DesktopShell from "../components/layout/DesktopShell";
 import HostDebugWindow from "../features/debug/HostDebugWindow";
 import PreviewPane from "../features/preview/PreviewPane";
@@ -11,7 +12,12 @@ import SearchPanel from "../features/search/SearchPanel";
 import { isHostDebugWindow } from "../lib/hostDebugWindow";
 import { disposeSidecarListener, useSearchStore } from "../state/searchStore";
 
-function App() {
+interface AppProps {
+  themeMode: DesktopThemeMode;
+  onThemeModeChange: (mode: DesktopThemeMode) => void;
+}
+
+function App({ themeMode, onThemeModeChange }: AppProps) {
   if (isHostDebugWindow()) {
     return <HostDebugWindow />;
   }
@@ -64,13 +70,15 @@ function App() {
             </section>
           </section>
           <aside className="panel panel-results-preview">
-            <PreviewPane />
+            <PreviewPane themeMode={themeMode} onThemeModeChange={onThemeModeChange} />
           </aside>
         </section>
       ) : (
         <section className="search-screen">
           <section className="panel panel-search-page">
             <SearchPanel
+              themeMode={themeMode}
+              onThemeModeChange={onThemeModeChange}
               onSearchStarted={() => {
                 setActivePage("results");
               }}
