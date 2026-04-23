@@ -55,13 +55,13 @@
 后端处理规则如下：
 
 1. 通过 `SearchAnalysis::GetWorldPrefixes()` 做世界前缀匹配
-2. 从原始坐标中提取 `seed` 与 base36 `mixing`
-3. 使用 `SettingsCache::Base36ToBinary()` 反解 `mixing`
-4. 使用现有 [`BuildWorldCode`](f:/oni_world_app-master/src/entry_sidecar.cpp) 反向重建 canonical 坐标码
-5. 若重建结果与用户输入不完全一致，则拒绝请求
-6. 使用 canonical 坐标码进入 `AppRuntime::Generate()`，由 `CoordinateChanged()` 建立最终生成状态
+2. 按 `prefix-seed-part3-part4-mixing` 五段结构解析原始坐标
+3. 从原始坐标中提取 `seed` 与 base36 `mixing`
+4. 使用 `SettingsCache::Base36ToBinary()` 反解 `mixing`
+5. 使用原始坐标直接进入 `AppRuntime::Generate()`，由 `CoordinateChanged()` 建立最终生成状态
+6. 若原始坐标无法完成生成，则拒绝请求
 
-这套链路的关键点是：**同一个后端既负责解释坐标，也负责实际生成地图，并在生成前先做一次 canonical 回写校验。**
+这套链路的关键点是：**同一个后端既负责解释坐标，也负责实际生成地图，而且不会在前置校验阶段把中段样式硬编码成单一格式。**
 
 ### 3. 结果页复用方式
 

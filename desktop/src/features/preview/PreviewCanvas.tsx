@@ -4,6 +4,7 @@ import { Circle, Layer, Line, Rect, Stage, Text } from "react-konva";
 
 import type { DesktopThemeMode } from "../../app/antdTheme";
 import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
+import { exportPreviewPng } from "./exportPreviewPng";
 import { createPreviewPalette, zoneFillColor } from "./previewPalette";
 import { toPreviewViewModel } from "./previewModel";
 import {
@@ -30,7 +31,7 @@ interface PreviewCanvasProps {
 
 export interface PreviewCanvasHandle {
   resetView: () => void;
-  exportPng: () => void;
+  exportPng: () => Promise<void>;
 }
 
 const DEFAULT_STAGE = { width: 560, height: 560 };
@@ -301,15 +302,14 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
         setHasManualViewportInteraction(false);
         setViewport(resetViewport(model, stageSize.width, stageSize.height));
       },
-      exportPng: () => {
+      exportPng: async () => {
         if (!stageRef.current || !preview) {
           return;
         }
-        const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
-        const link = document.createElement("a");
-        link.href = uri;
-        link.download = `oni-preview-${preview.summary.seed}.png`;
-        link.click();
+        await exportPreviewPng({
+          dataUrl: stageRef.current.toDataURL({ pixelRatio: 2 }),
+          seed: preview.summary.seed,
+        });
       },
     }),
     [model, preview, stageSize.height, stageSize.width]

@@ -129,6 +129,11 @@ export interface PreviewRequest {
   mixing: number;
 }
 
+export interface CoordPreviewRequest {
+  jobId: string;
+  coord: string;
+}
+
 export interface WorldOption {
   id: number;
   code: string;
@@ -297,6 +302,10 @@ export interface PreviewEvent {
   preview: PreviewPayload;
 }
 
+export interface CoordPreviewEvent extends PreviewEvent {
+  coord: string;
+}
+
 export interface SidecarStderrEvent {
   jobId: string;
   message: string;
@@ -309,7 +318,8 @@ export type SidecarEvent =
   | SearchCompletedEvent
   | SearchCancelledEvent
   | SearchFailedEvent
-  | PreviewEvent;
+  | PreviewEvent
+  | CoordPreviewEvent;
 
 export interface SearchMatchSummary {
   seed: number;

@@ -15,6 +15,7 @@ enum class SidecarCommandType {
     Unknown,
     Search,
     Preview,
+    PreviewCoord,
     Cancel,
     SetSearchActiveWorkers,
     GetSearchCatalog,
@@ -65,6 +66,11 @@ struct SidecarPreviewRequest {
     int mixing = 0;
 };
 
+struct SidecarPreviewCoordRequest {
+    std::string jobId;
+    std::string coord;
+};
+
 struct SidecarCancelRequest {
     std::string jobId;
 };
@@ -92,6 +98,7 @@ struct SidecarRequest {
     SidecarCommandType command = SidecarCommandType::Unknown;
     SidecarSearchRequest search;
     SidecarPreviewRequest preview;
+    SidecarPreviewCoordRequest previewCoord;
     SidecarCancelRequest cancel;
     SidecarSetSearchActiveWorkersRequest setSearchActiveWorkers;
     SidecarGetSearchCatalogRequest getSearchCatalog;
@@ -128,7 +135,8 @@ std::string SerializeCancelledEvent(const std::string &jobId,
                                     const SearchCancelledEvent &event);
 std::string SerializePreviewEvent(const std::string &jobId,
                                   const SidecarPreviewRequest &request,
-                                  const GeneratedWorldPreview &preview);
+                                  const GeneratedWorldPreview &preview,
+                                  const std::string *coordOverride = nullptr);
 std::string SerializeSearchCatalogEvent(const std::string &jobId,
                                         const SearchAnalysis::SearchCatalog &catalog);
 std::string SerializeSearchAnalysisEvent(const std::string &jobId,

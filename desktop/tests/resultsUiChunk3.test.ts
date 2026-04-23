@@ -112,6 +112,18 @@ test("ResultsTable renders antd table shell", () => {
   assert.match(markup, /max-height:\d+px/);
 });
 
+test("ResultsTable does not render antd selection control column", () => {
+  useSearchStore.setState({
+    geysers: BASE_STATE.geysers,
+    results: BASE_STATE.results,
+    selectedSeed: BASE_STATE.selectedSeed,
+  });
+
+  const markup = renderToStaticMarkup(createElement(ResultsTable));
+
+  assert.doesNotMatch(markup, /ant-table-selection-column/);
+});
+
 test("geyser summary prioritizes constrained geysers before other overview items", () => {
   const summary = formatGeyserCountSummary(
     [

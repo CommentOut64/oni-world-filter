@@ -189,6 +189,13 @@ pub struct PreviewRequestPayload {
     pub mixing: i32,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoordPreviewRequestPayload {
+    pub job_id: String,
+    pub coord: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorldOption {
@@ -527,6 +534,34 @@ pub fn load_preview(
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or("preview 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("preview")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return Ok(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
+}
+
+pub fn load_preview_by_coord(
+    app: Option<&AppHandle>,
+    request: &CoordPreviewRequestPayload,
+) -> Result<Value, HostError> {
+    validate_preview_coord_request(request)?;
+    let sidecar_path = resolve_sidecar_path(app)?;
+    let payload = build_preview_coord_command(request);
+    let events =
+        run_sidecar_request_collect(&sidecar_path, &payload, sidecar_request_priority(&payload))?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("preview_coord 请求失败");
             return Err(HostError::InvalidRequest(message.to_string()));
         }
         if event.get("event").and_then(Value::as_str) == Some("preview")
@@ -949,6 +984,18 @@ pub(crate) fn validate_preview_request(request: &PreviewRequestPayload) -> Resul
     Ok(())
 }
 
+pub(crate) fn validate_preview_coord_request(
+    request: &CoordPreviewRequestPayload,
+) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    if request.coord.trim().is_empty() {
+        return Err(HostError::InvalidRequest("coord 不能为空".to_string()));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_analyze_search_request(
     request: &SearchRequestPayload,
 ) -> Result<(), HostError> {
@@ -965,6 +1012,14 @@ pub(crate) fn build_preview_command(request: &PreviewRequestPayload) -> Value {
         "worldType": request.world_type,
         "seed": request.seed,
         "mixing": request.mixing
+    })
+}
+
+pub(crate) fn build_preview_coord_command(request: &CoordPreviewRequestPayload) -> Value {
+    json!({
+        "command": "preview_coord",
+        "jobId": request.job_id,
+        "coord": request.coord
     })
 }
 
@@ -994,7 +1049,10 @@ pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Va
 }
 
 fn sidecar_request_priority(request: &Value) -> SidecarProcessPriority {
-    if request.get("command").and_then(Value::as_str) == Some("preview") {
+    if matches!(
+        request.get("command").and_then(Value::as_str),
+        Some("preview" | "preview_coord")
+    ) {
         return SidecarProcessPriority::LowPerfAffinity;
     }
     SidecarProcessPriority::Normal
@@ -1311,13 +1369,13 @@ mod tests {
     use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
     use super::{
-        begin_host_cancellation, collect_sidecar_candidates, finalize_cancelled_from_snapshot,
-        finalize_cancelled_from_stdout_eof, first_existing_sidecar_path,
-        force_stop_child_process, list_geyser_options, list_world_options,
-        prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets, request_search_cancel,
-        resolve_sidecar_path, run_sidecar_request_collect, should_emit_failed_for_exit,
-        should_forward_sidecar_event, PreviewCpuSetInfo, SearchCatalogPayload,
-        SidecarProcessPriority,
+        begin_host_cancellation, build_preview_coord_command, collect_sidecar_candidates,
+        finalize_cancelled_from_snapshot, finalize_cancelled_from_stdout_eof,
+        first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
+        list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
+        request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
+        should_emit_failed_for_exit, should_forward_sidecar_event, validate_preview_coord_request,
+        CoordPreviewRequestPayload, PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -1786,5 +1844,59 @@ mod tests {
         assert!(events
             .iter()
             .any(|event| { event["event"] == "preview" || event["event"] == "failed" }));
+    }
+
+    #[test]
+    fn build_preview_coord_command_should_emit_coord_payload() {
+        let command = build_preview_coord_command(&CoordPreviewRequestPayload {
+            job_id: "coord-preview-001".to_string(),
+            coord: "V-SNDST-C-123456-0-D3-HD".to_string(),
+        });
+
+        assert_eq!(command["command"].as_str(), Some("preview_coord"));
+        assert_eq!(command["jobId"].as_str(), Some("coord-preview-001"));
+        assert_eq!(command["coord"].as_str(), Some("V-SNDST-C-123456-0-D3-HD"));
+    }
+
+    #[test]
+    fn validate_preview_coord_request_should_reject_blank_coord() {
+        let error = validate_preview_coord_request(&CoordPreviewRequestPayload {
+            job_id: "coord-preview-002".to_string(),
+            coord: "   ".to_string(),
+        })
+        .expect_err("blank coord should be rejected");
+
+        assert!(error.to_string().contains("coord"));
+    }
+
+    #[test]
+    #[ignore = "需要先构建 out/build/x64-release/src/oni-sidecar.exe"]
+    fn sidecar_preview_coord_smoke() {
+        let path = resolve_sidecar_path(None).expect("sidecar path should be resolvable");
+        let requests = [
+            json!({
+                "command": "preview_coord",
+                "jobId": "smoke-preview-coord-001",
+                "coord": "V-SNDST-C-100123-0-D3-HD"
+            }),
+            json!({
+                "command": "preview_coord",
+                "jobId": "smoke-preview-coord-002",
+                "coord": "FRST-C-1522766653-0-1A-D7BT5"
+            }),
+        ];
+
+        for request in requests {
+            let events = run_sidecar_request_collect(
+                &path,
+                &request,
+                SidecarProcessPriority::LowPerfAffinity,
+            )
+            .expect("preview_coord smoke should succeed");
+            assert!(
+                events.iter().any(|event| event["event"] == "preview"),
+                "preview_coord smoke should emit preview event for request: {request:?}"
+            );
+        }
     }
 }

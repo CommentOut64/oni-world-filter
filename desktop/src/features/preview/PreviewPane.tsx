@@ -3,6 +3,7 @@ import { Alert, Typography } from "antd";
 
 import type { DesktopThemeMode } from "../../app/antdTheme";
 import ThemeModeToggle from "../../components/layout/ThemeModeToggle";
+import { formatTauriError } from "../../lib/tauri.ts";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
 import PreviewCanvas, { type PreviewCanvasHandle } from "./PreviewCanvas";
@@ -57,6 +58,15 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
     void loadByMatch(selectedMatch);
   }, [selectedMatch, loadByMatch]);
 
+  const handleExportPng = () => {
+    usePreviewStore.setState({ lastError: null });
+    void canvasRef.current?.exportPng().catch((error) => {
+      usePreviewStore.setState({
+        lastError: `导出 PNG 失败: ${formatTauriError(error)}`,
+      });
+    });
+  };
+
   return (
     <section className="preview-pane">
       <header className="preview-pane-header">
@@ -85,7 +95,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
         onToggleLabels={() => setShowLabels((current) => !current)}
         onToggleGeysers={() => setShowGeysers((current) => !current)}
         onResetView={() => canvasRef.current?.resetView()}
-        onExportPng={() => canvasRef.current?.exportPng()}
+        onExportPng={handleExportPng}
         onOpenGeyserList={() => setShowGeyserList(true)}
       />
       <div className="preview-canvas-container">

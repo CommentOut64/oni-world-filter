@@ -34,6 +34,7 @@ import {
   persistSearchSessionSnapshot,
   restoreSearchSessionSnapshot,
 } from "./searchStorePersistence.ts";
+import { buildSearchMatchSummaryFromPreview, computeNearestDistanceFromSummary } from "../lib/searchMatchSummary.ts";
 
 const DEFAULT_CONSTRAINTS: SearchConstraints = {
   required: [],
@@ -100,6 +101,7 @@ interface SearchState {
   bindSidecarEvents: () => Promise<void>;
   startSearchJob: (draft: SearchDraft) => Promise<boolean>;
   cancelSearchJob: () => Promise<void>;
+  openDirectCoordResult: (match: SearchMatchSummary) => void;
   clearResults: () => void;
   selectSeed: (seed: number | null) => void;
   setDraft: (draft: SearchDraft) => void;
@@ -166,34 +168,23 @@ function toCoordCode(
   return `${prefix}${seed}-0-D3-${toBase36(mixing)}`;
 }
 
-function nearestDistance(event: SearchMatchEvent): number | null {
-  const start = event.summary.start;
-  if (!event.summary.geysers.length) {
-    return null;
-  }
-  let minDistance = Number.POSITIVE_INFINITY;
-  for (const geyser of event.summary.geysers) {
-    const dx = geyser.x - start.x;
-    const dy = geyser.y - start.y;
-    const value = Math.sqrt(dx * dx + dy * dy);
-    if (value < minDistance) {
-      minDistance = value;
-    }
-  }
-  return Number.isFinite(minDistance) ? Number(minDistance.toFixed(1)) : null;
-}
-
 function appendMatch(state: SearchState, event: SearchMatchEvent): SearchState {
   const match: SearchMatchSummary = {
-    seed: event.seed,
-    worldType: state.activeWorldType,
-    mixing: state.activeMixing,
-    coord: toCoordCode(state.worlds, state.activeWorldType, event.seed, state.activeMixing),
-    traits: event.summary.traits,
-    start: event.summary.start,
-    worldSize: event.summary.worldSize,
-    geysers: event.summary.geysers,
-    nearestDistance: nearestDistance(event),
+    ...buildSearchMatchSummaryFromPreview({
+      coord: toCoordCode(state.worlds, state.activeWorldType, event.seed, state.activeMixing),
+      worldType: state.activeWorldType,
+      seed: event.seed,
+      mixing: state.activeMixing,
+      summary: {
+        seed: event.seed,
+        worldType: state.activeWorldType,
+        start: event.summary.start,
+        worldSize: event.summary.worldSize,
+        traits: event.summary.traits,
+        geysers: event.summary.geysers,
+      },
+    }),
+    nearestDistance: computeNearestDistanceFromSummary(event.summary.start, event.summary.geysers),
   };
 
   return {
@@ -397,6 +388,22 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         lastError: formatTauriError(error),
       });
     }
+  },
+  openDirectCoordResult: (match) => {
+    set((state) => ({
+      isSearching: false,
+      isCancelling: false,
+      activeJobId: null,
+      activeWorldType: match.worldType,
+      activeMixing: match.mixing,
+      results: [match],
+      selectedSeed: match.seed,
+      draft: state.draft,
+      lastSubmittedRequest: null,
+      lastHostDebugMessages: [],
+      stats: createDefaultStats(1),
+      lastError: null,
+    }));
   },
   clearResults: () => {
     set({

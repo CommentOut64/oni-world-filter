@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  CoordPreviewEvent,
+  CoordPreviewRequest,
   GeyserOption,
   PreviewEvent,
   PreviewRequest,
@@ -30,7 +32,7 @@ export function shouldIgnoreSidecarStderr(message: string): boolean {
   );
 }
 
-function inTauriRuntime(): boolean {
+export function inTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
@@ -63,6 +65,15 @@ export async function loadPreview(request: PreviewRequest): Promise<PreviewEvent
     throw new Error("当前不在 Tauri 运行时，无法加载预览。");
   }
   return invoke<PreviewEvent>("load_preview", { request });
+}
+
+export async function loadPreviewByCoord(
+  request: CoordPreviewRequest
+): Promise<CoordPreviewEvent> {
+  if (!inTauriRuntime()) {
+    throw new Error("当前不在 Tauri 运行时，无法加载坐标预览。");
+  }
+  return invoke<CoordPreviewEvent>("load_preview_by_coord", { request });
 }
 
 export async function listWorlds(): Promise<WorldOption[]> {

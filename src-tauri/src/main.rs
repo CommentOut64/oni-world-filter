@@ -10,11 +10,14 @@ use state::AppState;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::start_search,
             commands::cancel_search,
             commands::load_preview,
+            commands::load_preview_by_coord,
             commands::list_worlds,
             commands::list_geysers,
             commands::get_search_catalog,

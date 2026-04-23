@@ -3,6 +3,7 @@ import { Button } from "antd";
 
 interface SearchActionsProps {
   isSearching: boolean;
+  isBusy?: boolean;
   hasResults: boolean;
   resultsCount: number;
   onViewResults: () => void;
@@ -10,11 +11,14 @@ interface SearchActionsProps {
 
 export default function SearchActions({
   isSearching,
+  isBusy = false,
   hasResults,
   resultsCount,
   onViewResults,
 }: SearchActionsProps) {
   void React;
+  const disablePrimaryAction = isSearching || isBusy;
+
   return (
     <section className="search-actions">
       <div className="search-actions-row">
@@ -23,7 +27,7 @@ export default function SearchActions({
           type="primary"
           className="search-action-primary"
           loading={isSearching}
-          disabled={isSearching}
+          disabled={disablePrimaryAction}
         >
           {isSearching ? "搜索进行中..." : "开始搜索"}
         </Button>

@@ -14,7 +14,11 @@ import { Controller, FormProvider, useForm } from "react-hook-form";
 import type { SearchAnalysisPayload } from "../../lib/contracts";
 import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
 import type { SearchDraft } from "../../state/searchStore";
-import { analyzeSearchRequest, formatTauriError } from "../../lib/tauri";
+import {
+  analyzeSearchRequest,
+  formatTauriError,
+  loadPreviewByCoord,
+} from "../../lib/tauri";
 import type { DesktopThemeMode } from "../../app/antdTheme";
 import ThemeModeToggle from "../../components/layout/ThemeModeToggle";
 import { usePreviewStore } from "../../state/previewStore";
@@ -23,6 +27,8 @@ import CountRuleEditor from "./CountRuleEditor";
 import DistanceRuleEditor from "./DistanceRuleEditor";
 import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
+import CoordQuickSearch from "./CoordQuickSearch";
+import { runCoordPreviewFlow } from "./coordPreviewFlow";
 import SearchActions from "./SearchActions";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
 import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay";
@@ -55,10 +61,12 @@ export default function SearchPanel({
   const resultsCount = useSearchStore((state) => state.results.length);
   const isSearching = useSearchStore((state) => state.isSearching);
   const startSearchJob = useSearchStore((state) => state.startSearchJob);
+  const openDirectCoordResult = useSearchStore((state) => state.openDirectCoordResult);
   const setDraft = useSearchStore((state) => state.setDraft);
   const lastError = useSearchStore((state) => state.lastError);
   const clearError = useSearchStore((state) => state.clearError);
   const clearPreview = usePreviewStore((state) => state.clear);
+  const primeResolvedPreview = usePreviewStore((state) => state.primeResolvedPreview);
   const hasResults = resultsCount > 0 || isSearching;
 
   const schema = useMemo(() => {
@@ -72,6 +80,8 @@ export default function SearchPanel({
     mode: "onChange",
     defaultValues: toSearchFormValues(draft),
   });
+  const [coordInput, setCoordInput] = useState("");
+  const [isCoordSubmitting, setIsCoordSubmitting] = useState(false);
   const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
   const [disabledMixingSlots, setDisabledMixingSlots] = useState<Set<number>>(new Set());
   const [pendingWarningConfirmation, setPendingWarningConfirmation] = useState<{
@@ -175,14 +185,59 @@ export default function SearchPanel({
     setPendingWarningConfirmation(null);
   };
 
+  const handleCoordSubmit = async () => {
+    if (isSearching || isCoordSubmitting) {
+      return;
+    }
+
+    const coord = coordInput.trim();
+    setIsCoordSubmitting(true);
+    clearError();
+    try {
+      await runCoordPreviewFlow(
+        {
+          loadPreviewByCoord: async (rawCoord) =>
+            loadPreviewByCoord({
+              jobId: `preview-coord-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              coord: rawCoord,
+            }),
+          openDirectCoordResult,
+          primeResolvedPreview,
+          setError: (message) => {
+            useSearchStore.setState({ lastError: message });
+          },
+          openResults: () => {
+            onViewResults?.();
+          },
+        },
+        coord
+      );
+    } finally {
+      setIsCoordSubmitting(false);
+    }
+  };
+
   return (
     <FormProvider {...methods}>
-      <form className="search-panel" onSubmit={submit}>
+      <section className="search-panel">
         <header className="search-panel-header">
           <div className="search-panel-header-row">
-            <Flex vertical gap={4}>
+            <Flex vertical gap={4} className="search-panel-title">
               <Typography.Title level={3}>搜索参数</Typography.Title>
             </Flex>
+            <div className="search-panel-header-center">
+              <CoordQuickSearch
+                value={coordInput}
+                loading={isCoordSubmitting}
+                disabled={isSearching || isCoordSubmitting}
+                onChange={(value) => {
+                  setCoordInput(value);
+                }}
+                onSubmit={() => {
+                  void handleCoordSubmit();
+                }}
+              />
+            </div>
             <ThemeModeToggle mode={themeMode} onModeChange={onThemeModeChange} />
           </div>
           {lastError ? (
@@ -197,7 +252,8 @@ export default function SearchPanel({
           ) : null}
         </header>
 
-        <section className="search-panel-grid">
+        <form className="search-panel-form" onSubmit={submit}>
+          <section className="search-panel-grid">
           <section className="search-column search-column-main">
             <Card className="search-section">
               <header className="search-section-header">
@@ -342,6 +398,7 @@ export default function SearchPanel({
             </Card>
             <SearchActions
               isSearching={isSearching}
+              isBusy={isCoordSubmitting}
               hasResults={hasResults}
               resultsCount={resultsCount}
               onViewResults={() => {
@@ -349,8 +406,9 @@ export default function SearchPanel({
               }}
             />
           </section>
-        </section>
-      </form>
+          </section>
+        </form>
+      </section>
       <SearchWarningConfirmModal
         open={pendingWarningConfirmation !== null}
         analysis={pendingWarningConfirmation?.analysis ?? null}

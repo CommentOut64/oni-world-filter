@@ -624,6 +624,18 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         return result;
     }
 
+    if (command == "preview_coord") {
+        result.request.command = SidecarCommandType::PreviewCoord;
+        auto &request = result.request.previewCoord;
+        if (!RequireString(root, "jobId", &request.jobId, &result.error)) {
+            return result;
+        }
+        if (!RequireString(root, "coord", &request.coord, &result.error)) {
+            return result;
+        }
+        return result;
+    }
+
     if (command == "cancel") {
         result.request.command = SidecarCommandType::Cancel;
         if (!RequireString(root, "jobId", &result.request.cancel.jobId, &result.error)) {
@@ -865,12 +877,16 @@ std::string SerializeCancelledEvent(const std::string &jobId,
 
 std::string SerializePreviewEvent(const std::string &jobId,
                                   const SidecarPreviewRequest &request,
-                                  const GeneratedWorldPreview &preview)
+                                  const GeneratedWorldPreview &preview,
+                                  const std::string *coordOverride)
 {
     Json::Value root = BuildBaseEventJson("preview", jobId);
     root["worldType"] = request.worldType;
     root["seed"] = request.seed;
     root["mixing"] = request.mixing;
+    if (coordOverride != nullptr) {
+        root["coord"] = *coordOverride;
+    }
     root["preview"] = BuildPreviewJson(preview);
     return WriteCompactJson(root);
 }
