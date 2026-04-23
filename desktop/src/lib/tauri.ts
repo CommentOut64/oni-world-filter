@@ -32,7 +32,7 @@ export function shouldIgnoreSidecarStderr(message: string): boolean {
   );
 }
 
-function inTauriRuntime(): boolean {
+export function inTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
