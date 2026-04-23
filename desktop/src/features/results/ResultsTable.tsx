@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Table } from "antd";
 
+import type { SearchMatchSummary } from "../../lib/contracts";
 import { useSearchStore } from "../../state/searchStore";
 import { createResultColumns } from "./resultColumns";
 
@@ -80,7 +81,7 @@ export default function ResultsTable() {
 
   return (
     <section ref={wrapperRef} className="results-table-wrap">
-      <Table
+      <Table<SearchMatchSummary>
         className="results-table"
         rowKey="seed"
         virtual
@@ -90,9 +91,7 @@ export default function ResultsTable() {
         columns={columns}
         dataSource={results}
         locale={{ emptyText: "暂无命中结果" }}
-        rowClassName={(record) =>
-          record.seed === selectedSeed ? "results-table-row-selected" : "results-table-row"
-        }
+        rowClassName={(record) => (record.seed === selectedSeed ? "ant-table-row-selected" : "")}
         onRow={(record) => ({
           onClick: () => {
             selectSeed(record.seed);
