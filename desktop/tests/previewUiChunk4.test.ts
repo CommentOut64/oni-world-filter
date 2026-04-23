@@ -72,6 +72,13 @@ test("PreviewLegend is mounted inside preview canvas container", () => {
   );
 });
 
+test("PreviewPane forwards themeMode to PreviewCanvas", () => {
+  assert.match(
+    PREVIEW_PANE_SOURCE,
+    /<PreviewCanvas[\s\S]*themeMode=\{themeMode\}/
+  );
+});
+
 test("PreviewLegend uses floating vertical layout styling", () => {
   assert.match(
     APP_CSS,
