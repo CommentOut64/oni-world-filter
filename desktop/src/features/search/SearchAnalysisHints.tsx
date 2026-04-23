@@ -1,21 +1,9 @@
 import type { SearchAnalysisPayload } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { formatProbabilityUpper } from "./searchProbabilityFormat";
 
 interface SearchAnalysisHintsProps {
   analysis: SearchAnalysisPayload | null;
-}
-
-function formatProbabilityUpper(probability: number): string {
-  if (!Number.isFinite(probability)) {
-    return "-";
-  }
-  if (probability <= 0) {
-    return "0";
-  }
-  if (probability < 0.0001) {
-    return probability.toExponential(2);
-  }
-  return `${(probability * 100).toFixed(3)}%`;
 }
 
 export default function SearchAnalysisHints({ analysis }: SearchAnalysisHintsProps) {

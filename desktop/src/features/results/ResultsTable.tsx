@@ -1,85 +1,104 @@
-import {
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  type SortingState,
-  useReactTable,
-} from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Table } from "antd";
 
 import { useSearchStore } from "../../state/searchStore";
 import { createResultColumns } from "./resultColumns";
 
+const DEFAULT_SCROLL_Y = 240;
+const MIN_SCROLL_Y = 120;
+
+function buildPrioritizedGeyserKeys(
+  lastSubmittedRequest: ReturnType<typeof useSearchStore.getState>["lastSubmittedRequest"]
+): string[] {
+  if (!lastSubmittedRequest) {
+    return [];
+  }
+
+  const orderedKeys = [
+    ...lastSubmittedRequest.constraints.required,
+    ...lastSubmittedRequest.constraints.forbidden,
+    ...lastSubmittedRequest.constraints.distance.map((item) => item.geyser),
+    ...lastSubmittedRequest.constraints.count.map((item) => item.geyser),
+  ];
+
+  return [...new Set(orderedKeys)];
+}
+
 export default function ResultsTable() {
+  void React;
   const results = useSearchStore((state) => state.results);
   const geysers = useSearchStore((state) => state.geysers);
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
   const selectSeed = useSearchStore((state) => state.selectSeed);
+  const lastSubmittedRequest = useSearchStore((state) => state.lastSubmittedRequest);
+  const wrapperRef = useRef<HTMLElement | null>(null);
+  const [scrollY, setScrollY] = useState(DEFAULT_SCROLL_Y);
 
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "seed", desc: false },
-  ]);
-  const columns = useMemo(() => createResultColumns(geysers), [geysers]);
+  const prioritizedGeyserKeys = useMemo(
+    () => buildPrioritizedGeyserKeys(lastSubmittedRequest),
+    [lastSubmittedRequest]
+  );
+  const columns = useMemo(
+    () => createResultColumns(geysers, prioritizedGeyserKeys),
+    [geysers, prioritizedGeyserKeys]
+  );
 
-  const table = useReactTable({
-    data: results,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const syncScrollY = () => {
+      const wrapperHeight = wrapper.clientHeight;
+      if (!wrapperHeight) {
+        return;
+      }
+
+      const headerHeight = wrapper.querySelector<HTMLElement>(".ant-table-header")?.offsetHeight ?? 0;
+      const nextScrollY = Math.max(MIN_SCROLL_Y, Math.floor(wrapperHeight - headerHeight));
+      setScrollY((current) => (current === nextScrollY ? current : nextScrollY));
+    };
+
+    syncScrollY();
+
+    const resizeObserver = new ResizeObserver(() => {
+      syncScrollY();
+    });
+
+    resizeObserver.observe(wrapper);
+
+    const header = wrapper.querySelector<HTMLElement>(".ant-table-header");
+    if (header) {
+      resizeObserver.observe(header);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [columns]);
 
   return (
-    <section className="results-table-wrap">
-      <table className="results-table">
-        <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th key={header.id}>
-                  {header.isPlaceholder ? null : (
-                    <button
-                      type="button"
-                      className="sort-button"
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                    </button>
-                  )}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              className={row.original.seed === selectedSeed ? "selected" : undefined}
-              onClick={() => {
-                selectSeed(row.original.seed);
-              }}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-          {table.getRowModel().rows.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="empty">
-                暂无命中结果
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+    <section ref={wrapperRef} className="results-table-wrap">
+      <Table
+        className="results-table"
+        rowKey="seed"
+        virtual
+        size="small"
+        pagination={false}
+        scroll={{ y: scrollY }}
+        columns={columns}
+        dataSource={results}
+        locale={{ emptyText: "暂无命中结果" }}
+        rowClassName={(record) =>
+          record.seed === selectedSeed ? "results-table-row-selected" : "results-table-row"
+        }
+        onRow={(record) => ({
+          onClick: () => {
+            selectSeed(record.seed);
+          },
+        })}
+      />
     </section>
   );
 }

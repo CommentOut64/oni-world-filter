@@ -59,6 +59,24 @@ const countRuleSchema = z.object({
   maxCount: z.coerce.number().int().min(0, "最大数量不能为负数"),
 });
 
+function normalizeBlankNumberInput(value: unknown): unknown {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+  if (typeof value === "number") {
+    return Number.isNaN(value) ? undefined : value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? value : parsed;
+  }
+  return value;
+}
+
 export interface SearchSchemaOptions {
   worldTypeMax?: number;
   mixingMax?: number;
@@ -75,13 +93,26 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
     options.mixingMax >= 0;
   const worldTypeMax = hasWorldTypeMax ? (options?.worldTypeMax ?? 0) : 0;
   const mixingMax = hasMixingMax ? (options?.mixingMax ?? 0) : 0;
-  const worldTypeSchema = hasWorldTypeMax
+  const worldTypeNumberSchema = hasWorldTypeMax
     ? z
-        .coerce.number()
+        .number({
+          required_error: "请选择具体世界",
+          invalid_type_error: "请选择具体世界",
+        })
         .int()
         .min(0)
         .max(worldTypeMax, `worldType 不能超过 ${worldTypeMax}`)
-    : z.coerce.number().int().min(0);
+    : z
+        .number({
+          required_error: "请选择具体世界",
+          invalid_type_error: "请选择具体世界",
+        })
+        .int()
+        .min(0);
+  const worldTypeSchema = z.preprocess(
+    normalizeBlankNumberInput,
+    worldTypeNumberSchema
+  );
   const mixingSchema = hasMixingMax
     ? nonNegativeInt.max(mixingMax, `mixing 不能超过 ${mixingMax}`)
     : nonNegativeInt;

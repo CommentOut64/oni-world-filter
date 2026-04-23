@@ -1,4 +1,6 @@
-import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
+import React from "react";
+import { Button, Select, Typography } from "antd";
+import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import type { GeyserOption } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
@@ -22,9 +24,9 @@ export default function GeyserConstraintEditor({
   geysers,
   disabledGeyserKeys,
 }: GeyserConstraintEditorProps) {
+  void React;
   const {
     control,
-    register,
     formState: { errors },
   } = useFormContext<SearchFormValues>();
   const required = useWatch({ control, name: "required" }) ?? [];
@@ -65,17 +67,18 @@ export default function GeyserConstraintEditor({
 
   return (
     <section className="constraint-editor">
-      <header>
-        <h4>{title}</h4>
-        <button
-          type="button"
+      <header className="constraint-editor-header">
+        <Typography.Text strong>{title}</Typography.Text>
+        <Button
+          htmlType="button"
+          size="small"
           disabled={!firstEnabledGeyser}
           onClick={() => append({ geyser: firstEnabledGeyser })}
         >
           新增
-        </button>
+        </Button>
       </header>
-      {fields.length === 0 ? <p className="hint">暂无规则</p> : null}
+      {fields.length === 0 ? <Typography.Text className="hint">暂无规则</Typography.Text> : null}
       {fields.map((field, index) => {
         const availability = buildGeyserOptionAvailability({
           geyserKeys: geysers.map((item) => item.key),
@@ -86,18 +89,28 @@ export default function GeyserConstraintEditor({
 
         return (
           <div className="constraint-row" key={field.id}>
-            <select {...register(`${type}.${index}.geyser`)}>
-              <option value="">请选择喷口</option>
-              {geysers.map((item) => (
-                <option key={item.id} value={item.key} disabled={availability[item.key] !== null}>
-                  {formatGeyserNameByKey(item.key)}
-                  {availability[item.key] ? ` (${availability[item.key]})` : ""}
-                </option>
-              ))}
-            </select>
-            <button type="button" onClick={() => remove(index)}>
+            <Controller
+              control={control}
+              name={`${type}.${index}.geyser` as const}
+              render={({ field: controllerField }) => (
+                <Select
+                  className="constraint-select"
+                  placeholder="请选择喷口"
+                  value={controllerField.value || undefined}
+                  options={geysers.map((item) => ({
+                    label: `${formatGeyserNameByKey(item.key)}${
+                      availability[item.key] ? ` (${availability[item.key]})` : ""
+                    }`,
+                    value: item.key,
+                    disabled: availability[item.key] !== null,
+                  }))}
+                  onChange={controllerField.onChange}
+                />
+              )}
+            />
+            <Button htmlType="button" onClick={() => remove(index)}>
               删除
-            </button>
+            </Button>
             {fieldErrors?.[index]?.geyser ? (
               <small className="error">{fieldErrors[index]?.geyser?.message}</small>
             ) : null}

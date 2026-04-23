@@ -1,44 +1,96 @@
-import type { ColumnDef } from "@tanstack/react-table";
+import { CopyOutlined } from "@ant-design/icons";
+import { Button, message } from "antd";
+import type { TableColumnsType } from "antd";
 
 import type { GeyserOption, SearchMatchSummary } from "../../lib/contracts";
 import { formatGeyserCountSummary } from "./resultSummary";
 
-function formatTraitSummary(traits: number[]): string {
-  if (!traits.length) {
-    return "-";
-  }
-  return traits.slice(0, 6).join(", ");
+export interface CoordCopyDeps {
+  writeText: (value: string) => Promise<void>;
+  notifySuccess: (content: string) => void;
 }
 
-function formatGeyserSummary(match: SearchMatchSummary, geysers: readonly GeyserOption[]): string {
-  return formatGeyserCountSummary(match.geysers, geysers);
+function createCoordCopyDeps(): CoordCopyDeps {
+  return {
+    writeText: (value) => navigator.clipboard.writeText(value),
+    notifySuccess: (content) => {
+      void message.success(content);
+    },
+  };
 }
 
-export function createResultColumns(geysers: readonly GeyserOption[]): ColumnDef<SearchMatchSummary>[] {
+function formatGeyserSummary(
+  match: SearchMatchSummary,
+  geysers: readonly GeyserOption[],
+  prioritizedGeyserKeys: readonly string[]
+): string {
+  return formatGeyserCountSummary(match.geysers, geysers, 4, prioritizedGeyserKeys);
+}
+
+export async function copyCoordCode(
+  coord: string,
+  deps: CoordCopyDeps = createCoordCopyDeps()
+): Promise<void> {
+  await deps.writeText(coord);
+  deps.notifySuccess("复制成功");
+}
+
+export function createResultColumns(
+  geysers: readonly GeyserOption[],
+  prioritizedGeyserKeys: readonly string[] = []
+): TableColumnsType<SearchMatchSummary> {
   return [
     {
-      accessorKey: "seed",
-      header: "Seed",
+      key: "seed",
+      dataIndex: "seed",
+      title: "Seed",
+      sorter: (lhs, rhs) => lhs.seed - rhs.seed,
+      defaultSortOrder: "ascend",
+      width: 120,
     },
     {
-      accessorKey: "coord",
-      header: "坐标码",
+      key: "coord",
+      dataIndex: "coord",
+      title: "坐标码",
+      ellipsis: true,
+      width: 220,
     },
     {
-      id: "geyserSummary",
-      header: "喷口概览",
-      cell: ({ row }) => formatGeyserSummary(row.original, geysers),
+      key: "copyCoord",
+      title: "",
+      width: 56,
+      align: "center",
+      render: (_, record) => (
+        <Button
+          type="text"
+          size="small"
+          aria-label={`复制坐标码 ${record.coord}`}
+          icon={<CopyOutlined />}
+          onClick={(event) => {
+            event.stopPropagation();
+            void copyCoordCode(record.coord);
+          }}
+        />
+      ),
     },
     {
-      accessorKey: "nearestDistance",
-      header: "最近距离",
-      cell: ({ row }) =>
-        row.original.nearestDistance === null ? "-" : row.original.nearestDistance.toFixed(1),
+      key: "geyserSummary",
+      title: "喷口概览",
+      render: (_, record) => formatGeyserSummary(record, geysers, prioritizedGeyserKeys),
+      ellipsis: true,
     },
     {
-      id: "traitSummary",
-      header: "Traits",
-      cell: ({ row }) => formatTraitSummary(row.original.traits),
+      key: "nearestDistance",
+      dataIndex: "nearestDistance",
+      title: "喷口最小距离",
+      sorter: (lhs, rhs) => {
+        const leftValue = lhs.nearestDistance ?? Number.POSITIVE_INFINITY;
+        const rightValue = rhs.nearestDistance ?? Number.POSITIVE_INFINITY;
+        return leftValue - rightValue;
+      },
+      render: (value: SearchMatchSummary["nearestDistance"]) =>
+        value === null ? "-" : value.toFixed(1),
+      width: 120,
     },
   ];
 }

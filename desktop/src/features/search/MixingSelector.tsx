@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import React, { useMemo } from "react";
+import { Card, Checkbox, Collapse, Select, Tag, Typography } from "antd";
 import { useFormContext } from "react-hook-form";
 
 import type { MixingSlotMeta } from "../../lib/contracts";
@@ -30,6 +31,23 @@ interface DisplaySlot extends MixingSlotMeta {
   displayName: string;
 }
 
+function formatMixingSlotDescription(slot: MixingSlotMeta): string | null {
+  const description = slot.description.trim();
+  if (!description) {
+    return null;
+  }
+  if (description === slot.path || description === slot.name) {
+    return null;
+  }
+  if (/^DLC\d+_ID$/i.test(description)) {
+    return null;
+  }
+  if (description.startsWith("STRINGS.")) {
+    return null;
+  }
+  return description;
+}
+
 function buildDisplaySlots(mixingSlots: MixingSlotMeta[]): DisplaySlot[] {
   const sourceSlots = mixingSlots.length > 0 ? mixingSlots : FALLBACK_MIXING_SLOTS;
   return [...sourceSlots]
@@ -57,9 +75,9 @@ function getUngroupedSlots(
 function renderModeLabel(mode: MixingUiMode): string {
   switch (mode) {
     case "guaranteed":
-      return "保证";
+      return "确保";
     case "normal":
-      return "普通";
+      return "可能";
     default:
       return "禁用";
   }
@@ -74,22 +92,26 @@ function ModeSelect({
   onChange: (mode: MixingUiMode) => void;
   disabled?: boolean;
 }) {
+  void React;
   return (
-    <select
+    <Select
+      size="small"
       value={value}
-      onChange={(event) => {
-        onChange(event.target.value as MixingUiMode);
+      options={[
+        { label: "可能", value: "normal" },
+        { label: "确保", value: "guaranteed" },
+      ]}
+      onChange={(nextValue) => {
+        onChange(nextValue as MixingUiMode);
       }}
       onClick={(event) => event.stopPropagation()}
       disabled={disabled}
-    >
-      <option value="normal">普通</option>
-      <option value="guaranteed">保证</option>
-    </select>
+    />
   );
 }
 
 export default function MixingSelector({ mixingSlots, disabledMixingSlots }: MixingSelectorProps) {
+  void React;
   const {
     watch,
     register,
@@ -115,85 +137,89 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
 
       <section className="mixing-package-section">
         <header className="mixing-package-header">
-          <h5>世界混搭</h5>
-          <p>按 DLC 包理解混搭内容。勾选后可选普通或保证，未勾选即为禁用。</p>
+          <Typography.Title level={5}>世界混搭</Typography.Title>
+          <Typography.Paragraph>
+            按 DLC 包理解混搭内容。勾选后可选可能或确保，未勾选即为禁用。
+          </Typography.Paragraph>
         </header>
 
-        <div className="mixing-package-list">
+        <div className="mixing-package-list mixing-package-stack">
           {groups.map((group) => {
             const packageLevel = levels[group.packageSlot.slot] ?? 0;
             const packageMode = getPackageMode(levels, group);
             const packageEnabled = isSlotEnabled(packageLevel);
             const packageDisabled = disabledMixingSlots?.has(group.packageSlot.slot) ?? false;
             const packageCheckboxDisabled = packageDisabled && !packageEnabled;
+            const packageDescription = formatMixingSlotDescription(group.packageSlot);
 
             return (
-              <details
+              <Card
                 key={`${group.packageSlot.slot}-${group.packageSlot.path}`}
                 className={`mixing-package-card${packageEnabled ? " active" : ""}${
                   packageDisabled ? " disabled" : ""
                 }`}
-                open={packageEnabled}
+                size="small"
               >
-                <summary className="mixing-package-card-header">
-                  <label
-                    className="mixing-package-toggle"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={packageEnabled}
-                      disabled={packageCheckboxDisabled}
-                      onChange={(event) => {
-                        const nextLevels = applyPackageMode(
-                          levels,
-                          group,
-                          event.target.checked ? "normal" : "off"
-                        );
-                        commitLevels(nextLevels);
-                      }}
-                    />
-                    <span>{group.packageSlot.displayName}</span>
-                  </label>
-                  {packageEnabled ? (
-                    <ModeSelect
-                      value={packageMode === "off" ? "normal" : packageMode}
-                      disabled={packageDisabled}
-                      onChange={(mode) => {
-                        commitLevels(applyPackageMode(levels, group, mode));
-                      }}
-                    />
-                  ) : (
-                    <span className="mixing-mode-badge">{renderModeLabel(packageMode)}</span>
-                  )}
-                </summary>
+                <div className="mixing-package-card-body">
+                  <div className="mixing-package-title-row">
+                    <div className="mixing-package-card-header">
+                      <Checkbox
+                        className="mixing-package-toggle"
+                        checked={packageEnabled}
+                        disabled={packageCheckboxDisabled}
+                        onChange={(event) => {
+                          const nextLevels = applyPackageMode(
+                            levels,
+                            group,
+                            event.target.checked ? "normal" : "off"
+                          );
+                          commitLevels(nextLevels);
+                        }}
+                      >
+                        {group.packageSlot.displayName}
+                      </Checkbox>
+                      {packageEnabled ? (
+                        <ModeSelect
+                          value={packageMode === "off" ? "normal" : packageMode}
+                          disabled={packageDisabled}
+                          onChange={(mode) => {
+                            commitLevels(applyPackageMode(levels, group, mode));
+                          }}
+                        />
+                      ) : (
+                        <Tag className="mixing-mode-badge">{renderModeLabel(packageMode)}</Tag>
+                      )}
+                    </div>
 
-                <p className="mixing-package-description">
-                  {group.packageSlot.description || group.packageSlot.path}
-                  {packageDisabled ? " 当前世界不可用。" : ""}
-                </p>
+                    {packageDescription || packageDisabled ? (
+                      <Typography.Paragraph className="mixing-package-description">
+                        {packageDescription ?? ""}
+                        {packageDisabled ? `${packageDescription ? " " : ""}当前世界不可用。` : ""}
+                      </Typography.Paragraph>
+                    ) : null}
+                  </div>
 
-                {group.children.length > 0 ? (
-                  <div className="mixing-child-list">
-                    {group.children.map((child) => {
-                      const childLevel = levels[child.slot] ?? 0;
-                      const childMode = levelToUiMode(childLevel);
-                      const childEnabled = isSlotEnabled(childLevel);
-                      const slotDisabled = disabledMixingSlots?.has(child.slot) ?? false;
-                      const childDisabled = slotDisabled || !packageEnabled;
-                      const childCheckboxDisabled = slotDisabled ? !childEnabled : !packageEnabled;
-                      const disabledReason =
-                        slotDisabled
-                          ? "当前世界不可用"
-                          : !packageEnabled
-                            ? "请先启用对应 DLC 包"
-                            : "";
+                  {group.children.length > 0 ? (
+                    <div className="mixing-child-list">
+                      {group.children.map((child) => {
+                        const childLevel = levels[child.slot] ?? 0;
+                        const childMode = levelToUiMode(childLevel);
+                        const childEnabled = isSlotEnabled(childLevel);
+                        const slotDisabled = disabledMixingSlots?.has(child.slot) ?? false;
+                        const childDisabled = slotDisabled || !packageEnabled;
+                        const childCheckboxDisabled = slotDisabled ? !childEnabled : !packageEnabled;
+                        const childDescription = formatMixingSlotDescription(child);
+                        const disabledReason =
+                          slotDisabled
+                            ? "当前世界不可用"
+                            : !packageEnabled
+                              ? "请先启用对应 DLC 包"
+                              : "";
 
-                      return (
-                        <div key={`${child.slot}-${child.path}`} className="mixing-child-row">
-                          <label className="mixing-child-toggle">
-                            <input
-                              type="checkbox"
+                        return (
+                          <div key={`${child.slot}-${child.path}`} className="mixing-child-row">
+                            <Checkbox
+                              className="mixing-child-toggle"
                               checked={childEnabled}
                               disabled={childCheckboxDisabled}
                               onChange={(event) => {
@@ -205,75 +231,95 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                                   )
                                 );
                               }}
-                            />
-                            <span className="mixing-child-name">
-                              [{child.slot}] {child.displayName}
-                            </span>
-                          </label>
+                            >
+                              <span className="mixing-child-name">
+                                {child.displayName}
+                              </span>
+                            </Checkbox>
 
-                          {childEnabled ? (
-                            <ModeSelect
-                              value={childMode === "off" ? "normal" : childMode}
-                              disabled={childDisabled}
-                              onChange={(mode) => {
-                                commitLevels(applyChildMode(levels, child.slot, mode));
-                              }}
-                            />
-                          ) : (
-                            <span className="mixing-mode-badge">{renderModeLabel(childMode)}</span>
-                          )}
+                            {childEnabled ? (
+                              <ModeSelect
+                                value={childMode === "off" ? "normal" : childMode}
+                                disabled={childDisabled}
+                                onChange={(mode) => {
+                                  commitLevels(applyChildMode(levels, child.slot, mode));
+                                }}
+                              />
+                            ) : (
+                              <Tag className="mixing-mode-badge">{renderModeLabel(childMode)}</Tag>
+                            )}
 
-                          <span className="mixing-child-description">
-                            {child.description || child.path}
-                          </span>
-                          {disabledReason ? (
-                            <span className="mixing-disabled-note">{disabledReason}</span>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="hint">该 DLC 包没有额外可选槽位，只有包本身开关。</p>
-                )}
-              </details>
+                            {childDescription ? (
+                              <Typography.Paragraph className="mixing-child-description">
+                                {childDescription}
+                              </Typography.Paragraph>
+                            ) : null}
+                            {disabledReason ? (
+                              <Typography.Text className="mixing-disabled-note">
+                                {disabledReason}
+                              </Typography.Text>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Typography.Text className="hint mixing-package-empty">
+                      该 DLC 包没有额外可选槽位，只有包本身开关。
+                    </Typography.Text>
+                  )}
+                </div>
+              </Card>
             );
           })}
         </div>
 
         {ungroupedSlots.length > 0 ? (
-          <section className="advanced-debug-panel">
+          <Card className="advanced-debug-panel" size="small">
             <header>
-              <h5>未分类槽位</h5>
-              <p>这些槽位暂未归入 DLC 包分组，仍保留只读展示以避免信息丢失。</p>
+              <Typography.Title level={5}>未分类槽位</Typography.Title>
+              <Typography.Paragraph>
+                这些槽位暂未归入 DLC 包分组，仍保留只读展示以避免信息丢失。
+              </Typography.Paragraph>
             </header>
             <ul className="mixing-ungrouped-list">
               {ungroupedSlots.map((slot) => (
                 <li key={`${slot.slot}-${slot.path}`}>
-                  [{slot.slot}] {slot.displayName}
+                  {slot.displayName}
                 </li>
               ))}
             </ul>
-          </section>
+          </Card>
         ) : null}
 
-        <details className="advanced-debug-panel">
-          <summary>高级信息</summary>
-          <div className="advanced-debug-content">
-            <p>Mixing 编码值：{normalizedMixing}</p>
-            <p>当前目录槽位数：{displaySlots.length}</p>
-            <p>当前禁用槽位数：{disabledMixingSlots?.size ?? 0}</p>
-            {disabledMixingSlots && disabledMixingSlots.size > 0 ? (
-              <ul className="mixing-ungrouped-list">
-                {displaySlots
-                  .filter((slot) => disabledMixingSlots.has(slot.slot))
-                  .map((slot) => (
-                    <li key={`disabled-${slot.slot}`}>[{slot.slot}] {slot.displayName}</li>
-                  ))}
-              </ul>
-            ) : null}
-          </div>
-        </details>
+        <Collapse
+          className="advanced-debug-panel mixing-advanced-collapse"
+          ghost
+          items={[
+            {
+              key: "advanced",
+              label: "高级信息",
+              children: (
+                <div className="advanced-debug-content">
+                  <p>Mixing 编码值：{normalizedMixing}</p>
+                  <p>当前目录槽位数：{displaySlots.length}</p>
+                  <p>当前禁用槽位数：{disabledMixingSlots?.size ?? 0}</p>
+                  {disabledMixingSlots && disabledMixingSlots.size > 0 ? (
+                    <ul className="mixing-ungrouped-list">
+                      {displaySlots
+                        .filter((slot) => disabledMixingSlots.has(slot.slot))
+                        .map((slot) => (
+                          <li key={`disabled-${slot.slot}`}>
+                            {slot.displayName}
+                          </li>
+                        ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ),
+            },
+          ]}
+        />
 
         {errors.mixing ? <small className="error">{errors.mixing.message}</small> : null}
       </section>

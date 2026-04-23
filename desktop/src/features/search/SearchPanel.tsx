@@ -1,11 +1,22 @@
+import {
+  Alert,
+  Card,
+  Checkbox,
+  Flex,
+  InputNumber,
+  Select,
+  Typography,
+} from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FormProvider, useForm } from "react-hook-form";
+import { Controller, FormProvider, useForm } from "react-hook-form";
 
 import type { SearchAnalysisPayload } from "../../lib/contracts";
 import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
 import type { SearchDraft } from "../../state/searchStore";
 import { analyzeSearchRequest, formatTauriError } from "../../lib/tauri";
+import type { DesktopThemeMode } from "../../app/antdTheme";
+import ThemeModeToggle from "../../components/layout/ThemeModeToggle";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
 import CountRuleEditor from "./CountRuleEditor";
@@ -15,6 +26,7 @@ import MixingSelector from "./MixingSelector";
 import SearchActions from "./SearchActions";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
 import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay";
+import { shouldShowSearchWarningConfirmation } from "./searchWarningPolicy";
 import {
   createSearchSchema,
   toSearchDraft,
@@ -24,23 +36,30 @@ import {
 import WorldSelector from "./WorldSelector";
 
 interface SearchPanelProps {
+  themeMode: DesktopThemeMode;
+  onThemeModeChange: (mode: DesktopThemeMode) => void;
   onSearchStarted?: () => void;
+  onViewResults?: () => void;
 }
 
-export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
+export default function SearchPanel({
+  themeMode,
+  onThemeModeChange,
+  onSearchStarted,
+  onViewResults,
+}: SearchPanelProps) {
   const worlds = useSearchStore((state) => state.worlds);
   const catalog = useSearchStore((state) => state.catalog);
   const geysers = useSearchStore((state) => state.geysers);
   const draft = useSearchStore((state) => state.draft);
+  const resultsCount = useSearchStore((state) => state.results.length);
   const isSearching = useSearchStore((state) => state.isSearching);
-  const isCancelling = useSearchStore((state) => state.isCancelling);
   const startSearchJob = useSearchStore((state) => state.startSearchJob);
-  const cancelSearchJob = useSearchStore((state) => state.cancelSearchJob);
-  const clearResults = useSearchStore((state) => state.clearResults);
   const setDraft = useSearchStore((state) => state.setDraft);
   const lastError = useSearchStore((state) => state.lastError);
   const clearError = useSearchStore((state) => state.clearError);
   const clearPreview = usePreviewStore((state) => state.clear);
+  const hasResults = resultsCount > 0 || isSearching;
 
   const schema = useMemo(() => {
     const worldTypeMax = worlds.length > 0 ? worlds.length - 1 : undefined;
@@ -131,7 +150,7 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
         });
         return;
       }
-      if (analysis.warnings.length > 0) {
+      if (shouldShowSearchWarningConfirmation(analysis)) {
         setPendingWarningConfirmation({ draft: nextDraft, analysis });
         return;
       }
@@ -156,51 +175,36 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
     setPendingWarningConfirmation(null);
   };
 
-  const copyAsJson = async () => {
-    const values = methods.getValues();
-    const nextDraft = toSearchDraft(values);
-    const text = JSON.stringify(
-      {
-        worldType: nextDraft.worldType,
-        mixing: nextDraft.mixing,
-        seedStart: nextDraft.seedStart,
-        seedEnd: nextDraft.seedEnd,
-        cpu: nextDraft.cpu,
-        constraints: nextDraft.constraints,
-      },
-      null,
-      2
-    );
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (error) {
-      useSearchStore.setState({
-        lastError: `复制失败: ${error instanceof Error ? error.message : String(error)}`,
-      });
-    }
-  };
-
   return (
     <FormProvider {...methods}>
       <form className="search-panel" onSubmit={submit}>
         <header className="search-panel-header">
-          <div>
-            <h3>搜索参数</h3>
-            <p>参数页独占整屏，优先横向平铺常用参数与规则编辑区。</p>
+          <div className="search-panel-header-row">
+            <Flex vertical gap={4}>
+              <Typography.Title level={3}>搜索参数</Typography.Title>
+            </Flex>
+            <ThemeModeToggle mode={themeMode} onModeChange={onThemeModeChange} />
           </div>
           {lastError ? (
-            <p className="error-inline" onClick={clearError}>
-              参数提示: {lastError}
-            </p>
+            <Alert
+              className="search-panel-alert"
+              type="error"
+              showIcon
+              closable
+              title={`参数提示: ${lastError}`}
+              onClose={clearError}
+            />
           ) : null}
         </header>
 
         <section className="search-panel-grid">
           <section className="search-column search-column-main">
-            <section className="search-section">
+            <Card className="search-section">
               <header className="search-section-header">
-                <h4>世界参数</h4>
-                <p>先按世界家族筛选具体世界，再按 DLC 包配置当前世界允许的混搭内容。</p>
+                <Typography.Title level={4}>世界参数</Typography.Title>
+                <Typography.Paragraph>
+                  先按世界家族筛选具体世界，再按 DLC 包配置当前世界允许的混搭内容。
+                </Typography.Paragraph>
               </header>
               <div className="world-parameter-layout">
                 <WorldSelector worlds={worlds} />
@@ -209,87 +213,115 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
                   disabledMixingSlots={disabledMixingSlots}
                 />
               </div>
-            </section>
+            </Card>
 
-            <section className="search-section">
+            <Card className="search-section">
               <header className="search-section-header">
-                <h4>性能参数</h4>
-                <p>CPU 模式与调度策略。</p>
+                <Typography.Title level={4}>性能参数</Typography.Title>
+                <Typography.Paragraph>CPU 模式与调度策略。</Typography.Paragraph>
               </header>
               <div className="field-grid">
-                <label className="field">
-                  <span>CPU 模式</span>
-                  <select {...methods.register("cpuMode")}>
-                    <option value="balanced">平衡</option>
-                    <option value="turbo">极速</option>
-                  </select>
+                <div className="field">
+                  <Typography.Text className="field-label">CPU 模式</Typography.Text>
+                  <Controller
+                    control={methods.control}
+                    name="cpuMode"
+                    render={({ field }) => (
+                      <Select
+                        className="field-control"
+                        value={field.value}
+                        options={[
+                          { label: "平衡", value: "balanced" },
+                          { label: "极速", value: "turbo" },
+                        ]}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
                   {methods.formState.errors.cpuMode ? (
                     <small className="error">{methods.formState.errors.cpuMode.message}</small>
                   ) : null}
-                </label>
-              </div>
-              <label className="field">
-                <span>调度选项</span>
-                <div className="field-inline">
-                  <label>
-                    <input type="checkbox" {...methods.register("cpuAllowSmt")} />
-                    允许 SMT
-                  </label>
-                  <label>
-                    <input type="checkbox" {...methods.register("cpuAllowLowPerf")} />
-                    允许低性能核心
-                  </label>
                 </div>
-              </label>
-            </section>
+              </div>
+              <div className="field">
+                <Typography.Text className="field-label">调度选项</Typography.Text>
+                <div className="field-inline">
+                  <Controller
+                    control={methods.control}
+                    name="cpuAllowSmt"
+                    render={({ field }) => (
+                      <Checkbox checked={field.value} onChange={(event) => field.onChange(event.target.checked)}>
+                        允许 SMT
+                      </Checkbox>
+                    )}
+                  />
+                  <Controller
+                    control={methods.control}
+                    name="cpuAllowLowPerf"
+                    render={({ field }) => (
+                      <Checkbox checked={field.value} onChange={(event) => field.onChange(event.target.checked)}>
+                        允许低性能核心
+                      </Checkbox>
+                    )}
+                  />
+                </div>
+              </div>
+            </Card>
 
-            <section className="search-section">
+            <Card className="search-section">
               <header className="search-section-header">
-                <h4>Seed 范围</h4>
-                <p>搜索的起止 seed 号。</p>
+                <Typography.Title level={4}>Seed 范围</Typography.Title>
               </header>
               <div className="field-grid">
-                <label className="field">
-                  <span>Seed Start</span>
-                  <input type="number" {...methods.register("seedStart", { valueAsNumber: true })} />
+                <div className="field">
+                  <Typography.Text className="field-label">Seed Start</Typography.Text>
+                  <Controller
+                    control={methods.control}
+                    name="seedStart"
+                    render={({ field }) => (
+                      <InputNumber
+                        className="field-control"
+                        value={field.value}
+                        style={{ width: "100%" }}
+                        onChange={(value) => field.onChange(value ?? undefined)}
+                      />
+                    )}
+                  />
                   {methods.formState.errors.seedStart ? (
                     <small className="error">{methods.formState.errors.seedStart.message}</small>
                   ) : null}
-                </label>
-                <label className="field">
-                  <span>Seed End</span>
-                  <input type="number" {...methods.register("seedEnd", { valueAsNumber: true })} />
+                </div>
+                <div className="field">
+                  <Typography.Text className="field-label">Seed End</Typography.Text>
+                  <Controller
+                    control={methods.control}
+                    name="seedEnd"
+                    render={({ field }) => (
+                      <InputNumber
+                        className="field-control"
+                        value={field.value}
+                        style={{ width: "100%" }}
+                        onChange={(value) => field.onChange(value ?? undefined)}
+                      />
+                    )}
+                  />
                   {methods.formState.errors.seedEnd ? (
                     <small className="error">{methods.formState.errors.seedEnd.message}</small>
                   ) : null}
-                </label>
+                </div>
               </div>
-            </section>
+            </Card>
 
-            <SearchActions
-              isSearching={isSearching}
-              isCancelling={isCancelling}
-              onCancel={() => {
-                void cancelSearchJob();
-              }}
-              onClear={() => {
-                clearResults();
-                clearPreview();
-              }}
-              onCopy={() => {
-                void copyAsJson();
-              }}
-            />
           </section>
 
           <section className="search-column search-column-rules">
-            <section className="search-section search-section-rules">
+            <Card className="search-section search-section-rules">
               <header className="search-section-header">
-                <h4>喷口约束</h4>
-                <p>
+                <Typography.Title level={4}>喷口约束</Typography.Title>
+                <Typography.Paragraph>
                   距离规则：第一栏为最小距离，第二栏为最大距离（从出生点到喷口的直线距离，单位：格）。
                   数量规则：第一栏为最小数量，第二栏为最大数量。
-                </p>
+                </Typography.Paragraph>
               </header>
               <div className="search-rule-grid">
                 <GeyserConstraintEditor
@@ -307,7 +339,15 @@ export default function SearchPanel({ onSearchStarted }: SearchPanelProps) {
                 <DistanceRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
                 <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
               </div>
-            </section>
+            </Card>
+            <SearchActions
+              isSearching={isSearching}
+              hasResults={hasResults}
+              resultsCount={resultsCount}
+              onViewResults={() => {
+                onViewResults?.();
+              }}
+            />
           </section>
         </section>
       </form>

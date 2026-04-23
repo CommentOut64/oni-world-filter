@@ -16,22 +16,55 @@ export interface MixingPackageGroup<TSlot extends MixingSlotMeta = MixingSlotMet
 export type MixingUiMode = "off" | "normal" | "guaranteed";
 
 export const WORLD_CATEGORY_OPTIONS: readonly WorldCategoryOption[] = [
-  {
-    id: "baseAsteroid",
-    label: "原版星体",
-    description: "单星体开局，沿用旧参数页第一组世界。",
-  },
-  {
-    id: "classicCluster",
-    label: "经典星群",
-    description: "经典星群布局，对应旧参数页第二组世界。",
-  },
-  {
-    id: "moonletCluster",
-    label: "卫星星群",
-    description: "多卫星布局，对应旧参数页第三组世界。",
-  },
+    {
+        id: "baseAsteroid",
+        label: "原版",
+        description: "未加装眼冒金星DLC的原版",
+    },
+    {
+        id: "classicCluster",
+        label: "经典",
+        description: "加装了眼冒金星DLC后的经典模式",
+    },
+    {
+        id: "moonletCluster",
+        label: "眼冒金星",
+        description: "加装了眼冒金星DLC后的新模式",
+    },
 ];
+
+const HIDDEN_WORLD_CODES = new Set(["PRES-A-", "V-PRES-C-"]);
+const BASE_ASTEROID_WORLD_CODES = new Set([
+    "SNDST-A-",
+    "OCAN-A-",
+    "S-FRZ-",
+    "LUSH-A-",
+    "FRST-A-",
+    "VOLCA-",
+    "BAD-A-",
+    "HTFST-A-",
+    "OASIS-A-",
+    "CER-A-",
+    "CERS-A-",
+    "PRE-A-",
+    "PRES-A-",
+]);
+const CLASSIC_CLUSTER_WORLD_CODES = new Set([
+    "V-SNDST-C-",
+    "V-OCAN-C-",
+    "V-SWMP-C-",
+    "V-SFRZ-C-",
+    "V-LUSH-C-",
+    "V-FRST-C-",
+    "V-VOLCA-C-",
+    "V-BAD-C-",
+    "V-HTFST-C-",
+    "V-OASIS-C-",
+    "V-CER-C-",
+    "V-CERS-C-",
+    "V-PRE-C-",
+    "V-PRES-C-",
+]);
 
 const MIXING_PACKAGE_ORDER = ["DLC2_ID", "DLC3_ID", "DLC4_ID"] as const;
 
@@ -44,13 +77,14 @@ const MIXING_PACKAGE_PREFIX: Record<MixingPackagePath, string[]> = {
 };
 
 export function classifyWorld(code: string): WorldCategory {
-  if (code.includes("-A-")) {
-    return "baseAsteroid";
-  }
-  if (code.startsWith("V-") && code.includes("-C-")) {
-    return "classicCluster";
-  }
-  return "moonletCluster";
+    // 使用完整映射表，避免 S-FRZ / VOLCA 这类不满足简单前缀规则的世界被误分。
+    if (BASE_ASTEROID_WORLD_CODES.has(code)) {
+        return "baseAsteroid";
+    }
+    if (CLASSIC_CLUSTER_WORLD_CODES.has(code)) {
+        return "classicCluster";
+    }
+    return "moonletCluster";
 }
 
 export function groupWorldsByCategory(
@@ -62,17 +96,41 @@ export function groupWorldsByCategory(
     moonletCluster: [],
   };
   for (const world of worlds) {
+    // 历史遗留命名异常的世界先从前端候选中隐藏，后端枚举保持不变。
+    if (HIDDEN_WORLD_CODES.has(world.code)) {
+      continue;
+    }
     grouped[classifyWorld(world.code)].push(world);
   }
   return grouped;
+}
+
+export function findCategoryForWorld(
+  worlds: readonly WorldOption[],
+  worldType: number
+): WorldCategory | null {
+  if (!Number.isFinite(worldType)) {
+    return null;
+  }
+  const world = worlds.find(
+    (item) => item.id === worldType && !HIDDEN_WORLD_CODES.has(item.code)
+  );
+  return world ? classifyWorld(world.code) : null;
 }
 
 export function getCategoryForWorld(
   worlds: readonly WorldOption[],
   worldType: number
 ): WorldCategory {
-  const world = worlds.find((item) => item.id === worldType);
-  return world ? classifyWorld(world.code) : "classicCluster";
+  return findCategoryForWorld(worlds, worldType) ?? "classicCluster";
+}
+
+export function isWorldTypeVisibleInCategory(
+  worlds: readonly WorldOption[],
+  worldType: number,
+  category: WorldCategory
+): boolean {
+  return findCategoryForWorld(worlds, worldType) === category;
 }
 
 function isChildOfPackage(path: string, packagePath: MixingPackagePath): boolean {

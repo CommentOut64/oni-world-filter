@@ -68,6 +68,13 @@ NormalizedSearchRequest NormalizeSearchRequest(const SearchAnalysisRequest &requ
         group.distanceRules.push_back(rule);
     }
 
+    for (auto &group : normalized.groups) {
+        // distance 语义与 BatchMatcher 保持一致: 只要设置距离规则，就至少要存在一个对应喷口。
+        if (!group.distanceRules.empty() && !group.hasForbidden && group.maxCount > 0) {
+            group.minCount = std::max(group.minCount, 1);
+        }
+    }
+
     return normalized;
 }
 

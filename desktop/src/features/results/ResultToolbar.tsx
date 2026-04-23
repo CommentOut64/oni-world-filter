@@ -1,30 +1,40 @@
+import React from "react";
+import { Button } from "antd";
+
+import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
-import { openHostDebugWindow } from "../../lib/hostDebugWindow";
 
 export default function ResultToolbar() {
+  void React;
   const isSearching = useSearchStore((state) => state.isSearching);
-  const resultsCount = useSearchStore((state) => state.results.length);
-  const selectedSeed = useSearchStore((state) => state.selectedSeed);
-  const lastSubmittedRequest = useSearchStore((state) => state.lastSubmittedRequest);
-  const lastHostDebugMessages = useSearchStore((state) => state.lastHostDebugMessages);
-
-  async function handleOpenHostDebugWindow(): Promise<void> {
-    await openHostDebugWindow({
-      request: lastSubmittedRequest,
-      messages: lastHostDebugMessages,
-    });
-  }
+  const isCancelling = useSearchStore((state) => state.isCancelling);
+  const cancelSearchJob = useSearchStore((state) => state.cancelSearchJob);
+  const clearResults = useSearchStore((state) => state.clearResults);
+  const clearPreview = usePreviewStore((state) => state.clear);
 
   return (
-    <>
-      <section className="result-toolbar">
-        <span>结果总数: {resultsCount.toLocaleString()}</span>
-        <span>状态: {isSearching ? "流式接收中" : "已停止"}</span>
-        <span>当前选中: {selectedSeed === null ? "-" : selectedSeed}</span>
-        <button type="button" onClick={() => void handleOpenHostDebugWindow()}>
-          打开调试窗口
-        </button>
-      </section>
-    </>
+    <section className="result-toolbar">
+      <div className="result-toolbar-actions">
+        <Button
+          htmlType="button"
+          onClick={() => {
+            void cancelSearchJob();
+          }}
+          disabled={!isSearching || isCancelling}
+          loading={isCancelling}
+        >
+          {isCancelling ? "取消中..." : "取消搜索"}
+        </Button>
+        <Button
+          htmlType="button"
+          onClick={() => {
+            clearResults();
+            clearPreview();
+          }}
+        >
+          清空结果
+        </Button>
+      </div>
+    </section>
   );
 }

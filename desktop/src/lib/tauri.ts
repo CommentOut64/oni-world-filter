@@ -18,6 +18,18 @@ import { FALLBACK_SEARCH_CATALOG, normalizeSearchCatalog } from "./searchCatalog
 const SIDECAR_EVENT_CHANNEL = "sidecar://event";
 const SIDECAR_STDERR_CHANNEL = "sidecar://stderr";
 
+export function shouldIgnoreSidecarStderr(message: string): boolean {
+  const normalized = message.trim();
+  return (
+    normalized.includes("compute child node pd failed, fallback to compute node.") ||
+    normalized.includes("compute node pd failed, fallback to compute node.") ||
+    normalized.includes("compute node pd failed after convert unknown cells") ||
+    normalized.includes("can not place all templates") ||
+    (normalized.includes("Intersect:") && normalized.includes("intersection result is empty.")) ||
+    (normalized.includes("Intersect:") && normalized.includes("subj:") && normalized.includes("clip:"))
+  );
+}
+
 function inTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -96,6 +108,9 @@ export async function subscribeSidecar(
     onEvent(payload.payload);
   });
   const unlistenStdErr = await listen<SidecarStderrEvent>(SIDECAR_STDERR_CHANNEL, (payload) => {
+    if (shouldIgnoreSidecarStderr(payload.payload.message)) {
+      return;
+    }
     onStdErr(payload.payload);
   });
 

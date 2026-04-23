@@ -64,47 +64,47 @@ const WorldInfo = ({ world, onSetFocus }: WorldInfoProps) => {
 
 const Biomes = () => {
     const biomes = [
-        "Tundra Biome",
-        "",
-        "Marsh Biome",
-        "Sandstone Biome",
-        "Jungle Biome",
-        "Magma Biome",
-        "Oily Biome",
-        "Space Biome",
-        "Ocean Biome",
-        "Rust Biome",
-        "Forest Biome",
-        "Radioactive Biome",
-        "Swampy Biome",
-        "Wasteland Biome",
-        "",
-        "Metallic Biome",
-        "Barren Biome",
-        "Moo Biome",
-        "Ice Cave Biome",
-        "Cool Pool Biome",
-        "Nectar Biome",
-        "Garden Biome",
-        "Feather Biome",
-        "Wetlands Biome",
+        { name: "Tundra Biome", iconIndex: 0 },
+        { name: "Marsh Biome", iconIndex: 2 },
+        { name: "Sandstone Biome", iconIndex: 3 },
+        { name: "Jungle Biome", iconIndex: 4 },
+        { name: "Magma Biome", iconIndex: 5 },
+        { name: "Oily Biome", iconIndex: 6 },
+        { name: "Space Biome", iconIndex: 7 },
+        { name: "Ocean Biome", iconIndex: 8 },
+        { name: "Rust Biome", iconIndex: 9 },
+        { name: "Forest Biome", iconIndex: 10 },
+        { name: "Radioactive Biome", iconIndex: 11 },
+        { name: "Swampy Biome", iconIndex: 12 },
+        { name: "Wasteland Biome", iconIndex: 13 },
+        { name: "Metallic Biome", iconIndex: 15 },
+        { name: "Barren Biome", iconIndex: 16 },
+        { name: "Moo Biome", iconIndex: 17 },
+        { name: "Ice Cave Biome", iconIndex: 18 },
+        { name: "Cool Pool Biome", iconIndex: 19 },
+        { name: "Nectar Biome", iconIndex: 20 },
+        { name: "Aquatic Biome" },
+        { name: "Niobium Biome" },
+        { name: "Regolith Biome" },
+        { name: "Garden Biome", iconIndex: 21 },
+        { name: "Feather Biome", iconIndex: 22 },
+        { name: "Wetlands Biome", iconIndex: 23 },
     ];
     const translation = useTranslation();
     return (
         <Row xs={3}>
-            {biomes.map(
-                (item, index) =>
-                    item !== "" && (
-                        <Card key={index}>
-                            <Card.Body style={{ padding: "0.75rem 0" }}>
-                                <span
-                                    className={"biome-icon icon" + index}
-                                ></span>
-                                <span>{translation(item)}</span>
-                            </Card.Body>
-                        </Card>
-                    )
-            )}
+            {biomes.map((item) => (
+                <Card key={item.name}>
+                    <Card.Body style={{ padding: "0.75rem 0" }}>
+                        {item.iconIndex !== undefined ? (
+                            <span
+                                className={"biome-icon icon" + item.iconIndex}
+                            ></span>
+                        ) : null}
+                        <span>{translation(item.name)}</span>
+                    </Card.Body>
+                </Card>
+            ))}
         </Row>
     );
 };

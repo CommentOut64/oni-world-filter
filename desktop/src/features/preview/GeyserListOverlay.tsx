@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import React, { useMemo } from "react";
+import { Button, Card, Typography } from "antd";
 import { formatGeyserNameFromSummary } from "../../lib/displayResolvers";
 import type { GeyserSummary } from "../../lib/contracts";
 import { useSearchStore } from "../../state/searchStore";
@@ -12,6 +13,7 @@ export default function GeyserListOverlay({
   geysersData,
   onClose,
 }: GeyserListOverlayProps) {
+  void React;
   const geysers = useSearchStore((state) => state.geysers);
 
   const sorted = useMemo(() => {
@@ -25,20 +27,26 @@ export default function GeyserListOverlay({
   }, [geysersData, geysers]);
 
   return (
-    <div className="geyser-overlay">
-      <div className="geyser-overlay-header">
-        <strong>喷口列表 ({geysersData.length})</strong>
-        <button className="geyser-overlay-close" onClick={onClose}>
+    <Card
+      size="small"
+      className="geyser-overlay"
+      variant="outlined"
+      title={`喷口列表 (${geysersData.length})`}
+      extra={
+        <Button className="geyser-overlay-close" htmlType="button" size="small" onClick={onClose}>
           关闭
-        </button>
-      </div>
-      <ul className="geyser-overlay-list">
+        </Button>
+      }
+    >
+      <div className="geyser-overlay-list">
         {sorted.map((item) => (
-          <li key={item.key}>
-            {item.name} @ ({item.geyser.x}, {item.geyser.y})
-          </li>
+          <div key={item.key} className="geyser-overlay-item">
+            <Typography.Text>
+              {item.name} @ ({item.geyser.x}, {item.geyser.y})
+            </Typography.Text>
+          </div>
         ))}
-      </ul>
-    </div>
+      </div>
+    </Card>
   );
 }

@@ -1,5 +1,7 @@
+import { Alert, Button } from "antd";
 import { useEffect, useState } from "react";
 
+import type { DesktopThemeMode } from "./antdTheme";
 import DesktopShell from "../components/layout/DesktopShell";
 import HostDebugWindow from "../features/debug/HostDebugWindow";
 import PreviewPane from "../features/preview/PreviewPane";
@@ -10,7 +12,12 @@ import SearchPanel from "../features/search/SearchPanel";
 import { isHostDebugWindow } from "../lib/hostDebugWindow";
 import { disposeSidecarListener, useSearchStore } from "../state/searchStore";
 
-function App() {
+interface AppProps {
+  themeMode: DesktopThemeMode;
+  onThemeModeChange: (mode: DesktopThemeMode) => void;
+}
+
+function App({ themeMode, onThemeModeChange }: AppProps) {
   if (isHostDebugWindow()) {
     return <HostDebugWindow />;
   }
@@ -40,17 +47,22 @@ function App() {
           <section className="panel panel-results-list">
             <section className="results-pane">
               <header className="results-pane-header">
-                <button type="button" className="back-button" onClick={() => setActivePage("search")}>
+                <Button type="default" className="back-button" onClick={() => setActivePage("search")}>
                   返回参数页
-                </button>
+                </Button>
                 <div>
                   <h3>结果列表</h3>
                 </div>
               </header>
               {lastError ? (
-                <p className="error-inline" onClick={clearError}>
-                  后端事件: {lastError}
-                </p>
+                <Alert
+                  className="shell-inline-alert"
+                  type="error"
+                  showIcon
+                  title={`后端事件: ${lastError}`}
+                  closable
+                  onClose={clearError}
+                />
               ) : null}
               <ResultSummaryCards />
               <ResultToolbar />
@@ -58,26 +70,22 @@ function App() {
             </section>
           </section>
           <aside className="panel panel-results-preview">
-            <PreviewPane />
+            <PreviewPane themeMode={themeMode} onThemeModeChange={onThemeModeChange} />
           </aside>
         </section>
       ) : (
         <section className="search-screen">
           <section className="panel panel-search-page">
             <SearchPanel
+              themeMode={themeMode}
+              onThemeModeChange={onThemeModeChange}
               onSearchStarted={() => {
                 setActivePage("results");
               }}
+              onViewResults={() => {
+                setActivePage("results");
+              }}
             />
-            {hasResults ? (
-              <button
-                type="button"
-                className="back-to-results"
-                onClick={() => setActivePage("results")}
-              >
-                查看结果{isSearching ? "（搜索中…）" : ` (${results.length})`}
-              </button>
-            ) : null}
           </section>
         </section>
       )}
