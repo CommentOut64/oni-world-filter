@@ -120,6 +120,21 @@ int RunAllTests()
 
     {
         const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"preview_coord","jobId":"job-preview-coord-001","coord":"V-SNDST-C-123456-0-D3-HD"})");
+        Expect(result.Ok(), "preview_coord request should parse", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::PreviewCoord,
+               "preview_coord request command mismatch",
+               failures);
+        Expect(result.request.previewCoord.jobId == "job-preview-coord-001",
+               "preview_coord request jobId mismatch",
+               failures);
+        Expect(result.request.previewCoord.coord == "V-SNDST-C-123456-0-D3-HD",
+               "preview_coord request coord mismatch",
+               failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
             R"({"command":"search","jobId":"job-binding-001","worldType":13,"seedStart":1,"seedEnd":1,"cpu":{"mode":"balanced","allowSmt":true,"allowLowPerf":true,"binding":"strict"}})");
         Expect(result.Ok(), "search request with binding alias should parse", failures);
         Expect(result.request.search.cpu.hasValue,
@@ -289,6 +304,7 @@ int RunAllTests()
         previewRequest.worldType = 13;
         previewRequest.seed = 100123;
         previewRequest.mixing = 625;
+        const std::string previewCoord = "V-SNDST-C-100123-0-D3-HD";
 
         GeneratedWorldPreview preview;
         preview.summary.seed = 100123;
@@ -425,7 +441,7 @@ int RunAllTests()
             failures,
             "cancelled event json parse failed");
         const auto previewJson = ParseJsonObject(
-            Batch::SerializePreviewEvent("job-preview-001", previewRequest, preview),
+            Batch::SerializePreviewEvent("job-preview-001", previewRequest, preview, &previewCoord),
             failures,
             "preview event json parse failed");
         const auto searchCatalogJson = ParseJsonObject(
@@ -451,6 +467,7 @@ int RunAllTests()
                failures);
         Expect(completedJson["throughput"]["valid"].asBool(), "completed throughput valid mismatch", failures);
         Expect(previewJson["preview"]["polygons"].size() == 1, "preview polygon size mismatch", failures);
+        Expect(previewJson["coord"].asString() == previewCoord, "preview coord mismatch", failures);
         Expect(previewJson["preview"]["summary"]["seed"].asInt() == 100123,
                "preview summary seed mismatch",
                failures);
