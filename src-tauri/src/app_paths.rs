@@ -109,9 +109,9 @@ mod tests {
     fn app_paths_should_keep_install_and_user_roots_separate() {
         let paths = build_resolved_app_paths(
             PathBuf::from(r"C:\Program Files\oni-world-filter\resources"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.wgh.oniworld.desktop"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop\logs"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.oni-world-filter"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter\logs"),
         );
 
         assert_eq!(
@@ -120,11 +120,11 @@ mod tests {
         );
         assert_eq!(
             paths.app_data_dir,
-            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.wgh.oniworld.desktop")
+            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.oni-world-filter")
         );
         assert_eq!(
             paths.app_local_data_dir,
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop")
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter")
         );
         assert_ne!(paths.install_resource_dir, paths.app_data_dir);
         assert_ne!(paths.install_resource_dir, paths.app_local_data_dir);
@@ -134,14 +134,14 @@ mod tests {
     fn app_paths_should_place_runtime_sidecar_under_local_app_data() {
         let paths = build_resolved_app_paths(
             PathBuf::from(r"C:\Program Files\oni-world-filter\resources"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.wgh.oniworld.desktop"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop\logs"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.oni-world-filter"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter\logs"),
         );
 
         assert_eq!(
             paths.runtime_sidecar_dir,
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop\sidecars")
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter\sidecars")
         );
         assert!(paths.runtime_sidecar_dir.starts_with(&paths.app_local_data_dir));
     }
@@ -150,14 +150,14 @@ mod tests {
     fn app_paths_should_keep_log_dir_outside_install_root() {
         let paths = build_resolved_app_paths(
             PathBuf::from(r"C:\Program Files\oni-world-filter\resources"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.wgh.oniworld.desktop"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop"),
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop\logs"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Roaming\com.oni-world-filter"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter"),
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter\logs"),
         );
 
         assert_eq!(
             paths.app_log_dir,
-            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.wgh.oniworld.desktop\logs")
+            PathBuf::from(r"C:\Users\wgh\AppData\Local\com.oni-world-filter\logs")
         );
         assert!(!paths.app_log_dir.starts_with(&paths.install_resource_dir));
     }
