@@ -246,6 +246,9 @@ int RunAllTests()
         Expect(!result.bottlenecks.empty(),
                "layer4 should include bottleneck geyser list",
                failures);
+        Expect(result.warnings.front().message.find("乐观估计可匹配概率=") != std::string::npos,
+               "layer4 low probability warning should use optimistic estimate wording",
+               failures);
     }
 
     {

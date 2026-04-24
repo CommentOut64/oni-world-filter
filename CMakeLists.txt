@@ -1,22 +1,17 @@
 cmake_minimum_required (VERSION 3.20)
 
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif()
+
 project("oniWorldApp")
 
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>")
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(ONI_BUILD_SIDECAR "Build native sidecar executable" ON)
 enable_testing()
-
-if(EMSCRIPTEN)
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
-endif()
-
-if("$ENV{EMSDK_PYTHON}" STREQUAL "")
-    find_program(PYTHON_CMD "python" REQUIRED)
-else()
-    set(PYTHON_CMD "$ENV{EMSDK_PYTHON}")
-endif()
 
 add_library(clipper STATIC
     "3rdparty/clipper/clipper.cpp"

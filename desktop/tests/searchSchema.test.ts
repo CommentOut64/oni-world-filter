@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createSearchSchema, toSearchDraft } from "../src/features/search/searchSchema.ts";
+import {
+  createSearchSchema,
+  getDefaultAllowLowPerfForCpuMode,
+  toSearchDraft,
+} from "../src/features/search/searchSchema.ts";
 
 const schema = createSearchSchema({ worldTypeMax: 20, mixingMax: 48828124 });
 
@@ -80,7 +84,7 @@ test("toSearchDraft disables warmup for desktop balanced mode", () => {
   });
 });
 
-test("toSearchDraft disables warmup for desktop turbo mode", () => {
+test("toSearchDraft enables low performance cores for desktop turbo mode", () => {
   const draft = toSearchDraft({
     ...buildValidFormValues(),
     cpuMode: "turbo",
@@ -89,9 +93,34 @@ test("toSearchDraft disables warmup for desktop turbo mode", () => {
   assert.deepEqual(draft.cpu, {
     mode: "turbo",
     allowSmt: true,
-    allowLowPerf: false,
+    allowLowPerf: true,
     placement: "strict",
   });
+});
+
+test("toSearchDraft forces low performance cores on for turbo mode", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    cpuMode: "turbo",
+    cpuAllowLowPerf: false,
+  });
+
+  assert.equal(draft.cpu.allowLowPerf, true);
+});
+
+test("cpu mode default clears low performance cores for balanced mode", () => {
+  assert.equal(getDefaultAllowLowPerfForCpuMode("turbo"), true);
+  assert.equal(getDefaultAllowLowPerfForCpuMode("balanced"), false);
+});
+
+test("toSearchDraft preserves manual low performance core selection for balanced mode", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    cpuMode: "balanced",
+    cpuAllowLowPerf: true,
+  });
+
+  assert.equal(draft.cpu.allowLowPerf, true);
 });
 
 test("search schema rejects legacy custom cpu mode", () => {

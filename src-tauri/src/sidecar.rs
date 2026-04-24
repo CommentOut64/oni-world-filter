@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::atomic::Ordering;
@@ -11,8 +13,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
+use crate::app_paths;
+use crate::diagnostics;
 use crate::error::HostError;
 use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
@@ -32,7 +36,11 @@ use windows_sys::Win32::System::Threading::SetProcessAffinityMask;
 pub const SIDECAR_EVENT_CHANNEL: &str = "sidecar://event";
 pub const SIDECAR_STDERR_CHANNEL: &str = "sidecar://stderr";
 const HOST_DEBUG_PREFIX: &str = "[host-debug]";
+pub(crate) const SIDECAR_DIAGNOSTIC_PREFIX: &str = "[sidecar-diagnostic]";
 const CANCEL_GRACE_TIMEOUT_MS: u64 = 75;
+static RUNTIME_SIDECAR_PREPARE_LOCK: Mutex<()> = Mutex::new(());
+#[cfg(windows)]
+const WINDOWS_CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 const WORLD_CODES: [&str; 38] = [
     "SNDST-A-",
@@ -390,11 +398,28 @@ pub fn start_search_streaming(
     }
 
     let sidecar_path = resolve_sidecar_path(Some(&app))?;
-    let mut child = Command::new(&sidecar_path)
+    let mut command = Command::new(&sidecar_path);
+    configure_sidecar_command(&mut command);
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
+    diagnostics::log(
+        Some(&app),
+        "sidecar.streaming.spawn",
+        format!(
+            "jobId={}, pid={}, sidecar={}, asset={}, requestWorldType={}, seedStart={}, seedEnd={}, mixing={}",
+            request.job_id,
+            child.id(),
+            sidecar_path.display(),
+            describe_file(&sidecar_path.parent().unwrap_or(sidecar_path.as_path()).join("data.zip")),
+            request.world_type,
+            request.seed_start,
+            request.seed_end,
+            request.mixing
+        ),
+    );
 
     let mut stdin = child
         .stdin
@@ -525,8 +550,12 @@ pub fn load_preview(
     validate_preview_request(request)?;
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_preview_command(request);
-    let events =
-        run_sidecar_request_collect(&sidecar_path, &payload, sidecar_request_priority(&payload))?;
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+        app,
+    )?;
 
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
@@ -553,8 +582,12 @@ pub fn load_preview_by_coord(
     validate_preview_coord_request(request)?;
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_preview_coord_command(request);
-    let events =
-        run_sidecar_request_collect(&sidecar_path, &payload, sidecar_request_priority(&payload))?;
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+        app,
+    )?;
 
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
@@ -578,8 +611,12 @@ pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayloa
     let sidecar_path = resolve_sidecar_path(app)?;
     let job_id = "search-catalog";
     let request = build_get_search_catalog_command(job_id);
-    let events =
-        run_sidecar_request_collect(&sidecar_path, &request, sidecar_request_priority(&request))?;
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &request,
+        sidecar_request_priority(&request),
+        app,
+    )?;
 
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
@@ -619,8 +656,12 @@ pub fn analyze_search_request(
     validate_analyze_search_request(request)?;
     let sidecar_path = resolve_sidecar_path(app)?;
     let payload = build_analyze_search_command(request);
-    let events =
-        run_sidecar_request_collect(&sidecar_path, &payload, sidecar_request_priority(&payload))?;
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+        app,
+    )?;
     for event in events {
         if event.get("event").and_then(Value::as_str) == Some("failed") {
             let message = event
@@ -650,68 +691,27 @@ fn collect_sidecar_candidates(manifest_dir: &Path, resource_dir: Option<&Path>) 
         .unwrap_or_else(|| manifest_dir.to_path_buf());
     let mut candidates = Vec::new();
 
-    candidates.push(manifest_dir.join("binaries/oni-sidecar.exe"));
-
     if let Some(resource_dir) = resource_dir {
+        candidates.push(resource_dir.join("binaries/oni-sidecar.exe"));
+        candidates.push(resource_dir.join("binaries/oni-sidecar-x86_64-pc-windows-msvc.exe"));
         candidates.push(resource_dir.join("oni-sidecar.exe"));
         candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-msvc.exe"));
-        candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-gnu.exe"));
     }
 
-    candidates.push(repo_root.join("out/build/mingw-release/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-release/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-debug/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-debug/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-release/oni-sidecar.exe"));
+    candidates.push(manifest_dir.join("binaries/oni-sidecar.exe"));
     candidates.push(repo_root.join("out/build/x64-release/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-debug/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-debug/src/oni-sidecar.exe"));
 
     candidates
-}
-
-#[derive(Debug)]
-struct ExistingSidecarCandidate {
-    path: PathBuf,
-    modified_at: SystemTime,
-    preference_index: usize,
-}
-
-fn collect_existing_sidecar_candidates(candidates: &[PathBuf]) -> Vec<ExistingSidecarCandidate> {
-    candidates
-        .iter()
-        .enumerate()
-        .filter_map(|(preference_index, path)| {
-            let metadata = path.metadata().ok()?;
-            if !metadata.is_file() || metadata.len() == 0 {
-                return None;
-            }
-            let modified_at = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-            Some(ExistingSidecarCandidate {
-                path: path.to_path_buf(),
-                modified_at,
-                preference_index,
-            })
-        })
-        .collect()
 }
 
 fn first_existing_sidecar_path(candidates: &[PathBuf]) -> Option<PathBuf> {
-    collect_existing_sidecar_candidates(candidates)
-        .into_iter()
-        .max_by(|left, right| {
-            left.modified_at
-                .cmp(&right.modified_at)
-                .then_with(|| right.preference_index.cmp(&left.preference_index))
-        })
-        .map(|candidate| candidate.path)
-}
-
-fn runtime_sidecar_dir(app: &AppHandle) -> Result<PathBuf, HostError> {
-    let base_dir = app.path().app_local_data_dir().map_err(|error| {
-        HostError::InvalidRequest(format!("无法解析 sidecar 运行目录: {}", error))
-    })?;
-    Ok(base_dir.join("sidecars"))
+    candidates.iter().find_map(|path| {
+        let metadata = path.metadata().ok()?;
+        if metadata.is_file() && metadata.len() > 0 {
+            return Some(path.to_path_buf());
+        }
+        None
+    })
 }
 
 fn runtime_sidecar_file_name(source_path: &Path) -> Result<String, HostError> {
@@ -723,6 +723,72 @@ fn runtime_sidecar_file_name(source_path: &Path) -> Result<String, HostError> {
         .unwrap_or_default()
         .as_nanos();
     Ok(format!("oni-sidecar-{}-{}.exe", modified, metadata.len()))
+}
+
+fn copy_sidecar_asset_to_runtime(source_path: &Path, runtime_path: &Path) -> Result<(), HostError> {
+    let Some(source_dir) = source_path.parent() else {
+        return Ok(());
+    };
+    let source_asset = source_dir.join("data.zip");
+    if !source_asset.is_file() {
+        return Ok(());
+    }
+    let Some(runtime_dir) = runtime_path.parent() else {
+        return Ok(());
+    };
+    let runtime_asset = runtime_dir.join("data.zip");
+    let temp_asset = runtime_dir.join("data.zip.tmp");
+    if temp_asset.exists() {
+        fs::remove_file(&temp_asset)?;
+    }
+    fs::copy(&source_asset, &temp_asset)?;
+    let source_size = source_asset.metadata()?.len();
+    let temp_size = temp_asset.metadata()?.len();
+    if source_size == 0 || temp_size != source_size {
+        let _ = fs::remove_file(&temp_asset);
+        return Err(HostError::InvalidRequest(format!(
+            "sidecar settings asset copy size mismatch: source={}, copied={}",
+            source_size, temp_size
+        )));
+    }
+    if runtime_asset.exists() {
+        fs::remove_file(&runtime_asset)?;
+    }
+    fs::rename(temp_asset, runtime_asset)?;
+    Ok(())
+}
+
+fn assert_runtime_sidecar_asset(runtime_path: &Path) -> Result<(), HostError> {
+    let Some(runtime_dir) = runtime_path.parent() else {
+        return Err(HostError::InvalidRequest("runtime sidecar 缺少父目录".to_string()));
+    };
+    let runtime_asset = runtime_dir.join("data.zip");
+    let metadata = runtime_asset.metadata()?;
+    if !metadata.is_file() || metadata.len() == 0 {
+        return Err(HostError::InvalidRequest(format!(
+            "runtime sidecar settings asset invalid: {} size={}",
+            runtime_asset.display(),
+            metadata.len()
+        )));
+    }
+    let mut file = fs::File::open(&runtime_asset)?;
+    let mut signature = [0_u8; 4];
+    file.read_exact(&mut signature)?;
+    if signature != [0x50, 0x4b, 0x03, 0x04] {
+        return Err(HostError::InvalidRequest(format!(
+            "runtime sidecar settings asset is not a zip: {} signature={:02x?}",
+            runtime_asset.display(),
+            signature
+        )));
+    }
+    Ok(())
+}
+
+fn describe_file(path: &Path) -> String {
+    match path.metadata() {
+        Ok(metadata) => format!("{} (exists=true, size={})", path.display(), metadata.len()),
+        Err(error) => format!("{} (exists=false, error={})", path.display(), error),
+    }
 }
 
 fn cleanup_runtime_sidecar_dir(runtime_dir: &Path, active_path: &Path) -> Result<(), HostError> {
@@ -759,13 +825,40 @@ fn prepare_runtime_sidecar_copy(
     runtime_dir: &Path,
     source_path: &Path,
 ) -> Result<PathBuf, HostError> {
+    let _prepare_guard = RUNTIME_SIDECAR_PREPARE_LOCK
+        .lock()
+        .expect("runtime sidecar prepare lock poisoned");
     fs::create_dir_all(runtime_dir)?;
     let runtime_path = runtime_dir.join(runtime_sidecar_file_name(source_path)?);
     if !runtime_path.is_file() {
         fs::copy(source_path, &runtime_path)?;
     }
+    copy_sidecar_asset_to_runtime(source_path, &runtime_path)?;
+    assert_runtime_sidecar_asset(&runtime_path)?;
     cleanup_runtime_sidecar_dir(runtime_dir, &runtime_path)?;
     Ok(runtime_path)
+}
+
+pub(crate) fn sidecar_spawn_creation_flags() -> u32 {
+    #[cfg(windows)]
+    {
+        WINDOWS_CREATE_NO_WINDOW
+    }
+
+    #[cfg(not(windows))]
+    {
+        0
+    }
+}
+
+pub(crate) fn configure_sidecar_command(command: &mut Command) {
+    #[cfg(windows)]
+    command.creation_flags(sidecar_spawn_creation_flags());
+
+    #[cfg(not(windows))]
+    {
+        let _ = command;
+    }
 }
 
 pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostError> {
@@ -777,12 +870,45 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let resource_dir = app.and_then(|app_handle| app_handle.path().resource_dir().ok());
+    let resource_dir = app.and_then(|app_handle| app_paths::resolve_install_resource_dir(app_handle).ok());
     let candidates = collect_sidecar_candidates(&manifest_dir, resource_dir.as_deref());
+    if let Some(app_handle) = app {
+        diagnostics::log(
+            Some(app_handle),
+            "sidecar.resolve",
+            format!(
+                "manifestDir={}, resourceDir={}, candidates={}",
+                manifest_dir.display(),
+                resource_dir
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "<none>".to_string()),
+                candidates
+                    .iter()
+                    .map(|path| describe_file(path))
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            ),
+        );
+    }
 
     if let Some(existing) = first_existing_sidecar_path(&candidates) {
         if let Some(app_handle) = app {
-            return prepare_runtime_sidecar_copy(&runtime_sidecar_dir(app_handle)?, &existing);
+            let runtime_path = prepare_runtime_sidecar_copy(
+                &app_paths::resolve_runtime_sidecar_dir(app_handle)?,
+                &existing,
+            )?;
+            diagnostics::log(
+                Some(app_handle),
+                "sidecar.resolve",
+                format!(
+                    "selected={}, runtime={}, runtimeAsset={}, runtimeAssetZipSignature=checked",
+                    describe_file(&existing),
+                    describe_file(&runtime_path),
+                    describe_file(&runtime_path.parent().unwrap_or(runtime_path.as_path()).join("data.zip"))
+                ),
+            );
+            return Ok(runtime_path);
         }
         return Ok(existing);
     }
@@ -794,13 +920,27 @@ fn run_sidecar_request_collect(
     sidecar_path: &Path,
     request: &Value,
     priority: SidecarProcessPriority,
+    app: Option<&AppHandle>,
 ) -> Result<Vec<Value>, HostError> {
     let mut command = Command::new(sidecar_path);
+    configure_sidecar_command(&mut command);
     command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = command.spawn()?;
+    diagnostics::log(
+        app,
+        "sidecar.oneshot.spawn",
+        format!(
+            "pid={}, sidecar={}, asset={}, priority={:?}, request={}",
+            child.id(),
+            sidecar_path.display(),
+            describe_file(&sidecar_path.parent().unwrap_or(sidecar_path).join("data.zip")),
+            priority,
+            request
+        ),
+    );
     apply_process_priority(&child, priority);
 
     {
@@ -825,7 +965,19 @@ fn run_sidecar_request_collect(
     let mut events = read_ndjson_events(stdout)?;
 
     let status = child.wait()?;
-    let stderr_text = stderr_reader.join().unwrap_or_default();
+    let stderr_text = sanitize_sidecar_stderr(&stderr_reader.join().unwrap_or_default());
+    diagnostics::log(
+        app,
+        "sidecar.oneshot.exit",
+        format!(
+            "sidecar={}, success={}, code={:?}, events={}, stderr={}",
+            sidecar_path.display(),
+            status.success(),
+            status.code(),
+            events.len(),
+            stderr_text
+        ),
+    );
     if !status.success() {
         return Err(HostError::SidecarExited {
             code: status.code(),
@@ -1081,6 +1233,16 @@ fn read_ndjson_events(stdout: ChildStdout) -> Result<Vec<Value>, HostError> {
     Ok(events)
 }
 
+pub(crate) fn sanitize_sidecar_stderr(stderr_text: &str) -> String {
+    stderr_text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .filter(|line| !line.starts_with(SIDECAR_DIAGNOSTIC_PREFIX))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn drain_stderr(stderr: ChildStderr) -> String {
     let reader = BufReader::new(stderr);
     let mut lines = Vec::new();
@@ -1091,7 +1253,7 @@ fn drain_stderr(stderr: ChildStderr) -> String {
         }
         lines.push(trimmed.to_string());
     }
-    lines.join("\n")
+    sanitize_sidecar_stderr(&lines.join("\n"))
 }
 
 fn emit_host_debug(app: &AppHandle, job_id: &str, message: String) {
@@ -1103,6 +1265,24 @@ fn emit_host_debug(app: &AppHandle, job_id: &str, message: String) {
             "message": message
         }),
     );
+}
+
+fn describe_job_status(job_status: Option<JobStatus>) -> &'static str {
+    match job_status {
+        Some(JobStatus::Running) => "running",
+        Some(JobStatus::Cancelling) => "cancelling",
+        Some(JobStatus::Completed) => "completed",
+        Some(JobStatus::Failed) => "failed",
+        Some(JobStatus::Cancelled) => "cancelled",
+        None => "unknown",
+    }
+}
+
+fn should_emit_host_debug_for_sidecar_event(event_name: &str) -> bool {
+    matches!(
+        event_name,
+        "started" | "match" | "completed" | "failed" | "cancelled"
+    )
 }
 
 fn spawn_stderr_logger(app: AppHandle, job_id: String, stderr: ChildStderr) {
@@ -1121,6 +1301,11 @@ fn spawn_stderr_logger(app: AppHandle, job_id: String, stderr: ChildStderr) {
                 }),
             );
         }
+        diagnostics::log(
+            Some(&app),
+            "sidecar.streaming.stderr",
+            format!("jobId={}, stderr stream closed", job_id),
+        );
     });
 }
 
@@ -1142,6 +1327,14 @@ fn spawn_stdout_forwarder(
             let event_json = match parsed {
                 Ok(value) => value,
                 Err(error) => {
+                    emit_host_debug(
+                        &app,
+                        &fallback_job_id,
+                        format!(
+                            "{} invalid stdout line: jobId={}, error={}",
+                            HOST_DEBUG_PREFIX, fallback_job_id, error
+                        ),
+                    );
                     if should_emit_failed_for_invalid_stdout(
                         registry.get_status(&fallback_job_id),
                     ) {
@@ -1170,6 +1363,19 @@ fn spawn_stdout_forwarder(
 
             let job_status = registry.get_status(&job_id);
             if !should_forward_sidecar_event(job_status, event_name.as_str()) {
+                if should_emit_host_debug_for_sidecar_event(event_name.as_str()) {
+                    emit_host_debug(
+                        &app,
+                        &job_id,
+                        format!(
+                            "{} dropped stdout event: event={}, jobId={}, status={}",
+                            HOST_DEBUG_PREFIX,
+                            event_name,
+                            job_id,
+                            describe_job_status(job_status)
+                        ),
+                    );
+                }
                 continue;
             }
 
@@ -1221,6 +1427,17 @@ fn spawn_waiter(
 
         match maybe_status {
             Ok(Some(status)) => {
+                diagnostics::log(
+                    Some(&app),
+                    "sidecar.streaming.exit",
+                    format!(
+                        "jobId={}, success={}, code={:?}, statusBefore={}",
+                        job_id,
+                        status.success(),
+                        status.code(),
+                        describe_job_status(registry.get_status(&job_id))
+                    ),
+                );
                 if should_emit_failed_for_exit(registry.get_status(&job_id), status.success()) {
                     let _ = registry.set_status(&job_id, JobStatus::Failed);
                     let _ = app.emit(
@@ -1239,6 +1456,11 @@ fn spawn_waiter(
                 thread::sleep(Duration::from_millis(40));
             }
             Err(error) => {
+                diagnostics::log(
+                    Some(&app),
+                    "sidecar.streaming.exit",
+                    format!("jobId={}, status query error={}", job_id, error),
+                );
                 if registry.get_status(&job_id) == Some(JobStatus::Running) {
                     let _ = registry.set_status(&job_id, JobStatus::Failed);
                     let _ = app.emit(
@@ -1374,6 +1596,8 @@ mod tests {
         first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
         list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
         request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
+        sanitize_sidecar_stderr,
+        sidecar_spawn_creation_flags,
         should_emit_failed_for_exit, should_forward_sidecar_event, validate_preview_coord_request,
         CoordPreviewRequestPayload, PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
     };
@@ -1448,8 +1672,8 @@ mod tests {
     }
 
     #[test]
-    fn resolve_candidates_should_choose_latest_modified_sidecar() {
-        let root = create_temp_root("prefer-latest");
+    fn resolve_candidates_should_follow_declared_preference_order() {
+        let root = create_temp_root("prefer-predeclared-order");
         let manifest_dir = root.join("src-tauri");
         let binaries = manifest_dir.join("binaries/oni-sidecar.exe");
         let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
@@ -1460,25 +1684,73 @@ mod tests {
 
         let candidates = collect_sidecar_candidates(&manifest_dir, None);
         let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
-        assert_eq!(resolved, x64);
+        assert_eq!(resolved, binaries);
 
         fs::remove_dir_all(root).expect("temp root should be removed");
     }
 
     #[test]
-    fn resolve_candidates_should_prefer_mingw_release_over_x64_release() {
-        let root = create_temp_root("prefer-mingw");
+    fn sanitize_sidecar_stderr_should_drop_diagnostic_lines() {
+        let stderr = "[sidecar-diagnostic] stdin closed; shutting down\nreal failure\n[sidecar-diagnostic] process exiting normally";
+
+        assert_eq!(sanitize_sidecar_stderr(stderr), "real failure");
+    }
+
+    #[test]
+    fn sanitize_sidecar_stderr_should_keep_real_errors() {
+        assert_eq!(
+            sanitize_sidecar_stderr("sidecar 进程异常退出(code=Some(-1073741819))"),
+            "sidecar 进程异常退出(code=Some(-1073741819))"
+        );
+    }
+
+    #[test]
+    fn resolve_candidates_should_prefer_installed_bundle_sidecar_when_resource_dir_exists() {
+        let root = create_temp_root("prefer-installed-bundle");
         let manifest_dir = root.join("src-tauri");
-        let mingw = root.join("out/build/mingw-release/src/oni-sidecar.exe");
-        let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
+        let manifest_binary = manifest_dir.join("binaries/oni-sidecar.exe");
+        let resource_dir = root.join("installed-app");
+        let bundled_binary = resource_dir.join("binaries/oni-sidecar.exe");
 
-        write_dummy_sidecar(&x64);
+        write_dummy_sidecar(&manifest_binary);
         std::thread::sleep(Duration::from_millis(20));
-        write_dummy_sidecar(&mingw);
+        write_dummy_sidecar(&bundled_binary);
 
-        let candidates = collect_sidecar_candidates(&manifest_dir, None);
+        let candidates = collect_sidecar_candidates(&manifest_dir, Some(resource_dir.as_path()));
         let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
-        assert_eq!(resolved, mingw);
+        assert_eq!(
+            resolved, bundled_binary,
+            "installed desktop should prefer bundled sidecar over build-time repo path"
+        );
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn collect_candidates_should_only_include_release_sidecar_candidates() {
+        let root = create_temp_root("candidate-layout");
+        let manifest_dir = root.join("src-tauri");
+        let resource_dir = root.join("installed-app");
+        let candidates = collect_sidecar_candidates(&manifest_dir, Some(resource_dir.as_path()));
+
+        assert_eq!(candidates[0], resource_dir.join("binaries/oni-sidecar.exe"));
+        assert!(candidates
+            .iter()
+            .any(|path| path == &resource_dir.join("oni-sidecar.exe")));
+        assert!(candidates
+            .iter()
+            .any(|path| path == &manifest_dir.join("binaries/oni-sidecar.exe")));
+        assert!(candidates
+            .iter()
+            .all(|path| !path.to_string_lossy().contains("mingw")));
+        assert!(candidates
+            .iter()
+            .all(|path| !path.to_string_lossy().contains("windows-gnu")));
+        assert!(candidates.iter().any(|path| path
+            == &root.join("out/build/x64-release/src/oni-sidecar.exe")));
+        assert!(candidates
+            .iter()
+            .all(|path| !path.to_string_lossy().contains("x64-debug")));
 
         fs::remove_dir_all(root).expect("temp root should be removed");
     }
@@ -1487,12 +1759,16 @@ mod tests {
     fn prepare_runtime_sidecar_copy_should_keep_only_latest_runtime_copy() {
         let root = create_temp_root("runtime-sidecar-copy");
         let runtime_dir = root.join("runtime");
-        let source_a = root.join("out/build/mingw-release/src/oni-sidecar.exe");
-        let source_b = root.join("out/build/mingw-debug/src/oni-sidecar.exe");
+        let source_a = root.join("out/build/x64-release/src/oni-sidecar.exe");
+        let source_b = root.join("src-tauri/binaries/oni-sidecar.exe");
 
         write_dummy_sidecar(&source_a);
+        fs::write(source_a.parent().unwrap().join("data.zip"), b"PK\x03\x04settings-a")
+            .expect("first settings asset should be written");
         std::thread::sleep(Duration::from_millis(20));
         write_dummy_sidecar(&source_b);
+        fs::write(source_b.parent().unwrap().join("data.zip"), b"PK\x03\x04settings-b")
+            .expect("second settings asset should be written");
 
         let first_copy =
             prepare_runtime_sidecar_copy(&runtime_dir, &source_a).expect("first runtime copy");
@@ -1511,6 +1787,95 @@ mod tests {
         );
 
         fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn prepare_runtime_sidecar_copy_should_copy_settings_asset() {
+        let root = create_temp_root("runtime-sidecar-asset-copy");
+        let runtime_dir = root.join("runtime");
+        let source = root.join("src-tauri/binaries/oni-sidecar.exe");
+
+        write_dummy_sidecar(&source);
+        fs::write(source.parent().unwrap().join("data.zip"), b"PK\x03\x04settings")
+            .expect("settings asset should be written");
+
+        let runtime_copy =
+            prepare_runtime_sidecar_copy(&runtime_dir, &source).expect("runtime copy");
+
+        assert!(runtime_copy.is_file(), "runtime sidecar copy should exist");
+        assert_eq!(
+            fs::read(runtime_dir.join("data.zip")).expect("runtime asset should exist"),
+            b"PK\x03\x04settings"
+        );
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn prepare_runtime_sidecar_copy_should_replace_empty_settings_asset() {
+        let root = create_temp_root("runtime-sidecar-empty-asset");
+        let runtime_dir = root.join("runtime");
+        let source = root.join("src-tauri/binaries/oni-sidecar.exe");
+
+        write_dummy_sidecar(&source);
+        fs::write(source.parent().unwrap().join("data.zip"), b"PK\x03\x04settings")
+            .expect("settings asset should be written");
+        fs::create_dir_all(&runtime_dir).expect("runtime dir should exist");
+        fs::write(runtime_dir.join("data.zip"), b"").expect("empty runtime asset should exist");
+
+        prepare_runtime_sidecar_copy(&runtime_dir, &source).expect("runtime copy");
+
+        assert_eq!(
+            fs::read(runtime_dir.join("data.zip")).expect("runtime asset should exist"),
+            b"PK\x03\x04settings"
+        );
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn prepare_runtime_sidecar_copy_should_be_safe_for_parallel_calls() {
+        let root = create_temp_root("runtime-sidecar-parallel-asset");
+        let runtime_dir = root.join("runtime");
+        let source = root.join("src-tauri/binaries/oni-sidecar.exe");
+
+        write_dummy_sidecar(&source);
+        let mut asset = b"PK\x03\x04".to_vec();
+        asset.extend(vec![7_u8; 4092]);
+        fs::write(source.parent().unwrap().join("data.zip"), asset.clone())
+            .expect("settings asset should be written");
+
+        let mut workers = Vec::new();
+        for _ in 0..8 {
+            let runtime_dir = runtime_dir.clone();
+            let source = source.clone();
+            workers.push(std::thread::spawn(move || {
+                prepare_runtime_sidecar_copy(&runtime_dir, &source).expect("runtime copy")
+            }));
+        }
+
+        for worker in workers {
+            assert!(worker.join().expect("worker should join").is_file());
+        }
+        assert_eq!(
+            fs::read(runtime_dir.join("data.zip")).expect("runtime asset should exist"),
+            asset
+        );
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn sidecar_spawn_creation_flags_should_hide_console_window_on_windows() {
+        #[cfg(windows)]
+        assert_eq!(
+            sidecar_spawn_creation_flags(),
+            0x0800_0000,
+            "Windows 下 sidecar 子进程必须使用 CREATE_NO_WINDOW"
+        );
+
+        #[cfg(not(windows))]
+        assert_eq!(sidecar_spawn_creation_flags(), 0);
     }
 
     #[test]
@@ -1779,7 +2144,7 @@ mod tests {
                 "distance": []
             }
         });
-        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal)
+        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal, None)
             .expect("search smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "started"));
         assert!(events.iter().any(|event| event["event"] == "completed"));
@@ -1797,7 +2162,7 @@ mod tests {
             "mixing": 625
         });
         let events =
-            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity)
+            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity, None)
                 .expect("preview smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "preview"));
     }
@@ -1819,7 +2184,7 @@ mod tests {
                 "distance": []
             }
         });
-        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal)
+        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal, None)
             .expect("search should not crash");
         assert!(events.iter().any(|event| event["event"] == "started"));
         assert!(events
@@ -1839,7 +2204,7 @@ mod tests {
             "mixing": 625
         });
         let events =
-            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity)
+            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity, None)
                 .expect("preview should not crash");
         assert!(events
             .iter()
@@ -1891,6 +2256,7 @@ mod tests {
                 &path,
                 &request,
                 SidecarProcessPriority::LowPerfAffinity,
+                None,
             )
             .expect("preview_coord smoke should succeed");
             assert!(

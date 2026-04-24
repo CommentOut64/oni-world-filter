@@ -90,9 +90,9 @@ test("ResultToolbar renders antd status shell", () => {
   assert.match(markup, /ant-btn/);
   assert.match(markup, /取消搜索/);
   assert.match(markup, /清空结果/);
+  assert.match(markup, /打开调试窗口/);
   assert.match(markup, /result-toolbar-actions/);
   assert.doesNotMatch(markup, /ant-space-compact/);
-  assert.doesNotMatch(markup, /打开调试窗口/);
   assert.doesNotMatch(markup, /结果总数/);
   assert.doesNotMatch(markup, /状态:/);
 });

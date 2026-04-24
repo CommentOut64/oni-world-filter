@@ -123,7 +123,7 @@ void Polygon::Intersect(const Polygon &clip)
     Paths result;
     clipper.Execute(ctIntersection, polytree, PolyFillType::pftEvenOdd);
     ClipperLib::PolyTreeToPaths(polytree, result);
-    this->Vertices.clear();
+    this->Clear();
     if (!result.empty()) {
         auto &path = result[0];
         for (auto &item : path) {

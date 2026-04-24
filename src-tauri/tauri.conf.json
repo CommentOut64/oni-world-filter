@@ -1,36 +1,49 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ONI World Desktop",
-  "version": "0.1.0",
-  "identifier": "com.wgh.oniworld.desktop",
-  "build": {
-    "beforeDevCommand": "cd desktop && corepack yarn dev",
-    "beforeBuildCommand": "cd desktop && corepack yarn build",
-    "devUrl": "http://127.0.0.1:1420",
-    "frontendDist": "../desktop/dist"
-  },
-  "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "ONI World Desktop",
-        "width": 1280,
-        "height": 800,
-        "resizable": true
-      }
-    ],
-    "security": {
-      "csp": null
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "resources": [
-      "binaries/oni-sidecar.exe"
-    ],
-    "icon": [
-      "icons/icon.ico"
-    ]
-  }
+    "$schema":  "https://schema.tauri.app/config/2",
+    "productName":  "oni-world-filter",
+    "version":  "0.0.1",
+    "identifier":  "com.oni-world-filter",
+    "build":  {
+                  "beforeDevCommand":  "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-before-dev.ps1",
+                  "beforeBuildCommand":  "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-before-build.ps1",
+                  "devUrl":  "http://127.0.0.1:1420",
+                  "frontendDist":  "../desktop/dist"
+              },
+    "app":  {
+                "windows":  [
+                                {
+                                    "label":  "main",
+                                    "title":  "oni-world-filter",
+                                    "width":  1280,
+                                    "height":  800,
+                                    "resizable":  true
+                                }
+                            ],
+                "security":  {
+                                 "csp":  null
+                             }
+            },
+    "bundle":  {
+                   "active":  true,
+                   "targets":  [
+                                   "nsis"
+                               ],
+                   "resources":  [
+                                     "binaries/oni-sidecar.exe",
+                                     "binaries/data.zip"
+                                 ],
+                   "icon":  [
+                                "icons/icon.ico"
+                            ],
+                   "windows":  {
+                                   "nsis":  {
+                                                "languages":  [
+                                                                  "SimpChinese"
+                                                              ],
+                                                "displayLanguageSelector":  false,
+                                                "installMode":  "both",
+                                                "installerHooks":  "installer/nsis-hooks.nsh"
+                                            }
+                               }
+               }
 }

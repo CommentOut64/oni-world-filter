@@ -25,7 +25,7 @@ export default function SearchAnalysisHints({ analysis }: SearchAnalysisHintsPro
       <header>
         <h4>分析结果</h4>
         <span className="analysis-probability">
-          瓶颈概率上界: {formatProbabilityUpper(analysis.predictedBottleneckProbability)}
+          乐观估计可匹配概率: {formatProbabilityUpper(analysis.predictedBottleneckProbability)}
         </span>
       </header>
 

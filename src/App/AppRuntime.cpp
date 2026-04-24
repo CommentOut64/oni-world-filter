@@ -10,12 +10,13 @@
 
 #include <clipper.hpp>
 
+#include "App/SettingsAsset.hpp"
 #include "config.h"
 
 #ifndef __EMSCRIPTEN__
 static bool LoadSharedResourceBlob(std::vector<char> &data, std::string *errorMessage)
 {
-    std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+    std::ifstream file(ResolveSettingsAssetPath(), std::ios::binary);
     if (!file.is_open()) {
         if (errorMessage != nullptr) {
             *errorMessage = "failed to open shared asset blob";

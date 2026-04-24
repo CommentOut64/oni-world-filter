@@ -38,7 +38,7 @@ ValidationIssue BuildLowProbabilityWarning(double probabilityUpper,
                                            bool hasLowConfidenceDistance)
 {
     const std::string severity = strongWarning ? "strong-warning" : "warning";
-    std::string message = "预测瓶颈概率上界=" + FormatProbability(probabilityUpper) +
+    std::string message = "乐观估计可匹配概率=" + FormatProbability(probabilityUpper) +
                           "，主要瓶颈: " + JoinGroups(bottlenecks) +
                           "，建议先放宽这些条件。";
     if (hasLowConfidenceDistance && strongWarning) {

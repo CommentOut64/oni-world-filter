@@ -27,6 +27,95 @@ std::shared_ptr<const SettingsCache> g_sharedSettingsCache;
 
 } // namespace
 
+SettingsCache::SettingsCache(const SettingsCache &other)
+{
+    *this = other;
+}
+
+SettingsCache &SettingsCache::operator=(const SettingsCache &other)
+{
+    if (this == &other) {
+        return *this;
+    }
+
+    borders = other.borders;
+    defaults = other.defaults;
+    layers = other.layers;
+    mobs = other.mobs;
+    rivers = other.rivers;
+    rooms = other.rooms;
+    temperatures = other.temperatures;
+    biomes = other.biomes;
+    clusters = other.clusters;
+    features = other.features;
+    subworldMixing = other.subworldMixing;
+    subworlds = other.subworlds;
+    orderedSubworlds = other.orderedSubworlds;
+    traits = other.traits;
+    worldMixing = other.worldMixing;
+    worlds = other.worlds;
+    dlcMixings = other.dlcMixings;
+    templates = other.templates;
+    traitFeatures = other.traitFeatures;
+    mixConfigs = other.mixConfigs;
+    cluster = other.cluster;
+    seed = other.seed;
+    m_dlcState = other.m_dlcState;
+
+    RepairTransientPointersAfterCopy();
+    return *this;
+}
+
+void SettingsCache::RepairTransientPointersAfterCopy()
+{
+    if (cluster != nullptr) {
+        const std::string coordinatePrefix = cluster->coordinatePrefix;
+        cluster = nullptr;
+        for (auto &pair : clusters) {
+            if (pair.second.coordinatePrefix == coordinatePrefix) {
+                cluster = &pair.second;
+                break;
+            }
+        }
+    }
+
+    for (auto &config : mixConfigs) {
+        config.setting = nullptr;
+        if (config.type == 2) {
+            auto itr = subworldMixing.find(config.path);
+            if (itr != subworldMixing.end()) {
+                config.setting = &itr->second;
+            }
+            continue;
+        }
+        if (config.type == 1) {
+            auto itr = worldMixing.find(config.path);
+            if (itr != worldMixing.end()) {
+                config.setting = &itr->second;
+            }
+        }
+    }
+
+    for (auto &pair : worlds) {
+        pair.second.ClearMixingsAndTraits();
+    }
+
+    for (auto &pair : orderedSubworlds) {
+        std::vector<SubWorld *> rebound;
+        rebound.reserve(pair.second.size());
+        for (const auto *subworld : pair.second) {
+            if (subworld == nullptr) {
+                continue;
+            }
+            auto itr = subworlds.find(subworld->name);
+            if (itr != subworlds.end()) {
+                rebound.push_back(&itr->second);
+            }
+        }
+        pair.second = std::move(rebound);
+    }
+}
+
 template<typename T>
 static bool LoadJsonFile(mz_zip_archive &zip, int index, T &result)
 {

@@ -43,6 +43,10 @@ struct SearchMutableStateSnapshot {
 class SettingsCache
 {
 public:
+    SettingsCache() = default;
+    SettingsCache(const SettingsCache &other);
+    SettingsCache &operator=(const SettingsCache &other);
+
     ComposableDictionary<std::vector<WeightedSimHash>> borders;
     DefaultSettings defaults;
     LevelLayerSettings layers;
@@ -106,6 +110,7 @@ public:
 
 private:
     void ParseAndApplyMixingSettingsCode(const std::string &code);
+    void RepairTransientPointersAfterCopy();
 };
 
 class SharedSettingsCache

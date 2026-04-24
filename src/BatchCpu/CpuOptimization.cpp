@@ -548,7 +548,7 @@ CpuTopologyFacts CpuTopologyDetector::DetectFacts()
 CpuMode ParseCpuMode(const std::string &value)
 {
     const auto lower = ToLower(value);
-    if (lower == "turbo" || lower == "极速" || lower == "custom" || lower == "自定义") {
+    if (lower == "turbo" || lower == "狂暴" || lower == "custom" || lower == "自定义") {
         return CpuMode::Turbo;
     }
     if (lower == "conservative" || lower == "保守") {

@@ -21,6 +21,19 @@ test("shouldIgnoreSidecarStderr ignores recoverable template placement diagnosti
   );
 });
 
+test("shouldIgnoreSidecarStderr ignores sidecar diagnostic progress lines", () => {
+  assert.equal(
+    shouldIgnoreSidecarStderr(
+      "[sidecar-diagnostic] search worker started jobId=search-1777015977549-mdntey"
+    ),
+    true
+  );
+});
+
+test("shouldIgnoreSidecarStderr keeps real stderr errors visible", () => {
+  assert.equal(shouldIgnoreSidecarStderr("sidecar 进程异常退出(code=Some(-1073741819))"), false);
+});
+
 test("frontend Alerts use title instead of deprecated message prop", () => {
   assert.doesNotMatch(APP_TSX, /<Alert[\s\S]*\bmessage=/);
   assert.doesNotMatch(SEARCH_PANEL_TSX, /<Alert[\s\S]*\bmessage=/);

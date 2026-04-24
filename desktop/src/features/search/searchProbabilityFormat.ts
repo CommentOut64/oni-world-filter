@@ -21,7 +21,7 @@ export function formatProbabilityUpper(probability: number): string {
 export function formatSearchWarningProbabilityCopy(probability: number): string {
   const display = formatProbabilityUpper(probability);
   if (display === "-") {
-    return "当前瓶颈概率上界暂不可用。";
+    return "乐观估计暂不可用。";
   }
-  return `当前瓶颈概率上界为 ${display}。`;
+  return `乐观估计可匹配概率约为 ${display}。`;
 }

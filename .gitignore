@@ -1,8 +1,6 @@
 .vs/
 .vscode/
 out/
-node_modules/
-.pixi/
 
 # CMake (covers accidental in-source builds)
 CMakeUserPresets.json

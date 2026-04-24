@@ -35,13 +35,22 @@ const MIXING_SLOTS = [
   },
 ];
 
-function renderSearchActions(): string {
+function renderSearchActions(
+  overrides?: Partial<{
+    isSearching: boolean;
+    isBusy: boolean;
+    hasResults: boolean;
+    resultsCount: number;
+  }>
+): string {
   return renderToStaticMarkup(
     createElement(SearchActions, {
       isSearching: false,
+      isBusy: false,
       hasResults: true,
       resultsCount: 3,
       onViewResults: () => undefined,
+      ...overrides,
     })
   );
 }
@@ -165,6 +174,17 @@ test("SearchActions renders antd buttons", () => {
   assert.doesNotMatch(markup, /取消搜索/);
   assert.doesNotMatch(markup, /清空结果/);
   assert.doesNotMatch(markup, /复制协议 JSON/);
+});
+
+test("SearchActions shows analyze busy state before search starts", () => {
+  const markup = renderSearchActions({
+    isSearching: false,
+    isBusy: true,
+  });
+
+  assert.match(markup, /正在分析/);
+  assert.match(markup, /ant-btn-loading/);
+  assert.match(markup, /disabled/);
 });
 
 test("WorldSelector renders antd segmented navigation", () => {

@@ -8,6 +8,7 @@ use serde_json::Value;
 use tauri::AppHandle;
 
 use crate::error::HostError;
+use crate::diagnostics;
 use crate::sidecar::{
     self, CoordPreviewRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
     SearchCatalogPayload, SearchRequestPayload,
@@ -63,6 +64,16 @@ impl ControlSidecarManager {
         request: &Value,
     ) -> Result<Vec<Value>, HostError> {
         let launcher = self.resolve_launcher(app)?;
+        diagnostics::log(
+            app,
+            "control.request",
+            format!(
+                "enabled={}, program={}, request={}",
+                self.enabled,
+                launcher.program.display(),
+                request
+            ),
+        );
         let mut guard = self
             .active_process
             .lock()
@@ -70,6 +81,11 @@ impl ControlSidecarManager {
 
         for attempt in 0..=1 {
             if guard.is_none() {
+                diagnostics::log(
+                    app,
+                    "control.spawn",
+                    format!("program={}", launcher.program.display()),
+                );
                 *guard = Some(ControlSidecarProcess::spawn(&launcher)?);
             }
 
@@ -90,6 +106,7 @@ impl ControlSidecarManager {
                     return Ok(outcome.events);
                 }
                 Err(error) => {
+                    diagnostics::log(app, "control.error", error.to_string());
                     if let Some(process) = guard.take() {
                         process.shutdown();
                     }
@@ -269,6 +286,7 @@ struct ControlRequestOutcome {
 impl SidecarLauncher {
     fn run_once(&self, request: &Value) -> Result<Vec<Value>, HostError> {
         let mut command = Command::new(&self.program);
+        sidecar::configure_sidecar_command(&mut command);
         command
             .args(&self.args)
             .stdin(Stdio::piped())
@@ -296,7 +314,7 @@ impl SidecarLauncher {
         let stderr_reader = std::thread::spawn(move || drain_stderr(stderr));
         let events = read_ndjson_events(stdout)?;
         let status = child.wait()?;
-        let stderr_text = stderr_reader.join().unwrap_or_default();
+        let stderr_text = sidecar::sanitize_sidecar_stderr(&stderr_reader.join().unwrap_or_default());
         if !status.success() {
             return Err(HostError::SidecarExited {
                 code: status.code(),
@@ -310,12 +328,14 @@ impl SidecarLauncher {
 impl ControlSidecarProcess {
     fn spawn(launcher: &SidecarLauncher) -> Result<Self, HostError> {
         let mut command = Command::new(&launcher.program);
+        sidecar::configure_sidecar_command(&mut command);
         command
             .args(&launcher.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let mut child = command.spawn()?;
+        eprintln!("[control-sidecar] spawned pid={} program={}", child.id(), launcher.program.display());
         let stdin = child
             .stdin
             .take()
@@ -395,6 +415,12 @@ impl ControlSidecarProcess {
 
     fn build_exit_error(&mut self) -> Result<HostError, HostError> {
         let status = self.child.wait()?;
+        eprintln!(
+            "[control-sidecar] exited success={} code={:?} stderr={}",
+            status.success(),
+            status.code(),
+            self.stderr_text_raw()
+        );
         Ok(HostError::SidecarExited {
             code: status.code(),
             message: self.stderr_text(),
@@ -402,6 +428,10 @@ impl ControlSidecarProcess {
     }
 
     fn stderr_text(&self) -> String {
+        sidecar::sanitize_sidecar_stderr(&self.stderr_text_raw())
+    }
+
+    fn stderr_text_raw(&self) -> String {
         let guard = self
             .stderr_lines
             .lock()
@@ -442,7 +472,7 @@ fn drain_stderr(stderr: ChildStderr) -> String {
         }
         lines.push(trimmed.to_string());
     }
-    lines.join("\n")
+    sidecar::sanitize_sidecar_stderr(&lines.join("\n"))
 }
 
 fn drain_stderr_into(stderr: ChildStderr, lines: Arc<Mutex<Vec<String>>>) {

@@ -27,7 +27,7 @@ bool Expect(bool condition, const char *message, int &failures)
 
 bool ReadAssetBlob(std::vector<char> &data, std::string *error)
 {
-    std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+    std::ifstream file(SETTING_TEST_ASSET_FILEPATH, std::ios::binary);
     if (!file.is_open()) {
         if (error != nullptr) {
             *error = "failed to open asset blob";
@@ -146,6 +146,69 @@ std::string FindInactiveWorldName(const SettingsCache &settings,
         }
     }
     return {};
+}
+
+bool OrderedSubworldPointersBindToLocalCopy(const SettingsCache &settings)
+{
+    for (const auto &[key, ordered] : settings.orderedSubworlds) {
+        (void)key;
+        for (const auto *subworld : ordered) {
+            if (subworld == nullptr) {
+                return false;
+            }
+            const auto itr = settings.subworlds.find(subworld->name);
+            if (itr == settings.subworlds.end()) {
+                return false;
+            }
+            if (subworld != &itr->second) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool WorldRuntimeBasePointersBindToLocalCopy(const World &world)
+{
+    if (world.subworldFiles.size() != world.subworldFiles2.size()) {
+        return false;
+    }
+    for (size_t index = 0; index < world.subworldFiles.size(); ++index) {
+        if (world.subworldFiles2[index] != &world.subworldFiles[index]) {
+            return false;
+        }
+    }
+
+    if (world.unknownCellsAllowedSubworlds.size() != world.unknownCellsAllowedSubworlds2.size()) {
+        return false;
+    }
+    for (size_t index = 0; index < world.unknownCellsAllowedSubworlds.size(); ++index) {
+        if (world.unknownCellsAllowedSubworlds2[index] != &world.unknownCellsAllowedSubworlds[index]) {
+            return false;
+        }
+    }
+
+    if (world.worldTemplateRules.size() != world.worldTemplateRules2.size()) {
+        return false;
+    }
+    for (size_t index = 0; index < world.worldTemplateRules.size(); ++index) {
+        if (world.worldTemplateRules2[index] != &world.worldTemplateRules[index]) {
+            return false;
+        }
+    }
+
+    return world.globalFeatures2.empty() && world.mixingSubworlds.empty();
+}
+
+bool CopiedWorldRuntimePointersBindToLocalCopy(const SettingsCache &settings)
+{
+    for (const auto &[name, world] : settings.worlds) {
+        (void)name;
+        if (!WorldRuntimeBasePointersBindToLocalCopy(world)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::string EncodeMinMax(const MinMax &value)
@@ -294,6 +357,27 @@ int RunAllTests()
             const std::string replayFingerprint = FingerprintMutableState(settings);
             Expect(replayFingerprint == mutatedFingerprint,
                    "restored state should reproduce the same mutable search runtime state",
+                   failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for copy isolation test",
+               failures);
+
+        if (settings.defaults.data.empty()) {
+            ++failures;
+            std::cerr << "[FAIL] copy isolation fixture should load non-empty defaults" << std::endl;
+        } else {
+            SettingsCache copied = settings;
+            Expect(OrderedSubworldPointersBindToLocalCopy(copied),
+                   "copied settings should rebind orderedSubworlds to the copied subworld map",
+                   failures);
+            Expect(CopiedWorldRuntimePointersBindToLocalCopy(copied),
+                   "copied settings should rebuild world runtime pointer caches against copied storage",
                    failures);
         }
     }

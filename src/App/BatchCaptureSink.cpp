@@ -3,6 +3,7 @@
 #ifndef __EMSCRIPTEN__
 #include <fstream>
 
+#include "App/SettingsAsset.hpp"
 #include "config.h"
 #endif
 
@@ -25,7 +26,7 @@ bool BatchCaptureSink::RequestResource(uint32_t expectedSize, std::vector<char> 
 {
 #ifndef __EMSCRIPTEN__
     data.assign(expectedSize, 0);
-    std::ifstream fstm(SETTING_ASSET_FILEPATH, std::ios::binary);
+    std::ifstream fstm(ResolveSettingsAssetPath(), std::ios::binary);
     if (!fstm.is_open()) {
         LogE("can not open file.");
         return false;
