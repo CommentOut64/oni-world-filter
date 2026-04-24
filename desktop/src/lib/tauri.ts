@@ -23,6 +23,7 @@ const SIDECAR_STDERR_CHANNEL = "sidecar://stderr";
 export function shouldIgnoreSidecarStderr(message: string): boolean {
   const normalized = message.trim();
   return (
+    normalized.startsWith("[sidecar-diagnostic]") ||
     normalized.includes("compute child node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed after convert unknown cells") ||

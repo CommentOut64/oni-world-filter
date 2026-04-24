@@ -314,7 +314,7 @@ impl SidecarLauncher {
         let stderr_reader = std::thread::spawn(move || drain_stderr(stderr));
         let events = read_ndjson_events(stdout)?;
         let status = child.wait()?;
-        let stderr_text = stderr_reader.join().unwrap_or_default();
+        let stderr_text = sidecar::sanitize_sidecar_stderr(&stderr_reader.join().unwrap_or_default());
         if !status.success() {
             return Err(HostError::SidecarExited {
                 code: status.code(),
@@ -419,7 +419,7 @@ impl ControlSidecarProcess {
             "[control-sidecar] exited success={} code={:?} stderr={}",
             status.success(),
             status.code(),
-            self.stderr_text()
+            self.stderr_text_raw()
         );
         Ok(HostError::SidecarExited {
             code: status.code(),
@@ -428,6 +428,10 @@ impl ControlSidecarProcess {
     }
 
     fn stderr_text(&self) -> String {
+        sidecar::sanitize_sidecar_stderr(&self.stderr_text_raw())
+    }
+
+    fn stderr_text_raw(&self) -> String {
         let guard = self
             .stderr_lines
             .lock()
@@ -468,7 +472,7 @@ fn drain_stderr(stderr: ChildStderr) -> String {
         }
         lines.push(trimmed.to_string());
     }
-    lines.join("\n")
+    sidecar::sanitize_sidecar_stderr(&lines.join("\n"))
 }
 
 fn drain_stderr_into(stderr: ChildStderr, lines: Arc<Mutex<Vec<String>>>) {

@@ -18,6 +18,7 @@ import {
   getSearchCatalog,
   listGeysers,
   listWorlds,
+  shouldIgnoreSidecarStderr,
   startSearch,
   subscribeSidecar,
 } from "../lib/tauri.ts";
@@ -135,17 +136,6 @@ function createDefaultStats(totalMatches = 0): SearchStats {
     currentSeedsPerSecond: 0,
     peakSeedsPerSecond: 0,
   };
-}
-
-function isRecoverableSidecarDiagnostic(message: string): boolean {
-  const normalized = message.trim();
-  return (
-    normalized.includes("compute child node pd failed, fallback to compute node.") ||
-    normalized.includes("compute node pd failed, fallback to compute node.") ||
-    normalized.includes("compute node pd failed after convert unknown cells") ||
-    (normalized.includes("Intersect:") && normalized.includes("intersection result is empty.")) ||
-    (normalized.includes("Intersect:") && normalized.includes("subj:") && normalized.includes("clip:"))
-  );
 }
 
 function makeJobId(prefix: string): string {
@@ -341,7 +331,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
             appendHostDebugMessage(stderrEvent.message);
             return;
           }
-          if (isRecoverableSidecarDiagnostic(stderrEvent.message)) {
+          if (shouldIgnoreSidecarStderr(stderrEvent.message)) {
             return;
           }
           useSearchStore.setState({

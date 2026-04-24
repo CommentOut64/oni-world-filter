@@ -36,6 +36,7 @@ use windows_sys::Win32::System::Threading::SetProcessAffinityMask;
 pub const SIDECAR_EVENT_CHANNEL: &str = "sidecar://event";
 pub const SIDECAR_STDERR_CHANNEL: &str = "sidecar://stderr";
 const HOST_DEBUG_PREFIX: &str = "[host-debug]";
+pub(crate) const SIDECAR_DIAGNOSTIC_PREFIX: &str = "[sidecar-diagnostic]";
 const CANCEL_GRACE_TIMEOUT_MS: u64 = 75;
 static RUNTIME_SIDECAR_PREPARE_LOCK: Mutex<()> = Mutex::new(());
 #[cfg(windows)]
@@ -964,7 +965,7 @@ fn run_sidecar_request_collect(
     let mut events = read_ndjson_events(stdout)?;
 
     let status = child.wait()?;
-    let stderr_text = stderr_reader.join().unwrap_or_default();
+    let stderr_text = sanitize_sidecar_stderr(&stderr_reader.join().unwrap_or_default());
     diagnostics::log(
         app,
         "sidecar.oneshot.exit",
@@ -1232,6 +1233,16 @@ fn read_ndjson_events(stdout: ChildStdout) -> Result<Vec<Value>, HostError> {
     Ok(events)
 }
 
+pub(crate) fn sanitize_sidecar_stderr(stderr_text: &str) -> String {
+    stderr_text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .filter(|line| !line.starts_with(SIDECAR_DIAGNOSTIC_PREFIX))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn drain_stderr(stderr: ChildStderr) -> String {
     let reader = BufReader::new(stderr);
     let mut lines = Vec::new();
@@ -1242,7 +1253,7 @@ fn drain_stderr(stderr: ChildStderr) -> String {
         }
         lines.push(trimmed.to_string());
     }
-    lines.join("\n")
+    sanitize_sidecar_stderr(&lines.join("\n"))
 }
 
 fn emit_host_debug(app: &AppHandle, job_id: &str, message: String) {
@@ -1585,6 +1596,7 @@ mod tests {
         first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
         list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
         request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
+        sanitize_sidecar_stderr,
         sidecar_spawn_creation_flags,
         should_emit_failed_for_exit, should_forward_sidecar_event, validate_preview_coord_request,
         CoordPreviewRequestPayload, PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
@@ -1675,6 +1687,21 @@ mod tests {
         assert_eq!(resolved, binaries);
 
         fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn sanitize_sidecar_stderr_should_drop_diagnostic_lines() {
+        let stderr = "[sidecar-diagnostic] stdin closed; shutting down\nreal failure\n[sidecar-diagnostic] process exiting normally";
+
+        assert_eq!(sanitize_sidecar_stderr(stderr), "real failure");
+    }
+
+    #[test]
+    fn sanitize_sidecar_stderr_should_keep_real_errors() {
+        assert_eq!(
+            sanitize_sidecar_stderr("sidecar 进程异常退出(code=Some(-1073741819))"),
+            "sidecar 进程异常退出(code=Some(-1073741819))"
+        );
     }
 
     #[test]
