@@ -269,6 +269,7 @@ struct ControlRequestOutcome {
 impl SidecarLauncher {
     fn run_once(&self, request: &Value) -> Result<Vec<Value>, HostError> {
         let mut command = Command::new(&self.program);
+        sidecar::configure_sidecar_command(&mut command);
         command
             .args(&self.args)
             .stdin(Stdio::piped())
@@ -310,6 +311,7 @@ impl SidecarLauncher {
 impl ControlSidecarProcess {
     fn spawn(launcher: &SidecarLauncher) -> Result<Self, HostError> {
         let mut command = Command::new(&launcher.program);
+        sidecar::configure_sidecar_command(&mut command);
         command
             .args(&launcher.args)
             .stdin(Stdio::piped())

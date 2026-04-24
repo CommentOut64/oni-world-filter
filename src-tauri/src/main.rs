@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod app_paths;
 mod control_sidecar;
 mod error;
 mod sidecar;
@@ -20,6 +21,7 @@ fn main() {
             commands::load_preview_by_coord,
             commands::list_worlds,
             commands::list_geysers,
+            commands::get_host_paths,
             commands::get_search_catalog,
             commands::analyze_search_request
         ])

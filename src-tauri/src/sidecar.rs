@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::atomic::Ordering;
@@ -11,8 +13,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
+use crate::app_paths;
 use crate::error::HostError;
 use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
@@ -33,6 +36,8 @@ pub const SIDECAR_EVENT_CHANNEL: &str = "sidecar://event";
 pub const SIDECAR_STDERR_CHANNEL: &str = "sidecar://stderr";
 const HOST_DEBUG_PREFIX: &str = "[host-debug]";
 const CANCEL_GRACE_TIMEOUT_MS: u64 = 75;
+#[cfg(windows)]
+const WINDOWS_CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 const WORLD_CODES: [&str; 38] = [
     "SNDST-A-",
@@ -390,7 +395,9 @@ pub fn start_search_streaming(
     }
 
     let sidecar_path = resolve_sidecar_path(Some(&app))?;
-    let mut child = Command::new(&sidecar_path)
+    let mut command = Command::new(&sidecar_path);
+    configure_sidecar_command(&mut command);
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -650,68 +657,27 @@ fn collect_sidecar_candidates(manifest_dir: &Path, resource_dir: Option<&Path>) 
         .unwrap_or_else(|| manifest_dir.to_path_buf());
     let mut candidates = Vec::new();
 
-    candidates.push(manifest_dir.join("binaries/oni-sidecar.exe"));
-
     if let Some(resource_dir) = resource_dir {
+        candidates.push(resource_dir.join("binaries/oni-sidecar.exe"));
+        candidates.push(resource_dir.join("binaries/oni-sidecar-x86_64-pc-windows-msvc.exe"));
         candidates.push(resource_dir.join("oni-sidecar.exe"));
         candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-msvc.exe"));
-        candidates.push(resource_dir.join("oni-sidecar-x86_64-pc-windows-gnu.exe"));
     }
 
-    candidates.push(repo_root.join("out/build/mingw-release/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-release/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-debug/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/mingw-debug/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-release/oni-sidecar.exe"));
+    candidates.push(manifest_dir.join("binaries/oni-sidecar.exe"));
     candidates.push(repo_root.join("out/build/x64-release/src/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-debug/oni-sidecar.exe"));
-    candidates.push(repo_root.join("out/build/x64-debug/src/oni-sidecar.exe"));
 
     candidates
-}
-
-#[derive(Debug)]
-struct ExistingSidecarCandidate {
-    path: PathBuf,
-    modified_at: SystemTime,
-    preference_index: usize,
-}
-
-fn collect_existing_sidecar_candidates(candidates: &[PathBuf]) -> Vec<ExistingSidecarCandidate> {
-    candidates
-        .iter()
-        .enumerate()
-        .filter_map(|(preference_index, path)| {
-            let metadata = path.metadata().ok()?;
-            if !metadata.is_file() || metadata.len() == 0 {
-                return None;
-            }
-            let modified_at = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-            Some(ExistingSidecarCandidate {
-                path: path.to_path_buf(),
-                modified_at,
-                preference_index,
-            })
-        })
-        .collect()
 }
 
 fn first_existing_sidecar_path(candidates: &[PathBuf]) -> Option<PathBuf> {
-    collect_existing_sidecar_candidates(candidates)
-        .into_iter()
-        .max_by(|left, right| {
-            left.modified_at
-                .cmp(&right.modified_at)
-                .then_with(|| right.preference_index.cmp(&left.preference_index))
-        })
-        .map(|candidate| candidate.path)
-}
-
-fn runtime_sidecar_dir(app: &AppHandle) -> Result<PathBuf, HostError> {
-    let base_dir = app.path().app_local_data_dir().map_err(|error| {
-        HostError::InvalidRequest(format!("无法解析 sidecar 运行目录: {}", error))
-    })?;
-    Ok(base_dir.join("sidecars"))
+    candidates.iter().find_map(|path| {
+        let metadata = path.metadata().ok()?;
+        if metadata.is_file() && metadata.len() > 0 {
+            return Some(path.to_path_buf());
+        }
+        None
+    })
 }
 
 fn runtime_sidecar_file_name(source_path: &Path) -> Result<String, HostError> {
@@ -768,6 +734,28 @@ fn prepare_runtime_sidecar_copy(
     Ok(runtime_path)
 }
 
+pub(crate) fn sidecar_spawn_creation_flags() -> u32 {
+    #[cfg(windows)]
+    {
+        WINDOWS_CREATE_NO_WINDOW
+    }
+
+    #[cfg(not(windows))]
+    {
+        0
+    }
+}
+
+pub(crate) fn configure_sidecar_command(command: &mut Command) {
+    #[cfg(windows)]
+    command.creation_flags(sidecar_spawn_creation_flags());
+
+    #[cfg(not(windows))]
+    {
+        let _ = command;
+    }
+}
+
 pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostError> {
     if let Some(path) = env::var_os("ONI_SIDECAR_PATH") {
         let candidate = PathBuf::from(path);
@@ -777,12 +765,15 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let resource_dir = app.and_then(|app_handle| app_handle.path().resource_dir().ok());
+    let resource_dir = app.and_then(|app_handle| app_paths::resolve_install_resource_dir(app_handle).ok());
     let candidates = collect_sidecar_candidates(&manifest_dir, resource_dir.as_deref());
 
     if let Some(existing) = first_existing_sidecar_path(&candidates) {
         if let Some(app_handle) = app {
-            return prepare_runtime_sidecar_copy(&runtime_sidecar_dir(app_handle)?, &existing);
+            return prepare_runtime_sidecar_copy(
+                &app_paths::resolve_runtime_sidecar_dir(app_handle)?,
+                &existing,
+            );
         }
         return Ok(existing);
     }
@@ -796,6 +787,7 @@ fn run_sidecar_request_collect(
     priority: SidecarProcessPriority,
 ) -> Result<Vec<Value>, HostError> {
     let mut command = Command::new(sidecar_path);
+    configure_sidecar_command(&mut command);
     command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -1105,6 +1097,24 @@ fn emit_host_debug(app: &AppHandle, job_id: &str, message: String) {
     );
 }
 
+fn describe_job_status(job_status: Option<JobStatus>) -> &'static str {
+    match job_status {
+        Some(JobStatus::Running) => "running",
+        Some(JobStatus::Cancelling) => "cancelling",
+        Some(JobStatus::Completed) => "completed",
+        Some(JobStatus::Failed) => "failed",
+        Some(JobStatus::Cancelled) => "cancelled",
+        None => "unknown",
+    }
+}
+
+fn should_emit_host_debug_for_sidecar_event(event_name: &str) -> bool {
+    matches!(
+        event_name,
+        "started" | "match" | "completed" | "failed" | "cancelled"
+    )
+}
+
 fn spawn_stderr_logger(app: AppHandle, job_id: String, stderr: ChildStderr) {
     thread::spawn(move || {
         let reader = BufReader::new(stderr);
@@ -1142,6 +1152,14 @@ fn spawn_stdout_forwarder(
             let event_json = match parsed {
                 Ok(value) => value,
                 Err(error) => {
+                    emit_host_debug(
+                        &app,
+                        &fallback_job_id,
+                        format!(
+                            "{} invalid stdout line: jobId={}, error={}",
+                            HOST_DEBUG_PREFIX, fallback_job_id, error
+                        ),
+                    );
                     if should_emit_failed_for_invalid_stdout(
                         registry.get_status(&fallback_job_id),
                     ) {
@@ -1170,10 +1188,36 @@ fn spawn_stdout_forwarder(
 
             let job_status = registry.get_status(&job_id);
             if !should_forward_sidecar_event(job_status, event_name.as_str()) {
+                if should_emit_host_debug_for_sidecar_event(event_name.as_str()) {
+                    emit_host_debug(
+                        &app,
+                        &job_id,
+                        format!(
+                            "{} dropped stdout event: event={}, jobId={}, status={}",
+                            HOST_DEBUG_PREFIX,
+                            event_name,
+                            job_id,
+                            describe_job_status(job_status)
+                        ),
+                    );
+                }
                 continue;
             }
 
             update_progress_snapshot_from_event(&registry, &job_id, event_name.as_str(), &event_json);
+            if should_emit_host_debug_for_sidecar_event(event_name.as_str()) {
+                emit_host_debug(
+                    &app,
+                    &job_id,
+                    format!(
+                        "{} forwarded stdout event: event={}, jobId={}, status={}",
+                        HOST_DEBUG_PREFIX,
+                        event_name,
+                        job_id,
+                        describe_job_status(job_status)
+                    ),
+                );
+            }
             let _ = app.emit(SIDECAR_EVENT_CHANNEL, event_json);
 
             match event_name.as_str() {
@@ -1374,6 +1418,7 @@ mod tests {
         first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
         list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
         request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
+        sidecar_spawn_creation_flags,
         should_emit_failed_for_exit, should_forward_sidecar_event, validate_preview_coord_request,
         CoordPreviewRequestPayload, PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
     };
@@ -1448,8 +1493,8 @@ mod tests {
     }
 
     #[test]
-    fn resolve_candidates_should_choose_latest_modified_sidecar() {
-        let root = create_temp_root("prefer-latest");
+    fn resolve_candidates_should_follow_declared_preference_order() {
+        let root = create_temp_root("prefer-predeclared-order");
         let manifest_dir = root.join("src-tauri");
         let binaries = manifest_dir.join("binaries/oni-sidecar.exe");
         let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
@@ -1460,25 +1505,58 @@ mod tests {
 
         let candidates = collect_sidecar_candidates(&manifest_dir, None);
         let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
-        assert_eq!(resolved, x64);
+        assert_eq!(resolved, binaries);
 
         fs::remove_dir_all(root).expect("temp root should be removed");
     }
 
     #[test]
-    fn resolve_candidates_should_prefer_mingw_release_over_x64_release() {
-        let root = create_temp_root("prefer-mingw");
+    fn resolve_candidates_should_prefer_installed_bundle_sidecar_when_resource_dir_exists() {
+        let root = create_temp_root("prefer-installed-bundle");
         let manifest_dir = root.join("src-tauri");
-        let mingw = root.join("out/build/mingw-release/src/oni-sidecar.exe");
-        let x64 = root.join("out/build/x64-release/src/oni-sidecar.exe");
+        let manifest_binary = manifest_dir.join("binaries/oni-sidecar.exe");
+        let resource_dir = root.join("installed-app");
+        let bundled_binary = resource_dir.join("binaries/oni-sidecar.exe");
 
-        write_dummy_sidecar(&x64);
+        write_dummy_sidecar(&manifest_binary);
         std::thread::sleep(Duration::from_millis(20));
-        write_dummy_sidecar(&mingw);
+        write_dummy_sidecar(&bundled_binary);
 
-        let candidates = collect_sidecar_candidates(&manifest_dir, None);
+        let candidates = collect_sidecar_candidates(&manifest_dir, Some(resource_dir.as_path()));
         let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
-        assert_eq!(resolved, mingw);
+        assert_eq!(
+            resolved, bundled_binary,
+            "installed desktop should prefer bundled sidecar over build-time repo path"
+        );
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn collect_candidates_should_only_include_release_sidecar_candidates() {
+        let root = create_temp_root("candidate-layout");
+        let manifest_dir = root.join("src-tauri");
+        let resource_dir = root.join("installed-app");
+        let candidates = collect_sidecar_candidates(&manifest_dir, Some(resource_dir.as_path()));
+
+        assert_eq!(candidates[0], resource_dir.join("binaries/oni-sidecar.exe"));
+        assert!(candidates
+            .iter()
+            .any(|path| path == &resource_dir.join("oni-sidecar.exe")));
+        assert!(candidates
+            .iter()
+            .any(|path| path == &manifest_dir.join("binaries/oni-sidecar.exe")));
+        assert!(candidates
+            .iter()
+            .all(|path| !path.to_string_lossy().contains("mingw")));
+        assert!(candidates
+            .iter()
+            .all(|path| !path.to_string_lossy().contains("windows-gnu")));
+        assert!(candidates.iter().any(|path| path
+            == &root.join("out/build/x64-release/src/oni-sidecar.exe")));
+        assert!(candidates
+            .iter()
+            .all(|path| !path.to_string_lossy().contains("x64-debug")));
 
         fs::remove_dir_all(root).expect("temp root should be removed");
     }
@@ -1487,8 +1565,8 @@ mod tests {
     fn prepare_runtime_sidecar_copy_should_keep_only_latest_runtime_copy() {
         let root = create_temp_root("runtime-sidecar-copy");
         let runtime_dir = root.join("runtime");
-        let source_a = root.join("out/build/mingw-release/src/oni-sidecar.exe");
-        let source_b = root.join("out/build/mingw-debug/src/oni-sidecar.exe");
+        let source_a = root.join("out/build/x64-release/src/oni-sidecar.exe");
+        let source_b = root.join("src-tauri/binaries/oni-sidecar.exe");
 
         write_dummy_sidecar(&source_a);
         std::thread::sleep(Duration::from_millis(20));
@@ -1511,6 +1589,19 @@ mod tests {
         );
 
         fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
+    fn sidecar_spawn_creation_flags_should_hide_console_window_on_windows() {
+        #[cfg(windows)]
+        assert_eq!(
+            sidecar_spawn_creation_flags(),
+            0x0800_0000,
+            "Windows 下 sidecar 子进程必须使用 CREATE_NO_WINDOW"
+        );
+
+        #[cfg(not(windows))]
+        assert_eq!(sidecar_spawn_creation_flags(), 0);
     }
 
     #[test]

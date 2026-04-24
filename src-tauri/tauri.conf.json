@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.wgh.oniworld.desktop",
   "build": {
-    "beforeDevCommand": "cd desktop && corepack yarn dev",
-    "beforeBuildCommand": "cd desktop && corepack yarn build",
+    "beforeDevCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-before-dev.ps1",
+    "beforeBuildCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-before-build.ps1",
     "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "../desktop/dist"
   },
@@ -25,7 +25,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis"
+    ],
     "resources": [
       "binaries/oni-sidecar.exe"
     ],

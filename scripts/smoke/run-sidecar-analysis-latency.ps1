@@ -20,9 +20,7 @@ function Resolve-SidecarPath {
 
     $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
     $candidates = @(
-        (Join-Path $repoRoot "out\build\mingw-debug\src\oni-sidecar.exe"),
-        (Join-Path $repoRoot "out\build\mingw-release\src\oni-sidecar.exe"),
-        (Join-Path $repoRoot "out\build\x64-debug\src\oni-sidecar.exe"),
+        (Join-Path $repoRoot "src-tauri\binaries\oni-sidecar.exe"),
         (Join-Path $repoRoot "out\build\x64-release\src\oni-sidecar.exe")
     )
 

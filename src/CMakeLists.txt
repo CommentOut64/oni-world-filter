@@ -8,14 +8,6 @@ set(SETTING_HEADER_FILES
     "Setting/WorldGenClasses.hpp"
 )
 
-add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/JsonDeserializeGen.hpp"
-    COMMAND ${PYTHON_CMD} "${CMAKE_CURRENT_SOURCE_DIR}/JsonDeserializeGen.py"
-                          "${CMAKE_CURRENT_SOURCE_DIR}/Setting"
-    DEPENDS ${SETTING_HEADER_FILES} "JsonDeserializeGen.py"
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    VERBATIM
-)
-
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/data.bin")
 execute_process(COMMAND ${CMAKE_COMMAND} -E echo_append "keep"
     OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/keep.txt"
@@ -33,15 +25,9 @@ endif()
 
 file(SIZE "${CMAKE_CURRENT_BINARY_DIR}/data.zip" SETTING_ASSET_FILESIZE)
 
-if(EMSCRIPTEN)
-set(ONI_ENTRY_SOURCE "entry_wasm.cpp")
-else()
-set(ONI_ENTRY_SOURCE "entry_cli.cpp")
-endif()
-
 set(ONI_BASE_SOURCES
     ${SETTING_HEADER_FILES}
-    "${CMAKE_CURRENT_BINARY_DIR}/JsonDeserializeGen.hpp"
+    "JsonDeserializeGen.hpp"
     "App/ResultModels.hpp"
     "App/ResultSink.hpp"
     "App/AppRuntime.hpp"
@@ -116,51 +102,8 @@ set(ONI_BASE_SOURCES
     "BatchCpu/CpuOptimization.cpp"
 )
 
-add_executable(oniWorldApp
-    ${ONI_BASE_SOURCES}
-    "App/WasmResultSink.cpp"
-    "${ONI_ENTRY_SOURCE}"
-)
-if(EMSCRIPTEN)
-target_compile_options(oniWorldApp PUBLIC "-Wall" "-Wextra" "-Werror")
-target_link_options(oniWorldApp
-    PUBLIC "-sALLOW_MEMORY_GROWTH" "-sINITIAL_HEAP=33554432"
-    PUBLIC "-sEXPORTED_FUNCTIONS=[_app_init,_app_generate]"
-    PUBLIC "-sMINIMAL_RUNTIME=1" "-sEXPORTED_RUNTIME_METHODS=[HEAP32,HEAPU8]"
-    PUBLIC "--pre-js" "${CMAKE_CURRENT_SOURCE_DIR}/jsUtils/prefix.js"
-    PUBLIC "--js-library" "${CMAKE_CURRENT_SOURCE_DIR}/jsUtils/getresult.js")
-add_custom_command(TARGET oniWorldApp POST_BUILD
-    COMMAND ${PYTHON_CMD} "${CMAKE_CURRENT_SOURCE_DIR}/JoinWasmFilesHash.py"
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    VERBATIM
-)
-list(APPEND WASM_LINK_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/jsUtils/prefix.js"
-    "${CMAKE_CURRENT_SOURCE_DIR}/jsUtils/getresult.js"
-    "${CMAKE_CURRENT_SOURCE_DIR}/JoinWasmFilesHash.py"
-)
-set_target_properties(oniWorldApp PROPERTIES LINK_DEPENDS "${WASM_LINK_DEPENDS}")
-elseif(MSVC)
-target_compile_options(oniWorldApp
-    PUBLIC "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244 /wd4267)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-target_compile_options(oniWorldApp
-    PUBLIC "-Wall" "-Wextra" "-Wno-conversion"
-    PUBLIC "-finput-charset=UTF-8" "-fexec-charset=UTF-8")
-find_package(Threads REQUIRED)
-target_link_libraries(oniWorldApp PUBLIC Threads::Threads)
-endif()
-target_include_directories(oniWorldApp
-    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
-    PUBLIC "${CMAKE_CURRENT_BINARY_DIR}"
-    PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
-    PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
-    PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
-)
-target_link_libraries(oniWorldApp PUBLIC clipper jsoncpp miniz)
-
-if(NOT EMSCRIPTEN AND ONI_BUILD_SIDECAR)
-add_executable(oni-sidecar EXCLUDE_FROM_ALL
+if(ONI_BUILD_SIDECAR)
+add_executable(oni-sidecar
     ${ONI_BASE_SOURCES}
     "entry_sidecar.cpp"
 )
@@ -179,15 +122,9 @@ target_compile_options(oni-sidecar
 target_link_options(oni-sidecar
     PRIVATE "$<$<CONFIG:Release>:/DEBUG:FULL>"
     PRIVATE "$<$<CONFIG:Release>:/MAP:oni-sidecar.map>")
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-target_compile_options(oni-sidecar
-    PUBLIC "-Wall" "-Wextra" "-Wno-conversion"
-    PUBLIC "-finput-charset=UTF-8" "-fexec-charset=UTF-8")
-target_link_libraries(oni-sidecar PUBLIC Threads::Threads)
 endif()
 endif()
 
-if(NOT EMSCRIPTEN)
 add_executable(test_filter_config
     "../tests/native/test_main.cpp"
     "../tests/native/test_filter_config.cpp"
@@ -408,6 +345,5 @@ target_include_directories(test_world_envelope_profile
 )
 target_link_libraries(test_world_envelope_profile PRIVATE clipper jsoncpp miniz)
 add_test(NAME test_world_envelope_profile COMMAND test_world_envelope_profile)
-endif()
 
 configure_file("config.h.in" "config.h")

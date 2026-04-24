@@ -6,6 +6,7 @@
 #include <charconv>
 #include <chrono>
 #include <cctype>
+#include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -269,11 +270,15 @@ bool ResolveCanonicalPreviewCoord(const std::string &rawCoord,
 
 DesktopSearchRuntimeMode ResolveDesktopSearchRuntimeMode()
 {
-    const char *raw = std::getenv("ONI_DESKTOP_SEARCH_RUNTIME");
-    if (raw != nullptr) {
+    char *raw = nullptr;
+    size_t rawLength = 0;
+    const errno_t envResult = _dupenv_s(&raw, &rawLength, "ONI_DESKTOP_SEARCH_RUNTIME");
+    if (envResult == 0 && raw != nullptr) {
         if (const auto parsed = ParseDesktopSearchRuntimeMode(raw); parsed.has_value()) {
+            free(raw);
             return parsed.value();
         }
+        free(raw);
     }
     return DesktopSearchRuntimeMode::Optimized;
 }
@@ -434,7 +439,7 @@ Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
         auto *runtime = AppRuntime::Instance();
         PrepareSearchRuntime(runtime, runtimeMode, cfg);
     };
-    request.evaluateSeed = [&cfg, runtimeMode](int seed) {
+    request.evaluateSeed = [cfg, runtimeMode](int seed) {
         return EvaluateSearchSeed(cfg, seed, runtimeMode);
     };
 

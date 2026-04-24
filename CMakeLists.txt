@@ -8,16 +8,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(ONI_BUILD_SIDECAR "Build native sidecar executable" ON)
 enable_testing()
 
-if(EMSCRIPTEN)
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
-endif()
-
-if("$ENV{EMSDK_PYTHON}" STREQUAL "")
-    find_program(PYTHON_CMD "python" REQUIRED)
-else()
-    set(PYTHON_CMD "$ENV{EMSDK_PYTHON}")
-endif()
-
 add_library(clipper STATIC
     "3rdparty/clipper/clipper.cpp"
 )

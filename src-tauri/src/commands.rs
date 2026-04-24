@@ -1,5 +1,6 @@
 use tauri::{AppHandle, State};
 
+use crate::app_paths::{self, HostPathsPayload};
 use crate::control_sidecar;
 use crate::sidecar::{
     self, CoordPreviewRequestPayload, GeyserOption, PreviewRequestPayload,
@@ -66,6 +67,11 @@ pub fn list_worlds() -> Vec<WorldOption> {
 #[tauri::command]
 pub fn list_geysers() -> Vec<GeyserOption> {
     sidecar::list_geyser_options()
+}
+
+#[tauri::command]
+pub fn get_host_paths(app: AppHandle) -> Result<HostPathsPayload, String> {
+    app_paths::collect_host_paths(&app).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
