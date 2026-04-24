@@ -214,6 +214,51 @@ function updateProgress(state: SearchState, event: SearchProgressEvent): SearchS
   };
 }
 
+function appendHostDebugMessage(message: string): void {
+  useSearchStore.setState((current) => {
+    const nextMessages = [...current.lastHostDebugMessages, message];
+    publishHostDebugSnapshot({
+      request: current.lastSubmittedRequest,
+      messages: nextMessages,
+    });
+    return {
+      lastHostDebugMessages: nextMessages,
+    };
+  });
+}
+
+function waitForSidecarBindingToSettle(): Promise<void> {
+  return new Promise((resolve) => {
+    const unsubscribe = useSearchStore.subscribe((state) => {
+      if (state.listening || !state.bindingSidecar) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}
+
+async function ensureSidecarListening(): Promise<void> {
+  const current = useSearchStore.getState();
+  if (current.listening) {
+    return;
+  }
+
+  if (!current.bindingSidecar) {
+    await current.bindSidecarEvents();
+  }
+
+  let settled = useSearchStore.getState();
+  if (!settled.listening && settled.bindingSidecar) {
+    await waitForSidecarBindingToSettle();
+    settled = useSearchStore.getState();
+  }
+
+  if (!settled.listening) {
+    throw new Error(settled.lastError ?? "sidecar 事件监听绑定失败");
+  }
+}
+
 export const useSearchStore = create<SearchState>((set, get) => ({
   catalog: null,
   worlds: [],
@@ -293,16 +338,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         },
         (stderrEvent) => {
           if (stderrEvent.message.startsWith(HOST_DEBUG_PREFIX)) {
-            useSearchStore.setState((current) => {
-              const nextMessages = [...current.lastHostDebugMessages, stderrEvent.message];
-              publishHostDebugSnapshot({
-                request: current.lastSubmittedRequest,
-                messages: nextMessages,
-              });
-              return {
-                lastHostDebugMessages: nextMessages,
-              };
-            });
+            appendHostDebugMessage(stderrEvent.message);
             return;
           }
           if (isRecoverableSidecarDiagnostic(stderrEvent.message)) {
@@ -363,6 +399,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       messages: [],
     });
     try {
+      await ensureSidecarListening();
       await startSearch(request);
       return true;
     } catch (error) {
@@ -442,6 +479,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   ingestSidecarEvent: (event) => {
     const state = get();
     if (!state.activeJobId || event.jobId !== state.activeJobId) {
+      appendHostDebugMessage(
+        `${HOST_DEBUG_PREFIX} frontend dropped sidecar event: event=${event.event}, eventJobId=${event.jobId}, activeJobId=${state.activeJobId ?? "null"}`
+      );
       return;
     }
 

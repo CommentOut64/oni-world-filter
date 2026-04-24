@@ -82,6 +82,7 @@ export default function SearchPanel({
   });
   const [coordInput, setCoordInput] = useState("");
   const [isCoordSubmitting, setIsCoordSubmitting] = useState(false);
+  const [isSearchSubmitting, setIsSearchSubmitting] = useState(false);
   const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
   const [disabledMixingSlots, setDisabledMixingSlots] = useState<Set<number>>(new Set());
   const [pendingWarningConfirmation, setPendingWarningConfirmation] = useState<{
@@ -138,6 +139,7 @@ export default function SearchPanel({
   const submit = methods.handleSubmit(async (values) => {
     const nextDraft = toSearchDraft(values);
     setPendingWarningConfirmation(null);
+    setIsSearchSubmitting(true);
     try {
       const analysis = await analyzeSearchRequest({
         jobId: `analyze-${Date.now()}`,
@@ -167,6 +169,8 @@ export default function SearchPanel({
     } catch (error) {
       useSearchStore.setState({ lastError: formatTauriError(error) });
       return;
+    } finally {
+      setIsSearchSubmitting(false);
     }
 
     await startSearchWithDraft(nextDraft);
@@ -398,7 +402,7 @@ export default function SearchPanel({
             </Card>
             <SearchActions
               isSearching={isSearching}
-              isBusy={isCoordSubmitting}
+              isBusy={isCoordSubmitting || isSearchSubmitting}
               hasResults={hasResults}
               resultsCount={resultsCount}
               onViewResults={() => {

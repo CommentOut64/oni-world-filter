@@ -24,7 +24,7 @@ export default function HostDebugWindow() {
       <Card className="host-debug-header" variant="borderless">
         <Typography.Title level={3}>Host 调试窗口</Typography.Title>
         <Typography.Paragraph>
-          这里显示 desktop 宿主实际解析到的 sidecar 路径，以及宿主真正发送给 sidecar 的 payload。
+          这里显示 desktop 宿主实际解析到的 sidecar 路径、真正发送给 sidecar 的 payload，以及 host 转发 stdout 事件的轨迹。
         </Typography.Paragraph>
       </Card>
       <Card className="host-debug-body" variant="borderless">

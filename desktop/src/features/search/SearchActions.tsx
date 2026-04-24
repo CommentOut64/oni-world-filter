@@ -17,7 +17,8 @@ export default function SearchActions({
   onViewResults,
 }: SearchActionsProps) {
   void React;
-  const disablePrimaryAction = isSearching || isBusy;
+  const showPrimaryBusyState = isSearching || isBusy;
+  const disablePrimaryAction = showPrimaryBusyState;
 
   return (
     <section className="search-actions">
@@ -26,10 +27,10 @@ export default function SearchActions({
           htmlType="submit"
           type="primary"
           className="search-action-primary"
-          loading={isSearching}
+          loading={showPrimaryBusyState}
           disabled={disablePrimaryAction}
         >
-          {isSearching ? "搜索进行中..." : "开始搜索"}
+          {isSearching ? "搜索进行中..." : isBusy ? "正在分析..." : "开始搜索"}
         </Button>
         <Button
           htmlType="button"
