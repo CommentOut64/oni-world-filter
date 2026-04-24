@@ -29,7 +29,7 @@ test("desktop package identity is oni-world-filter everywhere", () => {
   assert.match(tauriCargo, /^name\s*=\s*"oni-world-filter"/m);
   assert.match(tauriLock, /^name = "oni-world-filter"/m);
   assert.equal(tauriConfig.productName, "oni-world-filter");
-  assert.equal(tauriConfig.identifier, "com.wgh.oni-world-filter");
+  assert.equal(tauriConfig.identifier, "com.oni-world-filter");
   assert.equal(tauriConfig.app.windows[0].title, "oni-world-filter");
   assert.equal(desktopPackage.name, "oni-world-filter");
   assert.match(indexHtml, /<title>oni-world-filter<\/title>/);

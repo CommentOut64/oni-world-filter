@@ -229,3 +229,36 @@ test("progress sidecar event updates visible search stats while search is runnin
   assert.equal(state.stats.currentSeedsPerSecond, 12.5);
   assert.equal(state.stats.peakSeedsPerSecond, 12.5);
 });
+
+test("sidecar stderr diagnostics do not become visible backend errors", async () => {
+  mockIPC(async () => null, { shouldMockEvents: true });
+
+  const module = await loadSearchStoreModule();
+  const { useSearchStore } = module;
+  await useSearchStore.getState().bindSidecarEvents();
+
+  await emit("sidecar://stderr", {
+    jobId: "search-1777015977549-mdntey",
+    message: "[sidecar-diagnostic] search worker started jobId=search-1777015977549-mdntey",
+  });
+
+  assert.equal(useSearchStore.getState().lastError, null);
+});
+
+test("real sidecar stderr errors still become visible backend errors", async () => {
+  mockIPC(async () => null, { shouldMockEvents: true });
+
+  const module = await loadSearchStoreModule();
+  const { useSearchStore } = module;
+  await useSearchStore.getState().bindSidecarEvents();
+
+  await emit("sidecar://stderr", {
+    jobId: "search-1777015977549-mdntey",
+    message: "sidecar 进程异常退出(code=Some(-1073741819))",
+  });
+
+  assert.equal(
+    useSearchStore.getState().lastError,
+    "[search-1777015977549-mdntey] sidecar 进程异常退出(code=Some(-1073741819))"
+  );
+});

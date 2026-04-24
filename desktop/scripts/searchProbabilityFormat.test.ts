@@ -12,6 +12,10 @@ test("formatProbabilityUpper trims redundant percent decimals", () => {
   assert.equal(formatProbabilityUpper(0.00005), "< 0.01%");
 });
 
-test("formatSearchWarningProbabilityCopy uses upper-bound wording", () => {
-  assert.equal(formatSearchWarningProbabilityCopy(1), "当前瓶颈概率上界为 100%。");
+test("formatSearchWarningProbabilityCopy uses optimistic estimate wording", () => {
+  assert.equal(formatSearchWarningProbabilityCopy(1), "乐观估计可匹配概率约为 100%。");
+});
+
+test("formatSearchWarningProbabilityCopy uses optimistic estimate unavailable wording", () => {
+  assert.equal(formatSearchWarningProbabilityCopy(Number.NaN), "乐观估计暂不可用。");
 });
