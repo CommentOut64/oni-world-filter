@@ -122,7 +122,7 @@ public:
     /// 3D, but it is unknown for higher dimensions. It is calculated as the
     /// average of the initial simplex points.
     /// </summary>
-    std::array<double, MaxDimension> InsidePoint;
+    std::array<double, MaxDimension> InsidePoint = {};
 
     /*
      * Helper arrays to store faces for adjacency update.

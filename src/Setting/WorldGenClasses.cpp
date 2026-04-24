@@ -185,12 +185,11 @@ void World::ClearMixingsAndTraits()
     globalFeatures2.clear();
     mixingSubworlds.clear();
     mixingSubworlds.reserve(10);
-    for (auto filter : unknownCellsAllowedSubworlds2) {
-        auto filter2 = const_cast<AllowedCellsFilter *>(filter);
-        filter2->Restore();
-    }
     unknownCellsAllowedSubworlds2.clear();
     worldTemplateRules2.clear();
+    for (auto &filter : unknownCellsAllowedSubworlds) {
+        filter.Restore();
+    }
     for (auto &subworld : subworldFiles) {
         subworldFiles2.push_back(&subworld);
     }
