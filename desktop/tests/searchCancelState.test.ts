@@ -304,3 +304,34 @@ test("cancelled event should not roll processed seeds back to zero", async () =>
   assert.equal(finalState.stats.totalMatches, 2);
   assert.equal(finalState.stats.currentSeedsPerSecond, 0);
 });
+
+test("mismatched sidecar event should leave a visible host debug trace", async () => {
+  mockIPC(() => {
+    throw new Error("unexpected IPC call");
+  });
+
+  const module = await loadSearchStoreModule();
+  const { useSearchStore } = module;
+
+  useSearchStore.setState({
+    ...createBaseState(module, "job-active"),
+    lastSubmittedRequest: {
+      jobId: "job-active",
+      worldType: module.DEFAULT_SEARCH_DRAFT.worldType,
+      seedStart: module.DEFAULT_SEARCH_DRAFT.seedStart,
+      seedEnd: module.DEFAULT_SEARCH_DRAFT.seedEnd,
+      mixing: module.DEFAULT_SEARCH_DRAFT.mixing,
+      constraints: module.DEFAULT_SEARCH_DRAFT.constraints,
+      cpu: module.DEFAULT_SEARCH_DRAFT.cpu,
+    },
+  });
+
+  useSearchStore.getState().ingestSidecarEvent(createMatchEvent("job-other"));
+
+  const finalState = useSearchStore.getState();
+  assert.equal(finalState.results.length, 0);
+  assert.equal(finalState.lastHostDebugMessages.length, 1);
+  assert.match(finalState.lastHostDebugMessages[0] ?? "", /frontend dropped sidecar event/);
+  assert.match(finalState.lastHostDebugMessages[0] ?? "", /job-other/);
+  assert.match(finalState.lastHostDebugMessages[0] ?? "", /job-active/);
+});
