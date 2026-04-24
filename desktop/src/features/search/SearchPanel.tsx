@@ -7,7 +7,7 @@ import {
   Select,
   Typography,
 } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, FormProvider, useForm } from "react-hook-form";
 
@@ -35,6 +35,7 @@ import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay";
 import { shouldShowSearchWarningConfirmation } from "./searchWarningPolicy";
 import {
   createSearchSchema,
+  getDefaultAllowLowPerfForCpuMode,
   toSearchDraft,
   toSearchFormValues,
   type SearchFormValues,
@@ -91,6 +92,19 @@ export default function SearchPanel({
   } | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
+  const watchCpuMode = methods.watch("cpuMode");
+  const previousCpuModeRef = useRef(watchCpuMode);
+
+  useEffect(() => {
+    const previousCpuMode = previousCpuModeRef.current;
+    previousCpuModeRef.current = watchCpuMode;
+    if (watchCpuMode === "turbo" || previousCpuMode === "turbo") {
+      methods.setValue("cpuAllowLowPerf", getDefaultAllowLowPerfForCpuMode(watchCpuMode), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [methods, watchCpuMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -319,7 +333,11 @@ export default function SearchPanel({
                     control={methods.control}
                     name="cpuAllowLowPerf"
                     render={({ field }) => (
-                      <Checkbox checked={field.value} onChange={(event) => field.onChange(event.target.checked)}>
+                      <Checkbox
+                        checked={watchCpuMode === "turbo" ? getDefaultAllowLowPerfForCpuMode(watchCpuMode) : field.value}
+                        disabled={watchCpuMode === "turbo"}
+                        onChange={(event) => field.onChange(event.target.checked)}
+                      >
                         允许低性能核心
                       </Checkbox>
                     )}

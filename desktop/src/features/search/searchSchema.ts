@@ -4,9 +4,14 @@ import type { SearchDraft } from "../../state/searchStore";
 
 const nonNegativeInt = z.coerce.number().int().min(0);
 const cpuModeSchema = z.enum(["balanced", "turbo"]);
+type SearchCpuMode = z.infer<typeof cpuModeSchema>;
 export const MIXING_SLOT_COUNT = 11;
 export const MIXING_LEVEL_MIN = 0;
 export const MIXING_LEVEL_MAX = 4;
+
+export function getDefaultAllowLowPerfForCpuMode(cpuMode: SearchCpuMode): boolean {
+  return cpuMode === "turbo";
+}
 
 function clampMixingLevel(value: number): number {
   if (!Number.isFinite(value)) {
@@ -223,7 +228,7 @@ export function toSearchDraft(values: SearchFormValues): SearchDraft {
     cpu: {
       mode: values.cpuMode,
       allowSmt: values.cpuAllowSmt,
-      allowLowPerf: values.cpuAllowLowPerf,
+      allowLowPerf: values.cpuMode === "turbo" ? getDefaultAllowLowPerfForCpuMode(values.cpuMode) : values.cpuAllowLowPerf,
       placement: "strict",
     },
     constraints: {
