@@ -30,6 +30,8 @@ set(ONI_BASE_SOURCES
     "JsonDeserializeGen.hpp"
     "App/ResultModels.hpp"
     "App/ResultSink.hpp"
+    "App/SettingsAsset.hpp"
+    "App/SettingsAsset.cpp"
     "App/AppRuntime.hpp"
     "App/AppRuntime.cpp"
     "App/BatchCaptureSink.cpp"

@@ -2,6 +2,7 @@ use tauri::{AppHandle, State};
 
 use crate::app_paths::{self, HostPathsPayload};
 use crate::control_sidecar;
+use crate::diagnostics;
 use crate::sidecar::{
     self, CoordPreviewRequestPayload, GeyserOption, PreviewRequestPayload,
     SearchAnalysisPayload, SearchCatalogPayload, SearchRequestPayload, WorldOption,
@@ -14,8 +15,23 @@ pub async fn start_search(
     state: State<'_, AppState>,
     request: SearchRequestPayload,
 ) -> Result<(), String> {
-    sidecar::start_search_streaming(app, state.jobs.clone(), request)
-        .map_err(|error| error.to_string())
+    diagnostics::log(
+        Some(&app),
+        "command.start_search",
+        format!(
+            "jobId={}, worldType={}, seedStart={}, seedEnd={}, mixing={}, cpu={:?}",
+            request.job_id,
+            request.world_type,
+            request.seed_start,
+            request.seed_end,
+            request.mixing,
+            request.cpu
+        ),
+    );
+    sidecar::start_search_streaming(app.clone(), state.jobs.clone(), request).map_err(|error| {
+        diagnostics::log(Some(&app), "command.start_search.error", error.to_string());
+        error.to_string()
+    })
 }
 
 #[tauri::command]
@@ -33,14 +49,26 @@ pub async fn load_preview(
     state: State<'_, AppState>,
     request: PreviewRequestPayload,
 ) -> Result<serde_json::Value, String> {
+    diagnostics::log(
+        Some(&app),
+        "command.load_preview",
+        format!(
+            "jobId={}, worldType={}, seed={}, mixing={}",
+            request.job_id, request.world_type, request.seed, request.mixing
+        ),
+    );
     let app_handle = app.clone();
     let control_sidecar = state.control_sidecar.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         control_sidecar::load_preview(Some(&app_handle), &control_sidecar, &request)
     })
     .await
     .map_err(|error| error.to_string())?
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        diagnostics::log(Some(&app), "command.load_preview.error", error);
+    }
+    result
 }
 
 #[tauri::command]
@@ -49,14 +77,23 @@ pub async fn load_preview_by_coord(
     state: State<'_, AppState>,
     request: CoordPreviewRequestPayload,
 ) -> Result<serde_json::Value, String> {
+    diagnostics::log(
+        Some(&app),
+        "command.load_preview_by_coord",
+        format!("jobId={}, coord={}", request.job_id, request.coord),
+    );
     let app_handle = app.clone();
     let control_sidecar = state.control_sidecar.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         control_sidecar::load_preview_by_coord(Some(&app_handle), &control_sidecar, &request)
     })
     .await
     .map_err(|error| error.to_string())?
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        diagnostics::log(Some(&app), "command.load_preview_by_coord.error", error);
+    }
+    result
 }
 
 #[tauri::command]
@@ -79,14 +116,19 @@ pub async fn get_search_catalog(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SearchCatalogPayload, String> {
+    diagnostics::log(Some(&app), "command.get_search_catalog", "start");
     let app_handle = app.clone();
     let control_sidecar = state.control_sidecar.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         control_sidecar::get_search_catalog(Some(&app_handle), &control_sidecar)
     })
     .await
     .map_err(|error| error.to_string())?
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        diagnostics::log(Some(&app), "command.get_search_catalog.error", error);
+    }
+    result
 }
 
 #[tauri::command]
@@ -95,12 +137,29 @@ pub async fn analyze_search_request(
     state: State<'_, AppState>,
     request: SearchRequestPayload,
 ) -> Result<SearchAnalysisPayload, String> {
+    diagnostics::log(
+        Some(&app),
+        "command.analyze_search_request",
+        format!(
+            "jobId={}, worldType={}, seedStart={}, seedEnd={}, mixing={}, cpu={:?}",
+            request.job_id,
+            request.world_type,
+            request.seed_start,
+            request.seed_end,
+            request.mixing,
+            request.cpu
+        ),
+    );
     let app_handle = app.clone();
     let control_sidecar = state.control_sidecar.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         control_sidecar::analyze_search_request(Some(&app_handle), &control_sidecar, &request)
     })
     .await
     .map_err(|error| error.to_string())?
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        diagnostics::log(Some(&app), "command.analyze_search_request.error", error);
+    }
+    result
 }

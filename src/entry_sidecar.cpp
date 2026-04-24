@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -30,6 +31,7 @@
 #include "SearchAnalysis/HardValidator.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "SearchAnalysis/WorldEnvelopeProfile.hpp"
+#include "App/SettingsAsset.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
 
@@ -37,6 +39,51 @@ namespace {
 
 static thread_local BatchCaptureSink g_batchSink;
 static std::mutex g_outputMutex;
+
+std::string DescribeSettingsAsset()
+{
+    const auto assetPath = ResolveSettingsAssetPath();
+    std::error_code error;
+    const bool exists = std::filesystem::exists(assetPath, error);
+    std::ostringstream stream;
+    stream << assetPath.string() << " exists=" << (exists ? "true" : "false");
+    if (exists) {
+        stream << " size=" << std::filesystem::file_size(assetPath, error);
+    }
+    if (error) {
+        stream << " error=" << error.message();
+    }
+    return stream.str();
+}
+
+void EmitDiagnostic(const std::string &message)
+{
+    std::lock_guard<std::mutex> lock(g_outputMutex);
+    std::cerr << "[sidecar-diagnostic] " << message << '\n';
+    std::cerr.flush();
+}
+
+const char *DescribeCommand(Batch::SidecarCommandType command)
+{
+    switch (command) {
+    case Batch::SidecarCommandType::Search:
+        return "search";
+    case Batch::SidecarCommandType::Preview:
+        return "preview";
+    case Batch::SidecarCommandType::PreviewCoord:
+        return "preview_coord";
+    case Batch::SidecarCommandType::Cancel:
+        return "cancel";
+    case Batch::SidecarCommandType::SetSearchActiveWorkers:
+        return "set_search_active_workers";
+    case Batch::SidecarCommandType::GetSearchCatalog:
+        return "get_search_catalog";
+    case Batch::SidecarCommandType::AnalyzeSearchRequest:
+        return "analyze_search_request";
+    default:
+        return "unknown";
+    }
+}
 
 struct ActiveSearchState {
     std::mutex mutex;
@@ -354,7 +401,9 @@ Batch::SearchSeedEvaluation EvaluateSearchSeed(const Batch::FilterConfig &cfg,
 
 bool ReadSettingsBlob(std::vector<char> &data, std::string *errorMessage)
 {
-    std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+    const auto assetPath = ResolveSettingsAssetPath();
+    EmitDiagnostic("ReadSettingsBlob path=" + DescribeSettingsAsset());
+    std::ifstream file(assetPath, std::ios::binary);
     if (!file.is_open()) {
         if (errorMessage != nullptr) {
             *errorMessage = "failed to open settings asset blob";
@@ -386,7 +435,9 @@ public:
     bool RequestResource(uint32_t expectedSize, std::vector<char> &data) override
     {
         data.assign(expectedSize, 0);
-        std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+        EmitDiagnostic("PreviewCaptureSink::RequestResource expectedSize=" +
+                       std::to_string(expectedSize) + " path=" + DescribeSettingsAsset());
+        std::ifstream file(ResolveSettingsAssetPath(), std::ios::binary);
         if (!file.is_open()) {
             return false;
         }
@@ -454,6 +505,11 @@ Batch::CompiledSearchCpuRuntime CompileSearchRuntime(const Batch::FilterConfig &
 
 void RunSearchCommand(const Batch::SidecarSearchRequest &request)
 {
+    EmitDiagnostic("RunSearchCommand jobId=" + request.jobId +
+                   " worldType=" + std::to_string(request.worldType) +
+                   " seedStart=" + std::to_string(request.seedStart) +
+                   " seedEnd=" + std::to_string(request.seedEnd) +
+                   " mixing=" + std::to_string(request.mixing));
     std::vector<Batch::FilterError> errors;
     auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors);
     if (cfg.seedStart > cfg.seedEnd) {
@@ -474,6 +530,7 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
 
     std::thread worker([cfg, request, runtimePlan, cancelRequested, activeWorkerCap]() {
         try {
+            EmitDiagnostic("search worker started jobId=" + request.jobId);
             Batch::SearchEventCallbacks callbacks;
             callbacks.onStarted = [&](const Batch::SearchStartedEvent &event) {
                 EmitBuiltLine([&]() { return Batch::SerializeStartedEvent(request.jobId, event); });
@@ -500,10 +557,13 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
                                                     activeWorkerCap.get());
             (void)Batch::BatchSearchService::Run(searchRequest, callbacks);
         } catch (const std::exception &ex) {
+            EmitDiagnostic("search worker exception jobId=" + request.jobId + " message=" + ex.what());
             EmitLine(Batch::SerializeFailedEvent(request.jobId, ex.what()));
         } catch (...) {
+            EmitDiagnostic("search worker unknown exception jobId=" + request.jobId);
             EmitLine(Batch::SerializeFailedEvent(request.jobId, "search thread crashed"));
         }
+        EmitDiagnostic("search worker finished jobId=" + request.jobId);
         MarkSearchFinished(request.jobId);
     });
 
@@ -523,6 +583,10 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
 
 void RunPreviewCommand(const Batch::SidecarPreviewRequest &request)
 {
+    EmitDiagnostic("RunPreviewCommand jobId=" + request.jobId +
+                   " worldType=" + std::to_string(request.worldType) +
+                   " seed=" + std::to_string(request.seed) +
+                   " mixing=" + std::to_string(request.mixing));
     PreviewCaptureSink previewSink;
     auto *runtime = AppRuntime::Instance();
     runtime->SetResultSink(&previewSink);
@@ -548,6 +612,7 @@ void RunPreviewCommand(const Batch::SidecarPreviewRequest &request)
 
 void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
 {
+    EmitDiagnostic("RunPreviewCoordCommand jobId=" + request.jobId + " coord=" + request.coord);
     int worldType = 0;
     int seed = 0;
     int mixing = 0;
@@ -585,6 +650,7 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
 
 void RunGetSearchCatalogCommand(const Batch::SidecarGetSearchCatalogRequest &request)
 {
+    EmitDiagnostic("RunGetSearchCatalogCommand jobId=" + request.jobId);
     std::string errorMessage;
     const auto settings = SharedSettingsCache::GetOrCreate(ReadSettingsBlob, &errorMessage);
     if (!settings) {
@@ -636,6 +702,11 @@ SearchAnalysis::SearchAnalysisRequest BuildAnalysisRequest(
 
 void RunAnalyzeSearchCommand(const Batch::SidecarAnalyzeSearchRequest &request)
 {
+    EmitDiagnostic("RunAnalyzeSearchCommand jobId=" + request.jobId +
+                   " worldType=" + std::to_string(request.worldType) +
+                   " seedStart=" + std::to_string(request.seedStart) +
+                   " seedEnd=" + std::to_string(request.seedEnd) +
+                   " mixing=" + std::to_string(request.mixing));
     std::string errorMessage;
     const auto settings = SharedSettingsCache::GetOrCreate(ReadSettingsBlob, &errorMessage);
     if (!settings) {
@@ -665,55 +736,69 @@ void RunAnalyzeSearchCommand(const Batch::SidecarAnalyzeSearchRequest &request)
 
 int main()
 {
+    EmitDiagnostic("process started settingsAsset=" + DescribeSettingsAsset());
     std::string line;
     while (std::getline(std::cin, line)) {
         JoinInactiveSearchWorker();
         if (line.empty()) {
             continue;
         }
+        EmitDiagnostic("stdin line received bytes=" + std::to_string(line.size()));
 
         const auto parsed = Batch::ParseSidecarRequest(line);
         if (!parsed.Ok()) {
+            EmitDiagnostic("parse request failed error=" + parsed.error);
             EmitLine(Batch::SerializeFailedEvent("unknown", parsed.error));
             continue;
         }
+        EmitDiagnostic(std::string("dispatch command=") + DescribeCommand(parsed.request.command));
 
-        switch (parsed.request.command) {
-        case Batch::SidecarCommandType::Search:
-            RunSearchCommand(parsed.request.search);
-            break;
-        case Batch::SidecarCommandType::Preview:
-            RunPreviewCommand(parsed.request.preview);
-            break;
-        case Batch::SidecarCommandType::PreviewCoord:
-            RunPreviewCoordCommand(parsed.request.previewCoord);
-            break;
-        case Batch::SidecarCommandType::Cancel:
-            if (!RequestSearchCancel(parsed.request.cancel.jobId)) {
-                EmitLine(Batch::SerializeFailedEvent(parsed.request.cancel.jobId,
-                                                     "job is not running"));
+        try {
+            switch (parsed.request.command) {
+            case Batch::SidecarCommandType::Search:
+                RunSearchCommand(parsed.request.search);
+                break;
+            case Batch::SidecarCommandType::Preview:
+                RunPreviewCommand(parsed.request.preview);
+                break;
+            case Batch::SidecarCommandType::PreviewCoord:
+                RunPreviewCoordCommand(parsed.request.previewCoord);
+                break;
+            case Batch::SidecarCommandType::Cancel:
+                if (!RequestSearchCancel(parsed.request.cancel.jobId)) {
+                    EmitLine(Batch::SerializeFailedEvent(parsed.request.cancel.jobId,
+                                                         "job is not running"));
+                }
+                break;
+            case Batch::SidecarCommandType::SetSearchActiveWorkers:
+                if (!RequestSearchActiveWorkers(parsed.request.setSearchActiveWorkers.jobId,
+                                                parsed.request.setSearchActiveWorkers.activeWorkers)) {
+                    EmitLine(Batch::SerializeFailedEvent(parsed.request.setSearchActiveWorkers.jobId,
+                                                         "job is not running"));
+                }
+                break;
+            case Batch::SidecarCommandType::GetSearchCatalog:
+                RunGetSearchCatalogCommand(parsed.request.getSearchCatalog);
+                break;
+            case Batch::SidecarCommandType::AnalyzeSearchRequest:
+                RunAnalyzeSearchCommand(parsed.request.analyze);
+                break;
+            default:
+                EmitLine(Batch::SerializeFailedEvent("unknown", "unknown command"));
+                break;
             }
-            break;
-        case Batch::SidecarCommandType::SetSearchActiveWorkers:
-            if (!RequestSearchActiveWorkers(parsed.request.setSearchActiveWorkers.jobId,
-                                            parsed.request.setSearchActiveWorkers.activeWorkers)) {
-                EmitLine(Batch::SerializeFailedEvent(parsed.request.setSearchActiveWorkers.jobId,
-                                                     "job is not running"));
-            }
-            break;
-        case Batch::SidecarCommandType::GetSearchCatalog:
-            RunGetSearchCatalogCommand(parsed.request.getSearchCatalog);
-            break;
-        case Batch::SidecarCommandType::AnalyzeSearchRequest:
-            RunAnalyzeSearchCommand(parsed.request.analyze);
-            break;
-        default:
-            EmitLine(Batch::SerializeFailedEvent("unknown", "unknown command"));
-            break;
+        } catch (const std::exception &ex) {
+            EmitDiagnostic(std::string("command exception message=") + ex.what());
+            EmitLine(Batch::SerializeFailedEvent("unknown", ex.what()));
+        } catch (...) {
+            EmitDiagnostic("command unknown exception");
+            EmitLine(Batch::SerializeFailedEvent("unknown", "sidecar command crashed"));
         }
     }
 
+    EmitDiagnostic("stdin closed; shutting down");
     ShutdownSearchWorker();
+    EmitDiagnostic("process exiting normally");
     return 0;
 }
 

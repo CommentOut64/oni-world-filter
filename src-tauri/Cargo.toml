@@ -1,7 +1,7 @@
 [package]
-name = "oni_world_desktop"
-version = "0.1.0"
-description = "ONI World desktop host"
+name = "oni-world-filter"
+version = "0.0.1"
+description = "oni-world-filter desktop host"
 authors = ["wgh"]
 license = "MIT"
 edition = "2021"

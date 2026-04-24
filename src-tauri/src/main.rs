@@ -3,6 +3,7 @@
 mod commands;
 mod app_paths;
 mod control_sidecar;
+mod diagnostics;
 mod error;
 mod sidecar;
 mod state;

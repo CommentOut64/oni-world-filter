@@ -94,7 +94,7 @@ function Publish-VariantArtifacts {
 
     $sourcePath = $collected[0]
     $extension = [System.IO.Path]::GetExtension($sourcePath)
-    $finalName = "oni-world-desktop-$Version-$Variant-nsis$extension"
+    $finalName = "oni-world-filter-$Version-$Variant-nsis$extension"
     $finalPath = Join-Path $variantDirectory $finalName
     Move-Item -LiteralPath $sourcePath -Destination $finalPath -Force
 
@@ -169,7 +169,9 @@ Push-Location $repoRoot
 try {
     $requestedVariants = Get-RequestedVariants -Variant $Variant
 
+    Sync-DesktopVersion -RepoRoot $repoRoot
     Assert-VersionConsistency -RepoRoot $repoRoot
+    Assert-DesktopPackageIdentity -RepoRoot $repoRoot
     Assert-VsToolchain
     Assert-NodeAndYarn
     Assert-RustAndCargoTauri

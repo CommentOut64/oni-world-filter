@@ -30,13 +30,68 @@ function Get-DesktopVersion {
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
+    $versionPath = Join-Path $RepoRoot "VERSION"
+    if (-not (Test-Path -LiteralPath $versionPath)) {
+        throw "VERSION file not found: $versionPath"
+    }
+    $version = (Get-Content -Raw $versionPath).Trim()
+    if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+        throw "Invalid desktop version in ${versionPath}: $version"
+    }
+    return $version
+}
+
+function Set-TextFileUtf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($fullPath, $Value, $utf8NoBom)
+}
+
+function Sync-DesktopVersion {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $version = Get-DesktopVersion -RepoRoot $RepoRoot
+
     $cargoTomlPath = Join-Path $RepoRoot "src-tauri/Cargo.toml"
     $cargoToml = Get-Content -Raw $cargoTomlPath
-    $match = [regex]::Match($cargoToml, '(?m)^version\s*=\s*"([^"]+)"')
-    if (-not $match.Success) {
-        throw "Failed to parse version from $cargoTomlPath"
+    $cargoToml = [regex]::Replace($cargoToml, '(?m)^version\s*=\s*"[^"]+"', "version = `"$version`"", 1)
+    Set-TextFileUtf8NoBom -Path $cargoTomlPath -Value $cargoToml
+
+    $tauriConfigPath = Join-Path $RepoRoot "src-tauri/tauri.conf.json"
+    $tauriConfig = Get-Content -Raw $tauriConfigPath | ConvertFrom-Json
+    $tauriConfig.version = $version
+    Set-TextFileUtf8NoBom -Path $tauriConfigPath -Value (($tauriConfig | ConvertTo-Json -Depth 20) + "`r`n")
+
+    $desktopPackagePath = Join-Path $RepoRoot "desktop/package.json"
+    $desktopPackage = Get-Content -Raw $desktopPackagePath | ConvertFrom-Json
+    $desktopPackage.version = $version
+    Set-TextFileUtf8NoBom -Path $desktopPackagePath -Value (($desktopPackage | ConvertTo-Json -Depth 20) + "`r`n")
+}
+
+function Assert-DesktopPackageIdentity {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $expectedName = "oni-world-filter"
+    $cargoTomlPath = Join-Path $RepoRoot "src-tauri/Cargo.toml"
+    $cargoToml = Get-Content -Raw $cargoTomlPath
+    $cargoName = [regex]::Match($cargoToml, '(?m)^name\s*=\s*"([^"]+)"').Groups[1].Value
+    $tauriConfigPath = Join-Path $RepoRoot "src-tauri/tauri.conf.json"
+    $tauriConfig = Get-Content -Raw $tauriConfigPath | ConvertFrom-Json
+    $desktopPackagePath = Join-Path $RepoRoot "desktop/package.json"
+    $desktopPackage = Get-Content -Raw $desktopPackagePath | ConvertFrom-Json
+
+    if ($cargoName -ne $expectedName -or $tauriConfig.productName -ne $expectedName -or $tauriConfig.app.windows[0].title -ne $expectedName -or $desktopPackage.name -ne $expectedName) {
+        throw "Desktop package identity mismatch; expected all package names and window title to be '$expectedName'."
     }
-    return $match.Groups[1].Value
 }
 
 function Assert-VersionConsistency {
@@ -44,11 +99,23 @@ function Assert-VersionConsistency {
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
-    $cargoVersion = Get-DesktopVersion -RepoRoot $RepoRoot
+    $sourceVersion = Get-DesktopVersion -RepoRoot $RepoRoot
+
+    $cargoTomlPath = Join-Path $RepoRoot "src-tauri/Cargo.toml"
+    $cargoToml = Get-Content -Raw $cargoTomlPath
+    $cargoMatch = [regex]::Match($cargoToml, '(?m)^version\s*=\s*"([^"]+)"')
+    if (-not $cargoMatch.Success) {
+        throw "Failed to parse version from $cargoTomlPath"
+    }
+    $cargoVersion = $cargoMatch.Groups[1].Value
+
     $tauriConfigPath = Join-Path $RepoRoot "src-tauri/tauri.conf.json"
     $tauriVersion = (Get-Content -Raw $tauriConfigPath | ConvertFrom-Json).version
-    if ($cargoVersion -ne $tauriVersion) {
-        throw "Version mismatch: Cargo.toml=$cargoVersion, tauri.conf.json=$tauriVersion"
+    $desktopPackagePath = Join-Path $RepoRoot "desktop/package.json"
+    $desktopVersion = (Get-Content -Raw $desktopPackagePath | ConvertFrom-Json).version
+
+    if ($sourceVersion -ne $cargoVersion -or $sourceVersion -ne $tauriVersion -or $sourceVersion -ne $desktopVersion) {
+        throw "Version mismatch: VERSION=$sourceVersion, Cargo.toml=$cargoVersion, tauri.conf.json=$tauriVersion, desktop/package.json=$desktopVersion"
     }
 }
 
@@ -164,12 +231,15 @@ function Build-AndSyncSidecar {
     }
 
     $source = Resolve-Path (Join-Path $RepoRoot "out/build/$preset/src/oni-sidecar.exe")
+    $assetSource = Resolve-Path (Join-Path $RepoRoot "out/build/$preset/src/data.zip")
     $targetDir = Join-Path $RepoRoot "src-tauri/binaries"
     if (-not (Test-Path -LiteralPath $targetDir)) {
         New-Item -ItemType Directory -Path $targetDir | Out-Null
     }
     $target = Join-Path $targetDir "oni-sidecar.exe"
+    $assetTarget = Join-Path $targetDir "data.zip"
     Copy-Item -LiteralPath $source -Destination $target -Force
+    Copy-Item -LiteralPath $assetSource -Destination $assetTarget -Force
     Write-Host "Sidecar synced to $target"
     return $target
 }

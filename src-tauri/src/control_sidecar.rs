@@ -8,6 +8,7 @@ use serde_json::Value;
 use tauri::AppHandle;
 
 use crate::error::HostError;
+use crate::diagnostics;
 use crate::sidecar::{
     self, CoordPreviewRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
     SearchCatalogPayload, SearchRequestPayload,
@@ -63,6 +64,16 @@ impl ControlSidecarManager {
         request: &Value,
     ) -> Result<Vec<Value>, HostError> {
         let launcher = self.resolve_launcher(app)?;
+        diagnostics::log(
+            app,
+            "control.request",
+            format!(
+                "enabled={}, program={}, request={}",
+                self.enabled,
+                launcher.program.display(),
+                request
+            ),
+        );
         let mut guard = self
             .active_process
             .lock()
@@ -70,6 +81,11 @@ impl ControlSidecarManager {
 
         for attempt in 0..=1 {
             if guard.is_none() {
+                diagnostics::log(
+                    app,
+                    "control.spawn",
+                    format!("program={}", launcher.program.display()),
+                );
                 *guard = Some(ControlSidecarProcess::spawn(&launcher)?);
             }
 
@@ -90,6 +106,7 @@ impl ControlSidecarManager {
                     return Ok(outcome.events);
                 }
                 Err(error) => {
+                    diagnostics::log(app, "control.error", error.to_string());
                     if let Some(process) = guard.take() {
                         process.shutdown();
                     }
@@ -318,6 +335,7 @@ impl ControlSidecarProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let mut child = command.spawn()?;
+        eprintln!("[control-sidecar] spawned pid={} program={}", child.id(), launcher.program.display());
         let stdin = child
             .stdin
             .take()
@@ -397,6 +415,12 @@ impl ControlSidecarProcess {
 
     fn build_exit_error(&mut self) -> Result<HostError, HostError> {
         let status = self.child.wait()?;
+        eprintln!(
+            "[control-sidecar] exited success={} code={:?} stderr={}",
+            status.success(),
+            status.code(),
+            self.stderr_text()
+        );
         Ok(HostError::SidecarExited {
             code: status.code(),
             message: self.stderr_text(),
