@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "Setting/SettingsCache.hpp"
 #include "Utils/KRandom.hpp"
@@ -11,8 +12,31 @@ struct TemplateSpawner {
     const TemplateContainer *container;
 };
 
+struct WorldGenDebugPhaseFingerprint {
+    std::string afterSeedPoints;
+    std::string afterInitialDiagram;
+    std::string afterDistanceTags;
+    std::string afterConvertUnknownCells;
+    std::string afterPostConvertDiagram;
+    std::string afterGenerateChildren;
+    std::string templatePlacements;
+};
+
 class WorldGen
 {
+public:
+#if 0
+    // 临时 timing 检测，先停用。
+    struct GenerateTiming {
+        uint64_t seedPointsMicros = 0;
+        uint64_t diagramMicros = 0;
+        uint64_t cellProcessingMicros = 0;
+        uint64_t childrenMicros = 0;
+        uint64_t templatesMicros = 0;
+        uint64_t totalMicros = 0;
+    };
+#endif
+
 private:
     int m_seed;
     const SettingsCache &m_settings;
@@ -29,8 +53,13 @@ public:
     }
 
     bool GenerateOverworld(std::vector<Site> &sites);
+    bool DebugCapturePhaseFingerprint(WorldGenDebugPhaseFingerprint *fingerprint);
 
     std::vector<Vector3i> GetGeysers(int seed) const;
+#if 0
+    // 临时 timing 检测，先停用。
+    const GenerateTiming &LastGenerateTiming() const;
+#endif
 
 private:
     template<typename T>
@@ -41,7 +70,7 @@ private:
     bool GenerateSeedPoints(KRandom &random, std::vector<Site> &sites);
     void PropagateDistanceTags(std::vector<Site> &sites) const;
     void ConvertUnknownCells(std::vector<Site> &allSites, KRandom &random);
-    void GenerateChildren(Site &site, KRandom &random, int seed, bool usePD);
+    bool GenerateChildren(Site &site, KRandom &random, int seed, bool usePD);
     void SetFeatureBiome(Site &site, KRandom &random, const Feature *feature);
     bool DetermineTemplates(std::vector<Site *> &sites, KRandom &random);
 };

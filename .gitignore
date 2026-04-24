@@ -1,8 +1,6 @@
 .vs/
 .vscode/
 out/
-node_modules/
-.pixi/
 
 # CMake (covers accidental in-source builds)
 CMakeUserPresets.json
@@ -42,12 +40,8 @@ Thumbs.db
 Desktop.ini
 /llmdoc
 /devdoc
-
-# Desktop frontend
 /desktop/node_modules/
 /desktop/dist/
-
-# Tauri/Rust generated files
 /src-tauri/target/
 /src-tauri/gen/
 /src-tauri/binaries/

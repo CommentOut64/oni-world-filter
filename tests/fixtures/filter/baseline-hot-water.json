@@ -1,0 +1,19 @@
+{
+  "worldType": 13,
+  "seedStart": 100000,
+  "seedEnd": 100020,
+  "mixing": 625,
+  "threads": 0,
+  "required": [
+    "hot_water"
+  ],
+  "forbidden": [],
+  "distance": [],
+  "cpu": {
+    "mode": "balanced",
+    "enableWarmup": true,
+    "enableAdaptiveDown": true,
+    "chunkSize": 64,
+    "progressInterval": 1000
+  }
+}

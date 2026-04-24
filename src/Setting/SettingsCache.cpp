@@ -5,6 +5,7 @@
 #include <set>
 #include <algorithm>
 #include <filesystem>
+#include <mutex>
 #include <ranges>
 #include <regex>
 
@@ -18,6 +19,102 @@
 #include "Utils/SortHelper.hpp"
 
 Variant SettingsCache::m_nil;
+
+namespace {
+
+std::mutex g_sharedSettingsMutex;
+std::shared_ptr<const SettingsCache> g_sharedSettingsCache;
+
+} // namespace
+
+SettingsCache::SettingsCache(const SettingsCache &other)
+{
+    *this = other;
+}
+
+SettingsCache &SettingsCache::operator=(const SettingsCache &other)
+{
+    if (this == &other) {
+        return *this;
+    }
+
+    borders = other.borders;
+    defaults = other.defaults;
+    layers = other.layers;
+    mobs = other.mobs;
+    rivers = other.rivers;
+    rooms = other.rooms;
+    temperatures = other.temperatures;
+    biomes = other.biomes;
+    clusters = other.clusters;
+    features = other.features;
+    subworldMixing = other.subworldMixing;
+    subworlds = other.subworlds;
+    orderedSubworlds = other.orderedSubworlds;
+    traits = other.traits;
+    worldMixing = other.worldMixing;
+    worlds = other.worlds;
+    dlcMixings = other.dlcMixings;
+    templates = other.templates;
+    traitFeatures = other.traitFeatures;
+    mixConfigs = other.mixConfigs;
+    cluster = other.cluster;
+    seed = other.seed;
+    m_dlcState = other.m_dlcState;
+
+    RepairTransientPointersAfterCopy();
+    return *this;
+}
+
+void SettingsCache::RepairTransientPointersAfterCopy()
+{
+    if (cluster != nullptr) {
+        const std::string coordinatePrefix = cluster->coordinatePrefix;
+        cluster = nullptr;
+        for (auto &pair : clusters) {
+            if (pair.second.coordinatePrefix == coordinatePrefix) {
+                cluster = &pair.second;
+                break;
+            }
+        }
+    }
+
+    for (auto &config : mixConfigs) {
+        config.setting = nullptr;
+        if (config.type == 2) {
+            auto itr = subworldMixing.find(config.path);
+            if (itr != subworldMixing.end()) {
+                config.setting = &itr->second;
+            }
+            continue;
+        }
+        if (config.type == 1) {
+            auto itr = worldMixing.find(config.path);
+            if (itr != worldMixing.end()) {
+                config.setting = &itr->second;
+            }
+        }
+    }
+
+    for (auto &pair : worlds) {
+        pair.second.ClearMixingsAndTraits();
+    }
+
+    for (auto &pair : orderedSubworlds) {
+        std::vector<SubWorld *> rebound;
+        rebound.reserve(pair.second.size());
+        for (const auto *subworld : pair.second) {
+            if (subworld == nullptr) {
+                continue;
+            }
+            auto itr = subworlds.find(subworld->name);
+            if (itr != subworlds.end()) {
+                rebound.push_back(&itr->second);
+            }
+        }
+        pair.second = std::move(rebound);
+    }
+}
 
 template<typename T>
 static bool LoadJsonFile(mz_zip_archive &zip, int index, T &result)
@@ -242,6 +339,55 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
         {"dlc4::worldMixing/PrehistoricMixingSettings", 1},
     };
     return true;
+}
+
+std::shared_ptr<const SettingsCache> SharedSettingsCache::GetOrCreate(
+    const BlobLoader &loader,
+    std::string *errorMessage)
+{
+    std::lock_guard<std::mutex> lock(g_sharedSettingsMutex);
+    if (g_sharedSettingsCache) {
+        return g_sharedSettingsCache;
+    }
+    if (!loader) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "shared settings cache loader is empty";
+        }
+        return nullptr;
+    }
+
+    std::vector<char> data;
+    std::string loadError;
+    if (!loader(data, &loadError)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = loadError.empty() ? "failed to load settings blob" : loadError;
+        }
+        return nullptr;
+    }
+    if (data.empty()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "settings blob is empty";
+        }
+        return nullptr;
+    }
+
+    auto cache = std::make_shared<SettingsCache>();
+    const std::string_view content(data.data(), data.size());
+    if (!cache->LoadSettingsCache(content)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to parse settings cache from blob";
+        }
+        return nullptr;
+    }
+
+    g_sharedSettingsCache = cache;
+    return g_sharedSettingsCache;
+}
+
+void SharedSettingsCache::ResetForTests()
+{
+    std::lock_guard<std::mutex> lock(g_sharedSettingsMutex);
+    g_sharedSettingsCache.reset();
 }
 
 static std::vector<std::string> ParseSettingCoordinate(const std::string &coord)
@@ -471,5 +617,37 @@ void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids)
         ShuffleSeeded(filtered, random);
         world->ClearMixingsAndTraits();
         world->ApplayMixings(filtered);
+    }
+}
+
+SearchMutableStateSnapshot SettingsCache::CaptureSearchMutableState() const
+{
+    SearchMutableStateSnapshot snapshot;
+    snapshot.cluster = cluster;
+    snapshot.seed = seed;
+    snapshot.dlcState = m_dlcState;
+    snapshot.mixConfigs = mixConfigs;
+    if (cluster != nullptr) {
+        snapshot.activeWorlds.reserve(cluster->worldPlacements.size());
+        for (const auto &placement : cluster->worldPlacements) {
+            snapshot.activeWorlds.push_back(placement.world);
+        }
+    }
+    return snapshot;
+}
+
+void SettingsCache::RestoreSearchMutableState(const SearchMutableStateSnapshot &snapshot)
+{
+    cluster = snapshot.cluster;
+    seed = snapshot.seed;
+    m_dlcState = snapshot.dlcState;
+    mixConfigs = snapshot.mixConfigs;
+    for (const auto &worldName : snapshot.activeWorlds) {
+        auto itr = worlds.find(worldName);
+        if (itr == worlds.end()) {
+            LogE("world %s was wrong during RestoreSearchMutableState().", worldName.c_str());
+            continue;
+        }
+        itr->second.ClearMixingsAndTraits();
     }
 }

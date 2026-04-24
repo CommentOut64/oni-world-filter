@@ -1,6 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <string_view>
+#include <vector>
 
 #include "ClusterLayout.hpp"
 #include "TemplateContainer.hpp"
@@ -29,9 +32,21 @@ struct MixingConfig {
     }
 };
 
+struct SearchMutableStateSnapshot {
+    ClusterLayout *cluster = nullptr;
+    int seed = 0;
+    int dlcState = 0;
+    std::vector<MixingConfig> mixConfigs;
+    std::vector<std::string> activeWorlds;
+};
+
 class SettingsCache
 {
 public:
+    SettingsCache() = default;
+    SettingsCache(const SettingsCache &other);
+    SettingsCache &operator=(const SettingsCache &other);
+
     ComposableDictionary<std::vector<WeightedSimHash>> borders;
     DefaultSettings defaults;
     LevelLayerSettings layers;
@@ -71,6 +86,8 @@ public:
     bool IsSpaceOutEnabled() const { return (m_dlcState & 1) == 1; }
     std::vector<const WorldTrait *> GetRandomTraits(const World &world) const;
     void DoSubworldMixing(std::vector<World *> worlds);
+    SearchMutableStateSnapshot CaptureSearchMutableState() const;
+    void RestoreSearchMutableState(const SearchMutableStateSnapshot &snapshot);
     static uint32_t Base36ToBinary(const std::string &input);
     static std::string BinaryToBase36(uint32_t input);
 
@@ -93,4 +110,15 @@ public:
 
 private:
     void ParseAndApplyMixingSettingsCode(const std::string &code);
+    void RepairTransientPointersAfterCopy();
+};
+
+class SharedSettingsCache
+{
+public:
+    using BlobLoader = std::function<bool(std::vector<char> &data, std::string *errorMessage)>;
+
+    static std::shared_ptr<const SettingsCache> GetOrCreate(const BlobLoader &loader,
+                                                            std::string *errorMessage = nullptr);
+    static void ResetForTests();
 };

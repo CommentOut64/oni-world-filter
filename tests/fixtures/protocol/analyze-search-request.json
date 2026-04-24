@@ -1,0 +1,1 @@
+{"command":"analyze_search_request","jobId":"job-analyze-001","worldType":13,"seedStart":100000,"seedEnd":101000,"mixing":625,"constraints":{"required":["hot_water"],"forbidden":["big_volcano"],"distance":[{"geyser":"hot_water","minDist":0,"maxDist":80}],"count":[{"geyser":"hot_water","minCount":1,"maxCount":2}]}}
