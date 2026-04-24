@@ -115,7 +115,7 @@ public:
     bool RequestResource(uint32_t expectedSize, std::vector<char> &data) override
     {
         data.assign(expectedSize, 0);
-        std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+        std::ifstream file(SETTING_TEST_ASSET_FILEPATH, std::ios::binary);
         if (!file.is_open()) {
             return false;
         }
@@ -152,7 +152,7 @@ thread_local BatchCaptureSink g_batchSearchSink;
 bool ReadAssetBlob(std::vector<char> &data)
 {
     data.assign(SETTING_ASSET_FILESIZE, 0);
-    std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+    std::ifstream file(SETTING_TEST_ASSET_FILEPATH, std::ios::binary);
     if (!file.is_open()) {
         return false;
     }

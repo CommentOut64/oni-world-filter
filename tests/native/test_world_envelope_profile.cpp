@@ -22,7 +22,7 @@ bool Expect(bool condition, const char *message, int &failures)
 
 bool ReadAssetBlob(std::vector<char> &data)
 {
-    std::ifstream file(SETTING_ASSET_FILEPATH, std::ios::binary);
+    std::ifstream file(SETTING_TEST_ASSET_FILEPATH, std::ios::binary);
     if (!file.is_open()) {
         return false;
     }
