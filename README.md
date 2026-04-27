@@ -1,4 +1,4 @@
-# oniWorldApp
+# oni-world-filter
 
 > A Windows x64 desktop app for Oxygen Not Included world generation and seed filtering.
 
