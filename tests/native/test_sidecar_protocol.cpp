@@ -262,6 +262,7 @@ int RunAllTests()
 
         Batch::SearchMatchEvent match;
         match.seed = 42;
+        match.coord = "V-SNDST-C-42-0-D3-HD";
         match.processedSeeds = 50;
         match.totalSeeds = 100;
         match.totalMatches = 3;
@@ -456,6 +457,9 @@ int RunAllTests()
         Expect(startedJson["event"].asString() == "started", "started event type mismatch", failures);
         Expect(progressJson["event"].asString() == "progress", "progress event type mismatch", failures);
         Expect(matchJson["event"].asString() == "match", "match event type mismatch", failures);
+        Expect(matchJson["coord"].asString() == "V-SNDST-C-42-0-D3-HD",
+               "match event coord mismatch",
+               failures);
         Expect(completedJson["event"].asString() == "completed", "completed event type mismatch", failures);
         Expect(failedJson["event"].asString() == "failed", "failed event type mismatch", failures);
         Expect(cancelledJson["event"].asString() == "cancelled", "cancelled event type mismatch", failures);

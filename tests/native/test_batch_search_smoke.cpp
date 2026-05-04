@@ -151,6 +151,7 @@ int RunAllTests()
             evaluation.generated = true;
             evaluation.matched = (seed % 7 == 0);
             if (evaluation.matched) {
+                evaluation.coord = "mock-coord-" + std::to_string(seed);
                 evaluation.capture.startX = 10 + seed;
                 evaluation.capture.startY = 20 + seed;
                 evaluation.capture.worldW = 256;
@@ -179,6 +180,9 @@ int RunAllTests()
         };
         callbacks.onMatch = [&](const Batch::SearchMatchEvent &event) {
             matchCount.fetch_add(1, std::memory_order_relaxed);
+            Expect(event.coord == "mock-coord-" + std::to_string(event.seed),
+                   "match event should forward coord from evaluator",
+                   failures);
             std::lock_guard<std::mutex> lock(matchedSeedsMutex);
             matchedSeeds.push_back(event.seed);
         };
@@ -213,6 +217,30 @@ int RunAllTests()
         Expect(progressCount.load(std::memory_order_relaxed) > 0, "progress event should be emitted", failures);
         Expect(matchedSeeds.size() == 2 && matchedSeeds[0] == 7 && matchedSeeds[1] == 14,
                "matched seeds should be stable",
+               failures);
+    }
+
+    {
+        const auto plan = BuildBalancedPlan(BuildNonSmtTopology(), false);
+        auto request = BuildBaseRequest(plan);
+        request.seedStart = 7;
+        request.seedEnd = 7;
+        request.evaluateSeed = [](int seed) {
+            Batch::SearchSeedEvaluation evaluation;
+            evaluation.generated = true;
+            evaluation.matched = true;
+            evaluation.coord = "coord-from-evaluator-" + std::to_string(seed);
+            return evaluation;
+        };
+
+        std::string observedCoord;
+        Batch::SearchEventCallbacks callbacks;
+        callbacks.onMatch = [&](const Batch::SearchMatchEvent &event) { observedCoord = event.coord; };
+
+        const auto result = Batch::BatchSearchService::Run(request, callbacks);
+        Expect(!result.failed, "coord forwarding run should not fail", failures);
+        Expect(observedCoord == "coord-from-evaluator-7",
+               "coord should survive evaluator to match callback forwarding",
                failures);
     }
 
