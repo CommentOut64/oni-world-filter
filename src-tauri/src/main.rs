@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod commands;
 mod app_paths;
+mod commands;
 mod control_sidecar;
 mod diagnostics;
 mod error;
@@ -9,6 +9,13 @@ mod sidecar;
 mod state;
 
 use state::AppState;
+use tauri::{Manager, RunEvent};
+
+fn shutdown_runtime_sidecars(app: &tauri::AppHandle) {
+    let state = app.state::<AppState>();
+    sidecar::abort_all_running_jobs_for_shutdown(&state.jobs);
+    state.control_sidecar.reset();
+}
 
 fn main() {
     tauri::Builder::default()
@@ -26,8 +33,13 @@ fn main() {
             commands::get_search_catalog,
             commands::analyze_search_request
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run tauri application");
+        .build(tauri::generate_context!())
+        .expect("failed to build tauri application")
+        .run(|app, event| {
+            if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
+                shutdown_runtime_sidecars(app);
+            }
+        });
 }
 
 #[cfg(test)]

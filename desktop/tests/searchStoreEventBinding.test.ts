@@ -103,6 +103,7 @@ test("startSearchJob binds sidecar listener before invoking start_search", async
         event: "match",
         jobId: request.jobId,
         seed: 100123,
+        coord: "V-SNDST-C-100123-0-D3-0",
         processedSeeds: 1,
         totalSeeds: 1,
         totalMatches: 1,
@@ -152,8 +153,83 @@ test("startSearchJob binds sidecar listener before invoking start_search", async
   assert.equal(useSearchStore.getState().listening, true);
   assert.equal(useSearchStore.getState().results.length, 1);
   assert.equal(useSearchStore.getState().results[0]?.seed, 100123);
+  assert.equal(
+    useSearchStore.getState().results[0]?.coord,
+    "V-SNDST-C-100123-0-D3-0",
+    "search result coord should come from sidecar match event"
+  );
   assert.equal(useSearchStore.getState().isSearching, false);
   assert.equal(useSearchStore.getState().stats.totalMatches, 1);
+});
+
+test("search result coord prefers sidecar coord over local world catalog state", async () => {
+  mockIPC(
+    async (cmd, payload) => {
+      if (cmd !== "start_search") {
+        throw new Error(`unexpected command: ${cmd}`);
+      }
+
+      const request = payload.request as { jobId: string };
+      await emit("sidecar://event", {
+        event: "match",
+        jobId: request.jobId,
+        seed: 1203,
+        coord: "SIDECAR-COORD-1203",
+        processedSeeds: 1,
+        totalSeeds: 1,
+        totalMatches: 1,
+        summary: {
+          start: { x: 12, y: 34 },
+          worldSize: { w: 256, h: 384 },
+          traits: [],
+          geysers: [],
+        },
+      });
+      await emit("sidecar://event", createCompletedEvent(request.jobId));
+      return null;
+    },
+    { shouldMockEvents: true }
+  );
+
+  const module = await loadSearchStoreModule();
+  const { useSearchStore, DEFAULT_SEARCH_DRAFT } = module;
+  useSearchStore.setState({
+    worlds: [{ id: 13, code: "WRONG-PREFIX-" }],
+    geysers: [],
+    listening: false,
+    bindingSidecar: false,
+    isSearching: false,
+    isCancelling: false,
+    activeJobId: null,
+    results: [],
+    selectedSeed: null,
+    draft: DEFAULT_SEARCH_DRAFT,
+    lastSubmittedRequest: null,
+    lastHostDebugMessages: [],
+    stats: {
+      startedAtMs: null,
+      processedSeeds: 0,
+      totalSeeds: 0,
+      totalMatches: 0,
+      activeWorkers: 0,
+      currentSeedsPerSecond: 0,
+      peakSeedsPerSecond: 0,
+    },
+    lastError: null,
+  });
+
+  const started = await useSearchStore.getState().startSearchJob({
+    ...DEFAULT_SEARCH_DRAFT,
+    worldType: 13,
+    mixing: 625,
+  });
+
+  assert.equal(started, true);
+  assert.equal(
+    useSearchStore.getState().results[0]?.coord,
+    "SIDECAR-COORD-1203",
+    "frontend should no longer synthesize coord from local world catalog"
+  );
 });
 
 test("progress sidecar event updates visible search stats while search is running", async () => {

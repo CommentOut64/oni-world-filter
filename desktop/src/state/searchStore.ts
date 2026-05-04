@@ -143,25 +143,10 @@ function makeJobId(prefix: string): string {
   return `${prefix}-${Date.now()}-${suffix}`;
 }
 
-function toBase36(value: number): string {
-  const normalized = Math.max(0, Math.trunc(value));
-  return normalized.toString(36).toUpperCase();
-}
-
-function toCoordCode(
-  worlds: WorldOption[],
-  worldType: number,
-  seed: number,
-  mixing: number
-): string {
-  const prefix = worlds.find((item) => item.id === worldType)?.code ?? `WORLD-${worldType}-`;
-  return `${prefix}${seed}-0-D3-${toBase36(mixing)}`;
-}
-
 function appendMatch(state: SearchState, event: SearchMatchEvent): SearchState {
   const match: SearchMatchSummary = {
     ...buildSearchMatchSummaryFromPreview({
-      coord: toCoordCode(state.worlds, state.activeWorldType, event.seed, state.activeMixing),
+      coord: event.coord,
       worldType: state.activeWorldType,
       seed: event.seed,
       mixing: state.activeMixing,
