@@ -824,6 +824,7 @@ std::string SerializeMatchEvent(const std::string &jobId,
 {
     Json::Value root = BuildBaseEventJson("match", jobId);
     root["seed"] = event.seed;
+    root["coord"] = event.coord;
     root["processedSeeds"] = event.processedSeeds;
     root["totalSeeds"] = event.totalSeeds;
     root["totalMatches"] = event.totalMatches;

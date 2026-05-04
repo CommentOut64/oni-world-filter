@@ -15,6 +15,7 @@ struct SearchSeedEvaluation {
     bool ok = true;
     bool generated = false;
     bool matched = false;
+    std::string coord;
     BatchCaptureRecord capture;
     std::string errorMessage;
 };

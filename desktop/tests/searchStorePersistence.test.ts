@@ -50,7 +50,7 @@ function createMatch(seed: number): SearchMatchSummary {
     seed,
     worldType: 13,
     mixing: 625,
-    coord: `V-SNDST-C-${seed}`,
+    coord: `V-SNDST-C-${seed}-0-D3-DH`,
     traits: [],
     start: { x: 10, y: 20 },
     worldSize: { w: 256, h: 384 },
@@ -115,6 +115,43 @@ test("restoreSearchSessionSnapshot clears invalid selected seed when result set 
 test("restoreSearchSessionSnapshot removes corrupted session payload", () => {
   const storage = createMemoryStorage({
     [SEARCH_SESSION_STORAGE_KEY]: "{not-json",
+  });
+
+  const restored = restoreSearchSessionSnapshot(storage);
+  assert.equal(restored, null);
+  assert.equal(storage.getItem(SEARCH_SESSION_STORAGE_KEY), null);
+});
+
+test("restoreSearchSessionSnapshot drops legacy v1 session snapshots", () => {
+  const storage = createMemoryStorage({
+    "oni-search-session/v1": JSON.stringify({
+      version: 1,
+      draft: SAMPLE_DRAFT,
+      results: [createMatch(100123)],
+      selectedSeed: 100123,
+      lastSubmittedRequest: createRequest(),
+    }),
+  });
+
+  const restored = restoreSearchSessionSnapshot(storage);
+  assert.equal(restored, null);
+  assert.equal(storage.getItem(SEARCH_SESSION_STORAGE_KEY), null);
+});
+
+test("restoreSearchSessionSnapshot removes v2 snapshots with non-canonical coord", () => {
+  const storage = createMemoryStorage({
+    [SEARCH_SESSION_STORAGE_KEY]: JSON.stringify({
+      version: 2,
+      draft: SAMPLE_DRAFT,
+      results: [
+        {
+          ...createMatch(100123),
+          coord: "V-SNDST-C-100123",
+        },
+      ],
+      selectedSeed: 100123,
+      lastSubmittedRequest: createRequest(),
+    }),
   });
 
   const restored = restoreSearchSessionSnapshot(storage);

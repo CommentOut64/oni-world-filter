@@ -500,15 +500,27 @@ pub fn cancel_search(
     Ok(())
 }
 
+pub fn abort_all_running_jobs_for_shutdown(registry: &JobRegistry) {
+    for job in registry.snapshot_active_jobs() {
+        if job.status == JobStatus::Running {
+            let _ = registry.set_status(&job.job_id, JobStatus::Cancelling);
+        }
+        job.handles.cancel_token.store(true, Ordering::Relaxed);
+        request_search_cancel(&job.handles, &job.job_id);
+        let _ = force_stop_child_process(&job.handles);
+        let _ = finalize_cancelled_from_snapshot(registry, &job.job_id);
+    }
+}
+
 fn begin_host_cancellation(registry: &JobRegistry, job_id: &str) -> Result<bool, HostError> {
     match registry.get_status(job_id) {
         Some(JobStatus::Running) => {
             registry.set_status(job_id, JobStatus::Cancelling)?;
             Ok(true)
         }
-        Some(JobStatus::Cancelling | JobStatus::Completed | JobStatus::Failed | JobStatus::Cancelled) => {
-            Ok(false)
-        }
+        Some(
+            JobStatus::Cancelling | JobStatus::Completed | JobStatus::Failed | JobStatus::Cancelled,
+        ) => Ok(false),
         None => Err(HostError::JobNotFound(job_id.to_string())),
     }
 }
@@ -760,7 +772,9 @@ fn copy_sidecar_asset_to_runtime(source_path: &Path, runtime_path: &Path) -> Res
 
 fn assert_runtime_sidecar_asset(runtime_path: &Path) -> Result<(), HostError> {
     let Some(runtime_dir) = runtime_path.parent() else {
-        return Err(HostError::InvalidRequest("runtime sidecar 缺少父目录".to_string()));
+        return Err(HostError::InvalidRequest(
+            "runtime sidecar 缺少父目录".to_string(),
+        ));
     };
     let runtime_asset = runtime_dir.join("data.zip");
     let metadata = runtime_asset.metadata()?;
@@ -870,7 +884,8 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let resource_dir = app.and_then(|app_handle| app_paths::resolve_install_resource_dir(app_handle).ok());
+    let resource_dir =
+        app.and_then(|app_handle| app_paths::resolve_install_resource_dir(app_handle).ok());
     let candidates = collect_sidecar_candidates(&manifest_dir, resource_dir.as_deref());
     if let Some(app_handle) = app {
         diagnostics::log(
@@ -905,7 +920,12 @@ pub fn resolve_sidecar_path(app: Option<&AppHandle>) -> Result<PathBuf, HostErro
                     "selected={}, runtime={}, runtimeAsset={}, runtimeAssetZipSignature=checked",
                     describe_file(&existing),
                     describe_file(&runtime_path),
-                    describe_file(&runtime_path.parent().unwrap_or(runtime_path.as_path()).join("data.zip"))
+                    describe_file(
+                        &runtime_path
+                            .parent()
+                            .unwrap_or(runtime_path.as_path())
+                            .join("data.zip")
+                    )
                 ),
             );
             return Ok(runtime_path);
@@ -936,7 +956,12 @@ fn run_sidecar_request_collect(
             "pid={}, sidecar={}, asset={}, priority={:?}, request={}",
             child.id(),
             sidecar_path.display(),
-            describe_file(&sidecar_path.parent().unwrap_or(sidecar_path).join("data.zip")),
+            describe_file(
+                &sidecar_path
+                    .parent()
+                    .unwrap_or(sidecar_path)
+                    .join("data.zip")
+            ),
             priority,
             request
         ),
@@ -1335,9 +1360,8 @@ fn spawn_stdout_forwarder(
                             HOST_DEBUG_PREFIX, fallback_job_id, error
                         ),
                     );
-                    if should_emit_failed_for_invalid_stdout(
-                        registry.get_status(&fallback_job_id),
-                    ) {
+                    if should_emit_failed_for_invalid_stdout(registry.get_status(&fallback_job_id))
+                    {
                         let failed = json!({
                             "event": "failed",
                             "jobId": fallback_job_id,
@@ -1379,7 +1403,12 @@ fn spawn_stdout_forwarder(
                 continue;
             }
 
-            update_progress_snapshot_from_event(&registry, &job_id, event_name.as_str(), &event_json);
+            update_progress_snapshot_from_event(
+                &registry,
+                &job_id,
+                event_name.as_str(),
+                &event_json,
+            );
             let _ = app.emit(SIDECAR_EVENT_CHANNEL, event_json);
 
             match event_name.as_str() {
@@ -1509,7 +1538,8 @@ fn update_progress_snapshot_from_event(
             processed_seeds: 0,
             total_seeds: read_u64_field(event_json, "totalSeeds").unwrap_or(current.total_seeds),
             total_matches: 0,
-            active_workers: read_u32_field(event_json, "workerCount").unwrap_or(current.active_workers),
+            active_workers: read_u32_field(event_json, "workerCount")
+                .unwrap_or(current.active_workers),
         }),
         "progress" | "match" => Some(JobProgressSnapshot {
             processed_seeds: read_u64_field(event_json, "processedSeeds")
@@ -1591,15 +1621,15 @@ mod tests {
     use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
     use super::{
-        begin_host_cancellation, build_preview_coord_command, collect_sidecar_candidates,
-        finalize_cancelled_from_snapshot, finalize_cancelled_from_stdout_eof,
+        abort_all_running_jobs_for_shutdown, begin_host_cancellation,
+        build_preview_coord_command, collect_sidecar_candidates, finalize_cancelled_from_snapshot,
+        finalize_cancelled_from_stdout_eof,
         first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
         list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
         request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
-        sanitize_sidecar_stderr,
-        sidecar_spawn_creation_flags,
-        should_emit_failed_for_exit, should_forward_sidecar_event, validate_preview_coord_request,
-        CoordPreviewRequestPayload, PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
+        sanitize_sidecar_stderr, should_emit_failed_for_exit, should_forward_sidecar_event,
+        sidecar_spawn_creation_flags, validate_preview_coord_request, CoordPreviewRequestPayload,
+        PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -1746,8 +1776,9 @@ mod tests {
         assert!(candidates
             .iter()
             .all(|path| !path.to_string_lossy().contains("windows-gnu")));
-        assert!(candidates.iter().any(|path| path
-            == &root.join("out/build/x64-release/src/oni-sidecar.exe")));
+        assert!(candidates
+            .iter()
+            .any(|path| path == &root.join("out/build/x64-release/src/oni-sidecar.exe")));
         assert!(candidates
             .iter()
             .all(|path| !path.to_string_lossy().contains("x64-debug")));
@@ -1763,12 +1794,18 @@ mod tests {
         let source_b = root.join("src-tauri/binaries/oni-sidecar.exe");
 
         write_dummy_sidecar(&source_a);
-        fs::write(source_a.parent().unwrap().join("data.zip"), b"PK\x03\x04settings-a")
-            .expect("first settings asset should be written");
+        fs::write(
+            source_a.parent().unwrap().join("data.zip"),
+            b"PK\x03\x04settings-a",
+        )
+        .expect("first settings asset should be written");
         std::thread::sleep(Duration::from_millis(20));
         write_dummy_sidecar(&source_b);
-        fs::write(source_b.parent().unwrap().join("data.zip"), b"PK\x03\x04settings-b")
-            .expect("second settings asset should be written");
+        fs::write(
+            source_b.parent().unwrap().join("data.zip"),
+            b"PK\x03\x04settings-b",
+        )
+        .expect("second settings asset should be written");
 
         let first_copy =
             prepare_runtime_sidecar_copy(&runtime_dir, &source_a).expect("first runtime copy");
@@ -1796,8 +1833,11 @@ mod tests {
         let source = root.join("src-tauri/binaries/oni-sidecar.exe");
 
         write_dummy_sidecar(&source);
-        fs::write(source.parent().unwrap().join("data.zip"), b"PK\x03\x04settings")
-            .expect("settings asset should be written");
+        fs::write(
+            source.parent().unwrap().join("data.zip"),
+            b"PK\x03\x04settings",
+        )
+        .expect("settings asset should be written");
 
         let runtime_copy =
             prepare_runtime_sidecar_copy(&runtime_dir, &source).expect("runtime copy");
@@ -1818,8 +1858,11 @@ mod tests {
         let source = root.join("src-tauri/binaries/oni-sidecar.exe");
 
         write_dummy_sidecar(&source);
-        fs::write(source.parent().unwrap().join("data.zip"), b"PK\x03\x04settings")
-            .expect("settings asset should be written");
+        fs::write(
+            source.parent().unwrap().join("data.zip"),
+            b"PK\x03\x04settings",
+        )
+        .expect("settings asset should be written");
         fs::create_dir_all(&runtime_dir).expect("runtime dir should exist");
         fs::write(runtime_dir.join("data.zip"), b"").expect("empty runtime asset should exist");
 
@@ -2023,8 +2066,14 @@ mod tests {
         let event = finalize_cancelled_from_stdout_eof(&registry, "job-eof")
             .expect("stdout eof should synthesize cancelled");
 
-        assert_eq!(event.get("event").and_then(|value| value.as_str()), Some("cancelled"));
-        assert_eq!(event.get("jobId").and_then(|value| value.as_str()), Some("job-eof"));
+        assert_eq!(
+            event.get("event").and_then(|value| value.as_str()),
+            Some("cancelled")
+        );
+        assert_eq!(
+            event.get("jobId").and_then(|value| value.as_str()),
+            Some("job-eof")
+        );
         assert_eq!(
             event.get("processedSeeds").and_then(|value| value.as_u64()),
             Some(11)
@@ -2038,7 +2087,9 @@ mod tests {
             Some(3)
         );
         assert_eq!(
-            event.get("finalActiveWorkers").and_then(|value| value.as_u64()),
+            event
+                .get("finalActiveWorkers")
+                .and_then(|value| value.as_u64()),
             Some(2)
         );
         assert_eq!(registry.get_status("job-eof"), Some(JobStatus::Cancelled));
@@ -2068,7 +2119,10 @@ mod tests {
         let event = finalize_cancelled_from_snapshot(&registry, "job-host-abort")
             .expect("host abort should synthesize cancelled immediately");
 
-        assert_eq!(event.get("event").and_then(|value| value.as_str()), Some("cancelled"));
+        assert_eq!(
+            event.get("event").and_then(|value| value.as_str()),
+            Some("cancelled")
+        );
         assert_eq!(
             event.get("processedSeeds").and_then(|value| value.as_u64()),
             Some(77)
@@ -2082,11 +2136,56 @@ mod tests {
             Some(9)
         );
         assert_eq!(
-            event.get("finalActiveWorkers").and_then(|value| value.as_u64()),
+            event
+                .get("finalActiveWorkers")
+                .and_then(|value| value.as_u64()),
             Some(6)
         );
         assert_eq!(
             registry.get_status("job-host-abort"),
+            Some(JobStatus::Cancelled)
+        );
+    }
+
+    #[test]
+    fn shutdown_cleanup_should_cancel_and_force_stop_running_jobs() {
+        let registry = JobRegistry::default();
+        let mut child = spawn_sleeping_process();
+        let stdin = child.stdin.take();
+        let handles = RunningJobHandles {
+            child_handle: Arc::new(Mutex::new(Some(child))),
+            stdin_handle: Arc::new(Mutex::new(stdin)),
+            cancel_token: Arc::new(AtomicBool::new(false)),
+        };
+        registry
+            .insert_running("job-shutdown".to_string(), handles.clone())
+            .expect("insert running job should succeed");
+
+        let started_at = Instant::now();
+        abort_all_running_jobs_for_shutdown(&registry);
+
+        let status = {
+            let mut guard = handles
+                .child_handle
+                .lock()
+                .expect("child handle lock should succeed");
+            guard
+                .as_mut()
+                .expect("child should remain owned until wait")
+                .wait()
+                .expect("child wait should succeed")
+        };
+
+        assert!(
+            started_at.elapsed() < Duration::from_secs(1),
+            "shutdown cleanup should not wait for the long-running child to finish naturally"
+        );
+        assert!(
+            !status.success(),
+            "shutdown cleanup should terminate the still-running sidecar child"
+        );
+        assert_eq!(
+            registry.get_status("job-shutdown"),
             Some(JobStatus::Cancelled)
         );
     }
@@ -2144,8 +2243,9 @@ mod tests {
                 "distance": []
             }
         });
-        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal, None)
-            .expect("search smoke should succeed");
+        let events =
+            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal, None)
+                .expect("search smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "started"));
         assert!(events.iter().any(|event| event["event"] == "completed"));
     }
@@ -2161,9 +2261,13 @@ mod tests {
             "seed": 100123,
             "mixing": 625
         });
-        let events =
-            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity, None)
-                .expect("preview smoke should succeed");
+        let events = run_sidecar_request_collect(
+            &path,
+            &request,
+            SidecarProcessPriority::LowPerfAffinity,
+            None,
+        )
+        .expect("preview smoke should succeed");
         assert!(events.iter().any(|event| event["event"] == "preview"));
     }
 
@@ -2184,8 +2288,9 @@ mod tests {
                 "distance": []
             }
         });
-        let events = run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal, None)
-            .expect("search should not crash");
+        let events =
+            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::Normal, None)
+                .expect("search should not crash");
         assert!(events.iter().any(|event| event["event"] == "started"));
         assert!(events
             .iter()
@@ -2203,9 +2308,13 @@ mod tests {
             "seed": 100030,
             "mixing": 625
         });
-        let events =
-            run_sidecar_request_collect(&path, &request, SidecarProcessPriority::LowPerfAffinity, None)
-                .expect("preview should not crash");
+        let events = run_sidecar_request_collect(
+            &path,
+            &request,
+            SidecarProcessPriority::LowPerfAffinity,
+            None,
+        )
+        .expect("preview should not crash");
         assert!(events
             .iter()
             .any(|event| { event["event"] == "preview" || event["event"] == "failed" }));

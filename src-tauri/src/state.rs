@@ -43,13 +43,24 @@ pub struct JobEntry {
     pub progress_snapshot: Option<JobProgressSnapshot>,
 }
 
+#[derive(Clone)]
+pub struct ActiveJobSnapshot {
+    pub job_id: String,
+    pub status: JobStatus,
+    pub handles: RunningJobHandles,
+}
+
 #[derive(Default)]
 pub struct JobRegistry {
     jobs: Mutex<HashMap<String, JobEntry>>,
 }
 
 impl JobRegistry {
-    pub fn insert_running(&self, job_id: String, handles: RunningJobHandles) -> Result<(), HostError> {
+    pub fn insert_running(
+        &self,
+        job_id: String,
+        handles: RunningJobHandles,
+    ) -> Result<(), HostError> {
         let mut guard = self.jobs.lock().expect("job registry lock poisoned");
         if let Some(existing) = guard.get(&job_id) {
             if existing.status == JobStatus::Running {
@@ -110,6 +121,19 @@ impl JobRegistry {
         guard
             .get(job_id)
             .and_then(|entry| entry.progress_snapshot.clone())
+    }
+
+    pub fn snapshot_active_jobs(&self) -> Vec<ActiveJobSnapshot> {
+        let guard = self.jobs.lock().expect("job registry lock poisoned");
+        guard
+            .values()
+            .filter(|entry| matches!(entry.status, JobStatus::Running | JobStatus::Cancelling))
+            .map(|entry| ActiveJobSnapshot {
+                job_id: entry.job_id.clone(),
+                status: entry.status,
+                handles: entry.handles.clone(),
+            })
+            .collect()
     }
 }
 
@@ -198,7 +222,10 @@ mod tests {
         registry
             .set_status("job-cancel", JobStatus::Cancelled)
             .expect("set cancelled should succeed");
-        assert_eq!(registry.get_status("job-cancel"), Some(JobStatus::Cancelled));
+        assert_eq!(
+            registry.get_status("job-cancel"),
+            Some(JobStatus::Cancelled)
+        );
     }
 
     #[test]
@@ -224,6 +251,36 @@ mod tests {
             registry.get_progress_snapshot("job-progress"),
             Some(snapshot)
         );
+    }
+
+    #[test]
+    fn registry_should_snapshot_only_active_jobs() {
+        let registry = JobRegistry::default();
+        registry
+            .insert_running("job-running".to_string(), create_handles())
+            .expect("insert running job should succeed");
+        registry
+            .insert_running("job-cancelling".to_string(), create_handles())
+            .expect("insert cancelling job should succeed");
+        registry
+            .insert_running("job-completed".to_string(), create_handles())
+            .expect("insert completed job should succeed");
+        registry
+            .set_status("job-cancelling", JobStatus::Cancelling)
+            .expect("set cancelling should succeed");
+        registry
+            .set_status("job-completed", JobStatus::Completed)
+            .expect("set completed should succeed");
+
+        let snapshots = registry.snapshot_active_jobs();
+        assert_eq!(snapshots.len(), 2);
+        assert!(snapshots
+            .iter()
+            .any(|job| { job.job_id == "job-running" && job.status == JobStatus::Running }));
+        assert!(snapshots
+            .iter()
+            .any(|job| { job.job_id == "job-cancelling" && job.status == JobStatus::Cancelling }));
+        assert!(!snapshots.iter().any(|job| job.job_id == "job-completed"));
     }
 
     #[test]

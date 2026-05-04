@@ -119,7 +119,7 @@ target_include_directories(oni-sidecar
 target_link_libraries(oni-sidecar PUBLIC clipper jsoncpp miniz)
 if(MSVC)
 target_compile_options(oni-sidecar
-    PUBLIC "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244 /wd4267
+    PUBLIC /EHsc "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244 /wd4267
     PUBLIC "$<$<CONFIG:Release>:/Zi>")
 target_link_options(oni-sidecar
     PRIVATE "$<$<CONFIG:Release>:/DEBUG:FULL>"
@@ -286,6 +286,24 @@ target_include_directories(test_sidecar_protocol
 )
 target_link_libraries(test_sidecar_protocol PRIVATE jsoncpp)
 add_test(NAME test_sidecar_protocol COMMAND test_sidecar_protocol)
+
+add_executable(test_sidecar_shutdown
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_sidecar_shutdown.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_sidecar_shutdown
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_sidecar_shutdown PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_sidecar_shutdown PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_sidecar_shutdown COMMAND test_sidecar_shutdown)
 
 add_executable(test_recoverable_diagnostics
     "../tests/native/test_main.cpp"

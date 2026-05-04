@@ -90,6 +90,7 @@ function createMatchEvent(jobId: string): SearchMatchEvent {
     event: "match",
     jobId,
     seed: 100123,
+    coord: "V-SNDST-C-100123-0-D3-DH",
     processedSeeds: 9,
     totalSeeds: 200,
     totalMatches: 1,
