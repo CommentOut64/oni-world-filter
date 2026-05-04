@@ -328,6 +328,7 @@ BatchSearchResult BatchSearchService::Run(const SearchRequest &request,
                     if (callbacks.onMatch) {
                         SearchMatchEvent event;
                         event.seed = seed;
+                        event.coord = std::move(evaluation.coord);
                         event.capture = std::move(evaluation.capture);
                         event.processedSeeds = processed.load(std::memory_order_relaxed);
                         event.totalSeeds = result.totalSeeds;

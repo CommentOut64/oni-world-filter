@@ -384,6 +384,7 @@ Batch::SearchSeedEvaluation EvaluateSearchSeed(const Batch::FilterConfig &cfg,
         return evaluation;
     }
 
+    evaluation.coord = code;
     const auto matchResult = Batch::MatchFilter(cfg, g_batchSink.Data());
     if (!matchResult.Ok()) {
         evaluation.ok = false;

@@ -1,9 +1,9 @@
 import type { SearchCpuConfig, SearchMatchSummary, SearchRequest } from "../lib/contracts";
 import type { SearchDraft } from "./searchStore";
 
-export const SEARCH_SESSION_STORAGE_KEY = "oni-search-session/v1";
+export const SEARCH_SESSION_STORAGE_KEY = "oni-search-session/v2";
 
-const SEARCH_SESSION_VERSION = 1;
+const SEARCH_SESSION_VERSION = 2;
 
 export interface SearchSessionStorage {
   getItem(key: string): string | null;
@@ -34,6 +34,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function hasCanonicalCoord(value: unknown): value is string {
+  return typeof value === "string" && value.includes("-0-") && value.includes("-D3-");
+}
+
+function normalizeSearchMatchSummary(value: unknown): SearchMatchSummary | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    typeof value.seed !== "number" ||
+    typeof value.worldType !== "number" ||
+    typeof value.mixing !== "number" ||
+    !hasCanonicalCoord(value.coord) ||
+    !Array.isArray(value.traits) ||
+    !isRecord(value.start) ||
+    typeof value.start.x !== "number" ||
+    typeof value.start.y !== "number" ||
+    !isRecord(value.worldSize) ||
+    typeof value.worldSize.w !== "number" ||
+    typeof value.worldSize.h !== "number" ||
+    !Array.isArray(value.geysers)
+  ) {
+    return null;
+  }
+
+  return cloneValue(value as unknown as SearchMatchSummary);
 }
 
 function sanitizeSelectedSeed(results: SearchMatchSummary[], selectedSeed: number | null): number | null {
@@ -120,10 +148,17 @@ function parseSerializedSnapshot(raw: string): SerializedSearchSessionSnapshot |
   if (!(parsed.lastSubmittedRequest === null || isRecord(parsed.lastSubmittedRequest))) {
     return null;
   }
+  const normalizedResults = (parsed.results as unknown[])
+    .map((item) => normalizeSearchMatchSummary(item))
+    .filter((item): item is SearchMatchSummary => item !== null);
+  if (normalizedResults.length !== parsed.results.length) {
+    return null;
+  }
+
   return {
     version: SEARCH_SESSION_VERSION,
     draft: cloneValue(parsed.draft as unknown as SearchDraft),
-    results: cloneValue(parsed.results as unknown as SearchMatchSummary[]),
+    results: normalizedResults,
     selectedSeed: parsed.selectedSeed,
     lastSubmittedRequest:
       parsed.lastSubmittedRequest === null

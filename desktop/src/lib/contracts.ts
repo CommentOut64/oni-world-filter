@@ -231,6 +231,7 @@ export interface SearchMatchEvent {
   event: "match";
   jobId: string;
   seed: number;
+  coord: string;
   processedSeeds: number;
   totalSeeds: number;
   totalMatches: number;

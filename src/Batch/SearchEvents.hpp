@@ -41,6 +41,7 @@ struct SearchProgressEvent {
 struct SearchMatchEvent {
     SearchEventType type = SearchEventType::SearchMatch;
     int seed = 0;
+    std::string coord;
     BatchCaptureRecord capture;
     int processedSeeds = 0;
     int totalSeeds = 0;
