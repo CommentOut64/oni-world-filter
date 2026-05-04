@@ -195,8 +195,14 @@ bool RequestSearchActiveWorkers(const std::string &jobId, int activeWorkers)
 void ShutdownSearchWorker()
 {
     std::thread worker;
+    std::shared_ptr<std::atomic<bool>> cancelToken;
     {
         std::lock_guard<std::mutex> lock(g_activeSearch.mutex);
+        cancelToken = g_activeSearch.cancelToken;
+        if (cancelToken) {
+            // stdin EOF 表示宿主已离线，必须先请求取消，再等待搜索线程退出。
+            cancelToken->store(true, std::memory_order_relaxed);
+        }
         if (g_activeSearch.worker.joinable()) {
             worker = std::move(g_activeSearch.worker);
         }
