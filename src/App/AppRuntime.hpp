@@ -54,6 +54,7 @@ private:
     bool GenerateCurrentState(int traitsFlag, bool genWarpWorld);
     void SetSeedWithTraits(const std::vector<World *> &worlds, int traitsFlag);
     GeneratedWorldSummary BuildSummary(int seed,
+                                       int worldPlacementIndex,
                                        World *world,
                                        std::vector<Site> &sites,
                                        const std::vector<const WorldTrait *> &traits,
