@@ -704,6 +704,18 @@ fn collect_sidecar_candidates(manifest_dir: &Path, resource_dir: Option<&Path>) 
     let mut candidates = Vec::new();
 
     if let Some(resource_dir) = resource_dir {
+        let prefers_nested_resources = resource_dir
+            .file_name()
+            .map(|name| name != "resources")
+            .unwrap_or(true);
+        if prefers_nested_resources {
+            candidates.push(resource_dir.join("resources/binaries/oni-sidecar.exe"));
+            candidates.push(
+                resource_dir.join("resources/binaries/oni-sidecar-x86_64-pc-windows-msvc.exe"),
+            );
+            candidates.push(resource_dir.join("resources/oni-sidecar.exe"));
+            candidates.push(resource_dir.join("resources/oni-sidecar-x86_64-pc-windows-msvc.exe"));
+        }
         candidates.push(resource_dir.join("binaries/oni-sidecar.exe"));
         candidates.push(resource_dir.join("binaries/oni-sidecar-x86_64-pc-windows-msvc.exe"));
         candidates.push(resource_dir.join("oni-sidecar.exe"));
@@ -1757,13 +1769,46 @@ mod tests {
     }
 
     #[test]
+    fn resolve_candidates_should_prefer_portable_resources_bundle_sidecar_when_resource_dir_is_bundle_root(
+    ) {
+        let root = create_temp_root("prefer-portable-resources-bundle");
+        let manifest_dir = root.join("src-tauri");
+        let manifest_binary = manifest_dir.join("binaries/oni-sidecar.exe");
+        let resource_dir = root.join("portable-app");
+        let bundled_binary = resource_dir.join("resources/binaries/oni-sidecar.exe");
+
+        write_dummy_sidecar(&manifest_binary);
+        std::thread::sleep(Duration::from_millis(20));
+        write_dummy_sidecar(&bundled_binary);
+
+        let candidates = collect_sidecar_candidates(&manifest_dir, Some(resource_dir.as_path()));
+        let resolved = first_existing_sidecar_path(&candidates).expect("sidecar should resolve");
+        assert_eq!(
+            candidates[0], bundled_binary,
+            "portable bundle root should first probe resources/binaries"
+        );
+        assert_eq!(
+            resolved, bundled_binary,
+            "portable desktop should prefer bundled sidecar under resources over build-time repo path"
+        );
+
+        fs::remove_dir_all(root).expect("temp root should be removed");
+    }
+
+    #[test]
     fn collect_candidates_should_only_include_release_sidecar_candidates() {
         let root = create_temp_root("candidate-layout");
         let manifest_dir = root.join("src-tauri");
         let resource_dir = root.join("installed-app");
         let candidates = collect_sidecar_candidates(&manifest_dir, Some(resource_dir.as_path()));
 
-        assert_eq!(candidates[0], resource_dir.join("binaries/oni-sidecar.exe"));
+        assert_eq!(
+            candidates[0],
+            resource_dir.join("resources/binaries/oni-sidecar.exe")
+        );
+        assert!(candidates
+            .iter()
+            .any(|path| path == &resource_dir.join("binaries/oni-sidecar.exe")));
         assert!(candidates
             .iter()
             .any(|path| path == &resource_dir.join("oni-sidecar.exe")));

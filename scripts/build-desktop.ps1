@@ -1,6 +1,8 @@
 param(
     [ValidateSet("standard", "offline", "both")]
     [string]$Variant = "both",
+    [ValidateSet("installer", "portable", "all")]
+    [string]$Package = "all",
     [ValidateSet("unsigned")]
     [string]$SigningProfile = "unsigned",
     [switch]$SkipYarnInstall
@@ -12,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 . (Join-Path $PSScriptRoot "lib/desktop-bootstrap.ps1")
 
-function Get-RequestedVariants {
+function Get-RequestedPortableVariants {
     param(
         [Parameter(Mandatory = $true)][string]$Variant
     )
@@ -25,16 +27,20 @@ function Get-RequestedVariants {
     }
 }
 
-function Get-VariantConfigPath {
+function Test-ShouldBuildInstaller {
     param(
-        [Parameter(Mandatory = $true)][ValidateSet("standard", "offline")][string]$Variant,
-        [Parameter(Mandatory = $true)][string]$RepoRoot
+        [Parameter(Mandatory = $true)][string]$Package
     )
 
-    switch ($Variant) {
-        "standard" { return Join-Path $RepoRoot "src-tauri/tauri.standard.conf.json" }
-        "offline" { return Join-Path $RepoRoot "src-tauri/tauri.offline.conf.json" }
-    }
+    return $Package -eq "installer" -or $Package -eq "all"
+}
+
+function Test-ShouldBuildPortable {
+    param(
+        [Parameter(Mandatory = $true)][string]$Package
+    )
+
+    return $Package -eq "portable" -or $Package -eq "all"
 }
 
 function Clear-TauriBundleOutput {
@@ -48,31 +54,114 @@ function Clear-TauriBundleOutput {
     }
 }
 
-function Invoke-TauriBuildVariant {
+function Invoke-TauriBuild {
     param(
-        [Parameter(Mandatory = $true)][ValidateSet("standard", "offline")][string]$Variant,
-        [Parameter(Mandatory = $true)][string]$RepoRoot
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [switch]$NoBundle
     )
-
-    $configPath = Get-VariantConfigPath -Variant $Variant -RepoRoot $RepoRoot
-    if (-not (Test-Path -LiteralPath $configPath)) {
-        throw "Tauri overlay config not found: $configPath"
-    }
-
-    Clear-TauriBundleOutput -RepoRoot $RepoRoot
 
     Push-Location (Join-Path $RepoRoot "src-tauri")
     try {
-        cargo tauri build --config $configPath
+        if ($NoBundle) {
+            cargo tauri build --no-bundle
+            if ($LASTEXITCODE -ne 0) {
+                throw "cargo tauri build --no-bundle failed with exit code $LASTEXITCODE"
+            }
+            return
+        }
+
+        cargo tauri build
         if ($LASTEXITCODE -ne 0) {
-            throw "cargo tauri build --config $configPath failed with exit code $LASTEXITCODE"
+            throw "cargo tauri build failed with exit code $LASTEXITCODE"
         }
     } finally {
         Pop-Location
     }
 }
 
-function Publish-VariantArtifacts {
+function Publish-InstallerArtifacts {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$ReleaseRoot,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+
+    $sourceDirectory = Join-Path $RepoRoot "src-tauri/target/release/bundle/nsis"
+    $installerDirectory = Join-Path $ReleaseRoot "installer"
+    if (Test-Path -LiteralPath $installerDirectory) {
+        Remove-Item -LiteralPath $installerDirectory -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $installerDirectory | Out-Null
+
+    $collected = @(Collect-ReleaseArtifacts -SourceDirectory $sourceDirectory -DestinationDirectory $installerDirectory -Patterns @("*.exe"))
+    if ($collected.Count -ne 1) {
+        throw "Expected exactly one NSIS installer, but found $($collected.Count)"
+    }
+
+    $sourcePath = $collected[0]
+    $finalPath = Join-Path $installerDirectory "oni-world-filter-$Version-Setup.exe"
+    Move-Item -LiteralPath $sourcePath -Destination $finalPath -Force
+    return $finalPath
+}
+
+function Resolve-DesktopExecutablePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $path = Join-Path $RepoRoot "src-tauri/target/release/oni-world-filter.exe"
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Desktop executable not found: $path"
+    }
+    return (Resolve-Path -LiteralPath $path).Path
+}
+
+function Resolve-WebView2FixedRuntimeSource {
+    $source = $env:ONI_WEBVIEW2_FIXED_RUNTIME_DIR
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        throw "Portable offline packaging requires ONI_WEBVIEW2_FIXED_RUNTIME_DIR."
+    }
+    $resolved = (Resolve-Path -LiteralPath $source).Path
+    if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
+        throw "WebView2 fixed runtime directory not found: $resolved"
+    }
+    return $resolved
+}
+
+function New-PortableStageDirectory {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("standard", "offline")][string]$Variant,
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+
+    $stageRoot = Join-Path $RepoRoot "src-tauri/target/release/portable-stage/$Variant"
+    if (Test-Path -LiteralPath $stageRoot) {
+        Remove-Item -LiteralPath $stageRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $stageRoot | Out-Null
+
+    $packageRoot = Join-Path $stageRoot "oni-world-filter-$Version-Portable-$Variant"
+    $resourceBinariesDirectory = Join-Path $packageRoot "resources/binaries"
+    foreach ($path in @(
+        $packageRoot,
+        $resourceBinariesDirectory,
+        (Join-Path $packageRoot "data/app-data"),
+        (Join-Path $packageRoot "data/logs"),
+        (Join-Path $packageRoot "data/sidecars"),
+        (Join-Path $packageRoot "data/webview")
+    )) {
+        New-Item -ItemType Directory -Path $path -Force | Out-Null
+    }
+
+    return @{
+        stageRoot = $stageRoot
+        packageRoot = $packageRoot
+        resourceBinariesDirectory = $resourceBinariesDirectory
+    }
+}
+
+function Publish-PortableArtifacts {
     param(
         [Parameter(Mandatory = $true)][ValidateSet("standard", "offline")][string]$Variant,
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -80,25 +169,37 @@ function Publish-VariantArtifacts {
         [Parameter(Mandatory = $true)][string]$Version
     )
 
-    $sourceDirectory = Join-Path $RepoRoot "src-tauri/target/release/bundle/nsis"
-    $variantDirectory = Join-Path $ReleaseRoot $Variant
+    $desktopExecutable = Resolve-DesktopExecutablePath -RepoRoot $RepoRoot
+    $layout = New-PortableStageDirectory -Variant $Variant -RepoRoot $RepoRoot -Version $Version
+    $packageRoot = $layout.packageRoot
+    $stageRoot = $layout.stageRoot
+    $resourceBinariesDirectory = $layout.resourceBinariesDirectory
+
+    Copy-Item -LiteralPath $desktopExecutable -Destination (Join-Path $packageRoot "oni-world-filter.exe") -Force
+    Copy-Item -LiteralPath (Join-Path $RepoRoot "src-tauri/binaries/oni-sidecar.exe") -Destination (Join-Path $resourceBinariesDirectory "oni-sidecar.exe") -Force
+    Copy-Item -LiteralPath (Join-Path $RepoRoot "src-tauri/binaries/data.zip") -Destination (Join-Path $resourceBinariesDirectory "data.zip") -Force
+    Set-Content -LiteralPath (Join-Path $packageRoot "portable.flag") -Value "portable" -Encoding ascii
+
+    if ($Variant -eq "offline") {
+        $runtimeSource = Resolve-WebView2FixedRuntimeSource
+        Copy-Item -LiteralPath $runtimeSource -Destination (Join-Path $packageRoot "resources/Microsoft.WebView2.FixedVersionRuntime") -Recurse -Force
+    }
+
+    $variantDirectory = Join-Path $ReleaseRoot "portable-$Variant"
     if (Test-Path -LiteralPath $variantDirectory) {
         Remove-Item -LiteralPath $variantDirectory -Recurse -Force
     }
     New-Item -ItemType Directory -Path $variantDirectory | Out-Null
 
-    $collected = @(Collect-ReleaseArtifacts -SourceDirectory $sourceDirectory -DestinationDirectory $variantDirectory -Patterns @("*.exe"))
-    if ($collected.Count -ne 1) {
-        throw "Expected exactly one NSIS installer for variant '$Variant', but found $($collected.Count)"
+    $archivePath = Join-Path $variantDirectory "oni-world-filter-$Version-Portable-$Variant.zip"
+    Push-Location $stageRoot
+    try {
+        Compress-Archive -LiteralPath (Split-Path -Leaf $packageRoot) -DestinationPath $archivePath -Force
+    } finally {
+        Pop-Location
     }
 
-    $sourcePath = $collected[0]
-    $extension = [System.IO.Path]::GetExtension($sourcePath)
-    $finalName = "oni-world-filter-$Version-$Variant-nsis$extension"
-    $finalPath = Join-Path $variantDirectory $finalName
-    Move-Item -LiteralPath $sourcePath -Destination $finalPath -Force
-
-    return $finalPath
+    return $archivePath
 }
 
 function Write-ReleaseChecksums {
@@ -167,7 +268,9 @@ function Write-BuildSummary {
 
 Push-Location $repoRoot
 try {
-    $requestedVariants = Get-RequestedVariants -Variant $Variant
+    $requestedPortableVariants = @(Get-RequestedPortableVariants -Variant $Variant)
+    $buildInstaller = Test-ShouldBuildInstaller -Package $Package
+    $buildPortable = Test-ShouldBuildPortable -Package $Package
 
     Sync-DesktopVersion -RepoRoot $repoRoot
     Assert-VersionConsistency -RepoRoot $repoRoot
@@ -196,11 +299,22 @@ try {
 
     $env:ONI_REQUIRE_SIDECAR = "1"
     $artifacts = @()
-    foreach ($item in $requestedVariants) {
-        Write-Host "Building Tauri installer variant: $item"
-        Invoke-TauriBuildVariant -Variant $item -RepoRoot $repoRoot
-        $artifact = Publish-VariantArtifacts -Variant $item -RepoRoot $repoRoot -ReleaseRoot $releaseRoot -Version $version
-        $artifacts += $artifact
+
+    if ($buildInstaller) {
+        Write-Host "Building Tauri setup installer..."
+        Clear-TauriBundleOutput -RepoRoot $repoRoot
+        Invoke-TauriBuild -RepoRoot $repoRoot
+        $artifacts += Publish-InstallerArtifacts -RepoRoot $repoRoot -ReleaseRoot $releaseRoot -Version $version
+    } elseif ($buildPortable) {
+        Write-Host "Building Tauri desktop executable for portable packaging..."
+        Invoke-TauriBuild -RepoRoot $repoRoot -NoBundle
+    }
+
+    if ($buildPortable) {
+        foreach ($portableVariant in $requestedPortableVariants) {
+            Write-Host "Packaging portable variant: $portableVariant"
+            $artifacts += Publish-PortableArtifacts -Variant $portableVariant -RepoRoot $repoRoot -ReleaseRoot $releaseRoot -Version $version
+        }
     }
 
     Invoke-OptionalCodeSigning -SigningProfile $SigningProfile -Files $artifacts
