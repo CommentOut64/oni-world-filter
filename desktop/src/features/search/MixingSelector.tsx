@@ -139,7 +139,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
         <header className="mixing-package-header">
           <Typography.Title level={5}>世界混搭</Typography.Title>
           <Typography.Paragraph>
-            按 DLC 包理解混搭内容。勾选后可选可能或确保，未勾选即为禁用。
+            先勾选 DLC 包启用混搭，再按生态选择可能或确保；未勾选即为禁用。
           </Typography.Paragraph>
         </header>
 
@@ -178,17 +178,9 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                       >
                         {group.packageSlot.displayName}
                       </Checkbox>
-                      {packageEnabled ? (
-                        <ModeSelect
-                          value={packageMode === "off" ? "normal" : packageMode}
-                          disabled={packageDisabled}
-                          onChange={(mode) => {
-                            commitLevels(applyPackageMode(levels, group, mode));
-                          }}
-                        />
-                      ) : (
+                      {!packageEnabled ? (
                         <Tag className="mixing-mode-badge">{renderModeLabel(packageMode)}</Tag>
-                      )}
+                      ) : null}
                     </div>
 
                     {packageDescription || packageDisabled ? (

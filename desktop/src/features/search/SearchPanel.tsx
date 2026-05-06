@@ -398,7 +398,7 @@ export default function SearchPanel({
                 <Typography.Title level={4}>喷口约束</Typography.Title>
                 <Typography.Paragraph>
                   距离规则：第一栏为最小距离，第二栏为最大距离（从出生点到喷口的直线距离，单位：格）。
-                  数量规则：第一栏为最小数量，第二栏为最大数量。
+                  数量规则：第一栏为最小数量，第二栏为最大数量。均为全图数量（如果预测为0%，可能是最大数量值太小了）
                 </Typography.Paragraph>
               </header>
               <div className="search-rule-grid">

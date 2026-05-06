@@ -62,28 +62,19 @@ function Assert-CMakePresetsCollapsed {
     }
 }
 
-function Assert-TauriOverlayFilesPresent {
-    $paths = @(
-        ".\src-tauri\tauri.standard.conf.json",
-        ".\src-tauri\tauri.offline.conf.json"
-    )
-
-    foreach ($path in $paths) {
-        Assert-Condition -Condition (Test-Path -LiteralPath $path) -Message "Missing Tauri overlay config: $path"
-    }
-}
-
 function Assert-ReleaseArtifacts {
     param(
         [Parameter(Mandatory = $true)][string]$ResolvedReleaseRoot
     )
 
-    $standard = Get-ChildItem -LiteralPath (Join-Path $ResolvedReleaseRoot "standard") -Filter *.exe -File
-    $offline = Get-ChildItem -LiteralPath (Join-Path $ResolvedReleaseRoot "offline") -Filter *.exe -File
+    $installer = Get-ChildItem -LiteralPath (Join-Path $ResolvedReleaseRoot "installer") -Filter *Setup.exe -File
+    $portableStandard = Get-ChildItem -LiteralPath (Join-Path $ResolvedReleaseRoot "portable-standard") -Filter *Portable-standard.zip -File
+    $portableOffline = Get-ChildItem -LiteralPath (Join-Path $ResolvedReleaseRoot "portable-offline") -Filter *Portable-offline.zip -File
 
-    Assert-Condition -Condition (@($standard).Count -eq 1) -Message "Expected exactly one standard NSIS installer."
-    Assert-Condition -Condition (@($offline).Count -eq 1) -Message "Expected exactly one offline NSIS installer."
-    Assert-Condition -Condition ($offline[0].Length -gt $standard[0].Length) -Message "Offline installer is not larger than standard installer."
+    Assert-Condition -Condition (@($installer).Count -eq 1) -Message "Expected exactly one setup installer."
+    Assert-Condition -Condition (@($portableStandard).Count -eq 1) -Message "Expected exactly one portable standard archive."
+    Assert-Condition -Condition (@($portableOffline).Count -eq 1) -Message "Expected exactly one portable offline archive."
+    Assert-Condition -Condition ($portableOffline[0].Length -gt $portableStandard[0].Length) -Message "Portable offline archive is not larger than portable standard archive."
 }
 
 function Assert-NoLegacyReferences {
@@ -123,7 +114,6 @@ function Assert-NoLegacyReferences {
 $resolvedReleaseRoot = Resolve-ReleaseRoot -RequestedPath $ReleaseRoot
 Assert-LegacyFilesDeleted
 Assert-CMakePresetsCollapsed
-Assert-TauriOverlayFilesPresent
 Assert-ReleaseArtifacts -ResolvedReleaseRoot $resolvedReleaseRoot
 Assert-NoLegacyReferences
 

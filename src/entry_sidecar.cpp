@@ -458,22 +458,22 @@ public:
 
     void OnGeneratedWorldSummary(const GeneratedWorldSummary &summary) override
     {
-        m_lastSummary = summary;
+        m_summaries.push_back(summary);
     }
 
     void OnGeneratedWorldPreview(const GeneratedWorldPreview &preview) override
     {
-        m_lastPreview = preview;
+        m_previews.push_back(preview);
     }
 
-    const std::optional<GeneratedWorldPreview> &LastPreview() const
+    const GeneratedWorldPreview *PrimaryPreview() const
     {
-        return m_lastPreview;
+        return FindPrimaryGeneratedWorldPreview(m_previews);
     }
 
 private:
-    std::optional<GeneratedWorldSummary> m_lastSummary;
-    std::optional<GeneratedWorldPreview> m_lastPreview;
+    std::vector<GeneratedWorldSummary> m_summaries;
+    std::vector<GeneratedWorldPreview> m_previews;
 };
 
 Batch::SearchRequest BuildSearchRequest(const Batch::FilterConfig &cfg,
@@ -609,12 +609,13 @@ void RunPreviewCommand(const Batch::SidecarPreviewRequest &request)
         EmitLine(Batch::SerializeFailedEvent(request.jobId, "preview generate failed"));
         return;
     }
-    if (!previewSink.LastPreview().has_value()) {
+    const GeneratedWorldPreview *primaryPreview = previewSink.PrimaryPreview();
+    if (primaryPreview == nullptr) {
         EmitLine(Batch::SerializeFailedEvent(request.jobId, "preview payload is empty"));
         return;
     }
 
-    EmitLine(Batch::SerializePreviewEvent(request.jobId, request, previewSink.LastPreview().value()));
+    EmitLine(Batch::SerializePreviewEvent(request.jobId, request, *primaryPreview));
 }
 
 void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
@@ -639,7 +640,8 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
         EmitLine(Batch::SerializeFailedEvent(request.jobId, "preview generate failed"));
         return;
     }
-    if (!previewSink.LastPreview().has_value()) {
+    const GeneratedWorldPreview *primaryPreview = previewSink.PrimaryPreview();
+    if (primaryPreview == nullptr) {
         EmitLine(Batch::SerializeFailedEvent(request.jobId, "preview payload is empty"));
         return;
     }
@@ -651,7 +653,7 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
     resolvedRequest.mixing = mixing;
     EmitLine(Batch::SerializePreviewEvent(request.jobId,
                                           resolvedRequest,
-                                          previewSink.LastPreview().value(),
+                                          *primaryPreview,
                                           &canonicalCoord));
 }
 

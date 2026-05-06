@@ -11,6 +11,7 @@ import GeyserConstraintEditor from "../src/features/search/GeyserConstraintEdito
 import MixingSelector from "../src/features/search/MixingSelector.tsx";
 import SearchActions from "../src/features/search/SearchActions.tsx";
 import WorldSelector from "../src/features/search/WorldSelector.tsx";
+import { encodeMixingFromLevels, MIXING_SLOT_COUNT } from "../src/features/search/searchSchema.ts";
 
 const GEYSERS = [
   { id: 1, key: "steam", name: "Steam" },
@@ -110,6 +111,25 @@ function MixingSelectorHarness() {
   return createElement(
     SearchFormHarness,
     null,
+    createElement(MixingSelector, {
+      mixingSlots: MIXING_SLOTS,
+      disabledMixingSlots: new Set([3]),
+    })
+  );
+}
+
+function MixingSelectorEnabledHarness() {
+  const levels = new Array(MIXING_SLOT_COUNT).fill(0);
+  levels[0] = 1;
+  levels[1] = 2;
+
+  return createElement(
+    SearchFormHarness,
+    {
+      defaultValues: {
+        mixing: encodeMixingFromLevels(levels),
+      },
+    },
     createElement(MixingSelector, {
       mixingSlots: MIXING_SLOTS,
       disabledMixingSlots: new Set([3]),
@@ -238,6 +258,15 @@ test("MixingSelector renders antd grouping shell", () => {
   assert.doesNotMatch(markup, /STRINGS\.SUBWORLDS\.GARDEN\.DESC/);
   assert.doesNotMatch(markup, /STRINGS\.SUBWORLDS\.RADIOACTIVE\.DESC/);
   assert.doesNotMatch(markup, /\[\d+\]\s*(森林|Forest|冰窟生态|Ice Cave Biome|放射生态|Radioactive)/);
+});
+
+test("MixingSelector keeps mode selector on biome rows but not DLC package rows", () => {
+  const markup = renderToStaticMarkup(createElement(MixingSelectorEnabledHarness));
+
+  assert.match(markup, /寒霜行星包/);
+  assert.match(markup, /Forest/);
+  assert.match(markup, /title="确保"/);
+  assert.doesNotMatch(markup, /寒霜行星包<\/span><\/label><div class="ant-select[^"]*"/);
 });
 
 test("GeyserConstraintEditor renders antd controls", () => {
