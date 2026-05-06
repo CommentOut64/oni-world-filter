@@ -524,6 +524,7 @@ std::string RunLegacySummaryOnly(AppRuntime *runtime,
                                  RecordingSink &sink,
                                  const std::string &code)
 {
+    runtime->SetResultSink(&sink);
     runtime->SetSkipPolygons(true);
     runtime->Initialize(0);
     sink.Reset();
@@ -537,6 +538,7 @@ std::string RunPreparedSummaryOnly(AppRuntime *runtime,
                                    RecordingSink &sink,
                                    const std::string &code)
 {
+    runtime->SetResultSink(&sink);
     sink.Reset();
     if (!runtime->ResetSearchSeed(code)) {
         return {};
@@ -584,7 +586,9 @@ std::string RunLegacySummaryOnFreshThread(const std::string &code)
     return fingerprint;
 }
 
-std::string RunLegacyBatchSearchOnce(const BatchCpu::CompiledSearchCpuPlan &plan)
+std::string RunLegacyBatchSearchOnce(const BatchCpu::CompiledSearchCpuPlan &plan,
+                                     int worldType,
+                                     int mixing)
 {
     Batch::SearchRequest request;
     request.seedStart = 0;
@@ -601,7 +605,7 @@ std::string RunLegacyBatchSearchOnce(const BatchCpu::CompiledSearchCpuPlan &plan
         g_batchSearchSink.SetActive(true);
         runtime->Initialize(0);
     };
-    request.evaluateSeed = [](int seed) {
+    request.evaluateSeed = [worldType, mixing](int seed) {
         Batch::SearchSeedEvaluation evaluation;
         auto *runtime = AppRuntime::Instance();
         runtime->SetResultSink(&g_batchSearchSink);
@@ -609,7 +613,7 @@ std::string RunLegacyBatchSearchOnce(const BatchCpu::CompiledSearchCpuPlan &plan
         g_batchSearchSink.SetActive(true);
         g_batchSearchSink.Reset();
 
-        const std::string code = BuildWorldCode(13, seed, 0);
+        const std::string code = BuildWorldCode(worldType, seed, mixing);
         runtime->Initialize(0);
         evaluation.generated = runtime->Generate(code, 0);
         if (evaluation.generated) {
@@ -692,6 +696,29 @@ int RunAllTests()
         Expect(!sink.previews.empty(),
                "legacy Generate path should continue emitting previews",
                failures);
+    }
+
+    {
+        const std::string code = BuildWorldCode(32, 0, 0);
+        runtime->SetSkipPolygons(false);
+        runtime->Initialize(0);
+        sink.Reset();
+        Expect(runtime->Generate(code, 0), "moonlet preview path should generate successfully", failures);
+        Expect(sink.previews.size() > 1,
+               "moonlet preview path should keep both primary and warp previews",
+               failures);
+        const GeneratedWorldPreview *primaryPreview = FindPrimaryGeneratedWorldPreview(sink.previews);
+        Expect(primaryPreview != nullptr,
+               "moonlet preview path should resolve a primary preview",
+               failures);
+        if (primaryPreview != nullptr) {
+            Expect(primaryPreview->summary.isPrimary,
+                   "moonlet primary preview should be marked as primary",
+                   failures);
+            Expect(primaryPreview->summary.worldPlacementIndex == 1,
+                   "moonlet primary preview should point at the start-world placement",
+                   failures);
+        }
     }
 
     {
@@ -852,9 +879,9 @@ int RunAllTests()
             FingerprintStartWorldSummaryAsBatchCapture(sink.summaries);
         const std::string mainThreadBatchCapture = RunLegacyBatchCaptureOnly(runtime, code);
         const std::string freshThreadBatchCapture = RunLegacyBatchCaptureOnFreshThread(code);
-        const std::string singleWorker = RunLegacyBatchSearchOnce(BuildBalancedPlan(1));
-        const std::string multiWorkerA = RunLegacyBatchSearchOnce(BuildActualBalancedPlan());
-        const std::string multiWorkerB = RunLegacyBatchSearchOnce(BuildActualBalancedPlan());
+        const std::string singleWorker = RunLegacyBatchSearchOnce(BuildBalancedPlan(1), 13, 0);
+        const std::string multiWorkerA = RunLegacyBatchSearchOnce(BuildActualBalancedPlan(), 13, 0);
+        const std::string multiWorkerB = RunLegacyBatchSearchOnce(BuildActualBalancedPlan(), 13, 0);
 
         Expect(!expected.empty(),
                "single-seed legacy summary fixture should not be empty",
@@ -903,6 +930,68 @@ int RunAllTests()
         ExpectEqual(multiWorkerB,
                     singleWorker,
                     "repeated multi-worker batch search should match single-worker baseline",
+                    failures);
+    }
+
+    {
+        const std::string code = BuildWorldCode(32, 0, 0);
+        const std::string expected = RunLegacySummaryOnly(runtime, sink, code);
+        const std::string freshThreadSummary = RunLegacySummaryOnFreshThread(code);
+        const std::string expectedStartWorldCapture =
+            FingerprintStartWorldSummaryAsBatchCapture(sink.summaries);
+        const std::string mainThreadBatchCapture = RunLegacyBatchCaptureOnly(runtime, code);
+        const std::string freshThreadBatchCapture = RunLegacyBatchCaptureOnFreshThread(code);
+        const std::string singleWorker = RunLegacyBatchSearchOnce(BuildBalancedPlan(1), 32, 0);
+        const std::string multiWorkerA = RunLegacyBatchSearchOnce(BuildActualBalancedPlan(), 32, 0);
+        const std::string multiWorkerB = RunLegacyBatchSearchOnce(BuildActualBalancedPlan(), 32, 0);
+
+        Expect(!expected.empty(),
+               "moonlet legacy summary fixture should not be empty",
+               failures);
+        Expect(!freshThreadSummary.empty(),
+               "moonlet fresh-thread legacy summary fingerprint should not be empty",
+               failures);
+        Expect(!expectedStartWorldCapture.empty(),
+               "moonlet start-world legacy summary fixture should not be empty",
+               failures);
+        Expect(!mainThreadBatchCapture.empty(),
+               "moonlet main-thread batch capture fingerprint should not be empty",
+               failures);
+        Expect(!freshThreadBatchCapture.empty(),
+               "moonlet fresh-thread batch capture fingerprint should not be empty",
+               failures);
+        Expect(!singleWorker.empty(),
+               "moonlet single-worker batch search fingerprint should not be empty",
+               failures);
+        Expect(!multiWorkerA.empty(),
+               "moonlet multi-worker batch search fingerprint A should not be empty",
+               failures);
+        Expect(!multiWorkerB.empty(),
+               "moonlet multi-worker batch search fingerprint B should not be empty",
+               failures);
+        ExpectEqual(freshThreadSummary,
+                    expected,
+                    "moonlet fresh-thread legacy summary should match main-thread legacy summary",
+                    failures);
+        ExpectEqual(mainThreadBatchCapture,
+                    expectedStartWorldCapture,
+                    "moonlet main-thread batch capture should match start-world legacy summary",
+                    failures);
+        ExpectEqual(freshThreadBatchCapture,
+                    expectedStartWorldCapture,
+                    "moonlet fresh-thread batch capture should match start-world legacy summary",
+                    failures);
+        ExpectEqual(singleWorker,
+                    expectedStartWorldCapture,
+                    "moonlet single-worker batch search should match start-world legacy summary",
+                    failures);
+        ExpectEqual(multiWorkerA,
+                    singleWorker,
+                    "moonlet multi-worker batch search should stay deterministic against single-worker baseline",
+                    failures);
+        ExpectEqual(multiWorkerB,
+                    singleWorker,
+                    "moonlet repeated multi-worker batch search should match single-worker baseline",
                     failures);
     }
 
