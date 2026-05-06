@@ -12,7 +12,7 @@ test("desktop release version has a single source synchronized to package metada
   const desktopPackage = JSON.parse(readText("desktop/package.json"));
   const cargoVersion = tauriCargo.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
 
-  assert.equal(releaseVersion, "0.0.1");
+  assert.equal(releaseVersion, "0.0.3");
   assert.equal(cargoVersion, releaseVersion);
   assert.equal(tauriConfig.version, releaseVersion);
   assert.equal(desktopPackage.version, releaseVersion);
@@ -33,7 +33,8 @@ test("desktop package identity is oni-world-filter everywhere", () => {
   assert.equal(tauriConfig.app.windows[0].title, "oni-world-filter");
   assert.equal(desktopPackage.name, "oni-world-filter");
   assert.match(indexHtml, /<title>oni-world-filter<\/title>/);
-  assert.match(buildScript, /oni-world-filter-\$Version-\$Variant-nsis/);
+  assert.match(buildScript, /oni-world-filter-\$Version-Setup/);
+  assert.match(buildScript, /oni-world-filter-\$Version-Portable-\$Variant/);
 });
 
 test("desktop build script synchronizes package versions before validation", () => {
@@ -54,9 +55,20 @@ test("nsis installer uses Chinese language and sidecar cleanup hook", () => {
   assert.deepEqual(nsis?.languages, ["SimpChinese"]);
   assert.equal(nsis?.installerHooks, "installer/nsis-hooks.nsh");
   assert.equal(nsis?.installMode, "both");
+  assert.equal(tauriConfig.app.windows[0].create, false);
   assert.match(hooks, /!macro NSIS_HOOK_POSTUNINSTALL/);
   assert.match(hooks, /\$LOCALAPPDATA\\\$\{BUNDLEID\}\\sidecars/);
   assert.match(hooks, /RMDir \/r/);
+});
+
+test("release verification expects setup installer and two portable archives", () => {
+  const verifyScript = readText("scripts/verify-desktop-release.ps1");
+
+  assert.match(verifyScript, /Setup\.exe/);
+  assert.match(verifyScript, /portable-standard/);
+  assert.match(verifyScript, /Portable-standard\.zip/);
+  assert.match(verifyScript, /portable-offline/);
+  assert.match(verifyScript, /Portable-offline\.zip/);
 });
 
 test("host debug no longer logs forwarded stdout events", () => {
