@@ -86,6 +86,15 @@ bool Expect(bool condition, const char *message, int &failures)
     return false;
 }
 
+int EncodeMixingFromLevels(const std::vector<int> &levels)
+{
+    int value = 0;
+    for (const int level : levels) {
+        value = value * 5 + level;
+    }
+    return value;
+}
+
 SearchAnalysis::SearchCatalog BuildMockCatalog()
 {
     SearchAnalysis::SearchCatalog catalog;
@@ -434,7 +443,7 @@ int RunAllTests()
         request.worldType = 1;
         request.seedStart = 100;
         request.seedEnd = 200;
-        request.mixing = 1;
+        request.mixing = EncodeMixingFromLevels({1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
 
         SearchAnalysis::WorldEnvelopeProfile profile;
         profile.valid = true;
@@ -447,6 +456,90 @@ int RunAllTests()
                                                               &profile);
         Expect(HasIssue(result.errors, "world.disabled_mixing_slot_enabled"),
                "enabled disabled mixing slot should be rejected in layer2",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.mixing = EncodeMixingFromLevels({1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0});
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.disabledMixingSlots = {6, 7, 8, 9, 10};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(!HasIssue(result.errors, "world.disabled_mixing_slot_enabled"),
+               "PRE-style disabled slots should not reject frost-side enabled slots",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.mixing = EncodeMixingFromLevels({0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1});
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.disabledMixingSlots = {6, 7, 8, 9, 10};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(HasIssue(result.errors, "world.disabled_mixing_slot_enabled"),
+               "PRE-style disabled slots should reject prehistoric-side enabled slots",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.mixing = EncodeMixingFromLevels({0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1});
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.disabledMixingSlots = {0, 1, 2, 3, 4};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(!HasIssue(result.errors, "world.disabled_mixing_slot_enabled"),
+               "CER-style disabled slots should not reject prehistoric-side enabled slots",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 100;
+        request.seedEnd = 200;
+        request.mixing = EncodeMixingFromLevels({1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0});
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.disabledMixingSlots = {0, 1, 2, 3, 4};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(HasIssue(result.errors, "world.disabled_mixing_slot_enabled"),
+               "CER-style disabled slots should reject frost-side enabled slots",
                failures);
     }
 
