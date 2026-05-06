@@ -237,7 +237,7 @@ bool AppRuntime::GenerateCurrentState(int traitsFlag, bool genWarpWorld)
             return false;
         }
 
-        auto summary = BuildSummary(seed, world, sites, traits, worldGen);
+        auto summary = BuildSummary(seed, static_cast<int>(i), world, sites, traits, worldGen);
         m_sink->OnGeneratedWorldSummary(summary);
         if (!m_skipPolygons) {
             auto preview = BuildPreview(world, sites, summary);
@@ -298,6 +298,7 @@ void AppRuntime::SetSeedWithTraits(const std::vector<World *> &worlds, int trait
 }
 
 GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
+                                               int worldPlacementIndex,
                                                World *world,
                                                std::vector<Site> &sites,
                                                const std::vector<const WorldTrait *> &traits,
@@ -305,7 +306,9 @@ GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
 {
     GeneratedWorldSummary summary;
     summary.seed = seed;
-    summary.worldType = (world->locationType == LocationType::StartWorld) ? 0 : 1;
+    summary.isPrimary = world->locationType == LocationType::StartWorld;
+    summary.worldType = summary.isPrimary ? 0 : 1;
+    summary.worldPlacementIndex = worldPlacementIndex;
     summary.start = {sites[0].x, sites[0].y};
     summary.worldSize = world->worldsize;
     summary.start.y = summary.worldSize.y - summary.start.y;

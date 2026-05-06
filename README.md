@@ -29,7 +29,7 @@ oniWorldApp is a local desktop tool for generating, searching, and previewing Ox
 
 ## Development Requirements
 
-These requirements only apply when running from source, developing, or building installers. End users installing a prebuilt installer do not need these development tools.
+These requirements only apply when running from source, developing, or building release artifacts. End users using prebuilt artifacts do not need these development tools.
 
 - Windows 10/11 x64
 - Visual Studio C++ x64 Build Tools
@@ -54,20 +54,29 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-desktop.ps1
 
 This script prepares the desktop frontend and local world-generation core, then starts the Tauri development environment.
 
-## Build Installers
+## Build Release Artifacts
 
-Generate Windows installers:
+Generate `Setup + Portable-standard + Portable-offline`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build-desktop.ps1 -Variant both
+powershell -ExecutionPolicy Bypass -File .\scripts\build-desktop.ps1 -Package all -Variant both
 ```
 
-Build outputs are written to `out/release/desktop/<version>/`. The project currently provides two installer variants:
+Build outputs are written to `out/release/desktop/<version>/`. The current release matrix is:
 
-- `standard`: smaller package, suitable for machines with WebView2 already installed or with network access to install the runtime.
-- `offline`: larger package with the WebView2 offline installer included, suitable for offline environments.
+- `installer/oni-world-filter-<version>-Setup.exe`
+- `portable-standard/oni-world-filter-<version>-Portable-standard.zip`
+- `portable-offline/oni-world-filter-<version>-Portable-offline.zip`
 
-Installers are currently unsigned by default, so Windows or security software may show additional prompts during installation.
+Notes:
+
+- `Setup` is the standard NSIS installer.
+- `Portable-standard` is a no-install portable package that keeps runtime state under `.\data\` and does not write to `AppData`.
+- `Portable-offline` adds a bundled WebView2 Fixed Runtime for offline machines.
+
+Before building `Portable-offline`, set `ONI_WEBVIEW2_FIXED_RUNTIME_DIR` to an extracted WebView2 Fixed Runtime directory on the build machine.
+
+Artifacts are unsigned by default, so Windows or security software may show additional prompts during launch or installation.
 
 ## Project Structure
 

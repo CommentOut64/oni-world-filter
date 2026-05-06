@@ -48,14 +48,14 @@ bool BatchCaptureSink::RequestResource(uint32_t expectedSize, std::vector<char> 
 
 void BatchCaptureSink::OnGeneratedWorldSummary(const GeneratedWorldSummary &summary)
 {
-    if (summary.worldType == 0) {
-        m_data.startX = summary.start.x;
-        m_data.startY = summary.start.y;
+    if (!summary.isPrimary) {
+        return;
     }
-    if (m_data.worldW == 0) {
-        m_data.worldW = summary.worldSize.x;
-        m_data.worldH = summary.worldSize.y;
-    }
+
+    m_data.startX = summary.start.x;
+    m_data.startY = summary.start.y;
+    m_data.worldW = summary.worldSize.x;
+    m_data.worldH = summary.worldSize.y;
 
     m_data.traits.clear();
     m_data.traits.reserve(summary.traits.size());

@@ -9,7 +9,7 @@ mod sidecar;
 mod state;
 
 use state::AppState;
-use tauri::{Manager, RunEvent};
+use tauri::{Manager, RunEvent, WebviewWindowBuilder};
 
 fn shutdown_runtime_sidecars(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
@@ -17,11 +17,55 @@ fn shutdown_runtime_sidecars(app: &tauri::AppHandle) {
     state.control_sidecar.reset();
 }
 
+fn configure_portable_webview_fixed_runtime() {
+    #[cfg(windows)]
+    {
+        let Some(app_root) = std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
+        else {
+            return;
+        };
+        if !app_root.join("portable.flag").is_file() {
+            return;
+        }
+        let fixed_runtime_dir = app_root
+            .join("resources")
+            .join("Microsoft.WebView2.FixedVersionRuntime");
+        if fixed_runtime_dir.is_dir() {
+            std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", fixed_runtime_dir);
+        }
+    }
+}
+
 fn main() {
+    configure_portable_webview_fixed_runtime();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(AppState::default())
+        .setup(|app| {
+            let Some(main_window_config) = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|window| window.label == "main")
+                .cloned()
+            else {
+                return Err(Box::<dyn std::error::Error>::from(
+                    "main window config not found",
+                ));
+            };
+
+            let mut main_window_builder =
+                WebviewWindowBuilder::from_config(app, &main_window_config)?;
+            if let Some(webview_data_dir) = app_paths::resolve_webview_data_dir(app.handle())? {
+                main_window_builder = main_window_builder.data_directory(webview_data_dir);
+            }
+            main_window_builder.build()?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::start_search,
             commands::cancel_search,

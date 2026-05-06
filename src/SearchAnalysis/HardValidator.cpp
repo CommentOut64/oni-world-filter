@@ -10,14 +10,15 @@ namespace SearchAnalysis {
 namespace {
 
 constexpr int kMixingMax = 48828124;
+constexpr int kMixingSlotCount = 11;
 
 int ReadMixingSlotLevel(int mixing, int slot)
 {
-    if (slot < 0) {
+    if (slot < 0 || slot >= kMixingSlotCount) {
         return 0;
     }
     int value = std::max(0, mixing);
-    for (int i = 0; i < slot; ++i) {
+    for (int i = 0; i < (kMixingSlotCount - 1 - slot); ++i) {
         value /= 5;
     }
     return value % 5;
