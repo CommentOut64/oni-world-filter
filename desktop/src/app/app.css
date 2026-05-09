@@ -105,6 +105,13 @@ body {
   font-family: var(--font-main);
 }
 
+body,
+#root,
+.ant-app {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 #root {
   min-height: 100vh;
 }
@@ -114,6 +121,13 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .ant-app {
@@ -926,6 +940,12 @@ textarea {
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg-card-soft);
+}
+
+.results-table-wrap,
+.results-table-wrap * {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* 消除 antd Table 内部各层的 padding/margin/border，确保表头紧贴外框 */

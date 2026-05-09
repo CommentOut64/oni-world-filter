@@ -6,6 +6,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
 Push-Location $repoRoot
 try {
+    Sync-AppIconAssets -RepoRoot $repoRoot
     Invoke-Yarn -Args @("--cwd", "desktop", "build")
 } finally {
     Pop-Location

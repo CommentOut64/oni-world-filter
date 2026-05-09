@@ -57,7 +57,12 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
   return (
     <section className="constraint-editor">
       <header className="constraint-editor-header distance-rule-header">
-        <Typography.Text strong>距离规则</Typography.Text>
+        <Typography.Text strong>
+          距离规则
+          <Typography.Text type="secondary" style={{ fontSize: "0.85em", fontWeight: "normal" }}>
+            （单位：格）
+          </Typography.Text>
+        </Typography.Text>
         <Typography.Text className="distance-rule-column-label">最小</Typography.Text>
         <Typography.Text className="distance-rule-column-label">最大</Typography.Text>
         <Button

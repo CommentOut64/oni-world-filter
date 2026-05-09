@@ -45,3 +45,12 @@ Desktop.ini
 /src-tauri/target/
 /src-tauri/gen/
 /src-tauri/binaries/
+
+# Generated image assets
+/src-tauri/icons/
+/desktop/public/*.png
+/desktop/public/*.jpg
+/desktop/public/*.jpeg
+/desktop/public/*.webp
+/desktop/public/*.gif
+/desktop/public/*.bmp
