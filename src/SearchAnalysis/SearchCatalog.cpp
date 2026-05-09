@@ -157,7 +157,7 @@ std::vector<ParameterSpec> BuildParameterSpecs()
     AddParameterSpec(&specs,
                      "traitCatalog",
                      "catalog",
-                     "trait 目录（本期只读，不参与搜索约束）",
+                     "trait 目录（本期只读，不作为显式搜索字段；其生成影响会隐式进入 world envelope 分析）",
                      "searchable=false",
                      false,
                      "asset/worldgen/traits/*.json");

@@ -2,6 +2,7 @@
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -45,6 +46,11 @@ bool HasAllSlots(const std::vector<int> &slots, const std::vector<int> &expected
         }
     }
     return true;
+}
+
+bool Contains(const std::vector<std::string> &items, const char *value)
+{
+    return std::find(items.begin(), items.end(), value) != items.end();
 }
 
 } // namespace
@@ -111,6 +117,45 @@ int RunAllTests()
         Expect(profile.valid, "PRE profile should be valid", failures);
         Expect(HasAllSlots(profile.disabledMixingSlots, {6, 7, 8, 9, 10}),
                "PRE profile should disable slots 6..10",
+               failures);
+    }
+
+    {
+        const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 28, 0);
+        Expect(profile.valid, "PRE-C profile should be valid", failures);
+        Expect(Contains(profile.possibleGeyserTypes, "molten_iron"),
+               "PRE-C profile should include GeoActive generic metal geysers",
+               failures);
+        Expect(Contains(profile.possibleGeyserTypes, "small_volcano"),
+               "PRE-C profile should include GeoActive generic volcano geysers",
+               failures);
+        Expect(Contains(profile.possibleGeyserTypes, "liquid_sulfur"),
+               "PRE-C profile should include SpaceOut generic-only sulfur geyser",
+               failures);
+        Expect(!Contains(profile.impossibleGeyserTypes, "molten_iron"),
+               "PRE-C profile should not mark GeoActive metal geysers impossible",
+               failures);
+    }
+
+    {
+        const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 29, 0);
+        Expect(profile.valid, "CER-C profile should be valid", failures);
+        Expect(Contains(profile.possibleGeyserTypes, "big_volcano"),
+               "CER-C profile should include Volcanoes trait volcanoes",
+               failures);
+        Expect(Contains(profile.possibleGeyserTypes, "molten_gold"),
+               "CER-C profile should include GeoActive generic metals",
+               failures);
+    }
+
+    {
+        const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 34, 0);
+        Expect(profile.valid, "M-FRZ-C profile should be valid", failures);
+        Expect(Contains(profile.possibleGeyserTypes, "big_volcano"),
+               "M-FRZ-C profile should include Volcanoes trait volcanoes",
+               failures);
+        Expect(Contains(profile.impossibleGeyserTypes, "molten_iron"),
+               "M-FRZ-C profile should still keep generic metals impossible",
                failures);
     }
 
