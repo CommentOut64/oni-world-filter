@@ -7,6 +7,8 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8DB?logo=tauri&logoColor=white)
 
+<img src="./public/00.png" width="100%" alt="oniWorldApp 预览">
+
 oniWorldApp 是一个本地桌面工具，用于生成、搜索和预览《缺氧》的世界种子。项目复用 C++ 世界生成核心，并通过 Tauri 与 React 提供 Windows 桌面界面。
 
 ## 主要功能

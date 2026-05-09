@@ -10,6 +10,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 . (Join-Path $PSScriptRoot "lib/desktop-bootstrap.ps1")
@@ -128,6 +129,33 @@ function Resolve-WebView2FixedRuntimeSource {
     return $resolved
 }
 
+function New-ZipArchiveFromDirectory {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceDirectory,
+        [Parameter(Mandatory = $true)][string]$DestinationPath
+    )
+
+    if (-not (Test-Path -LiteralPath $SourceDirectory -PathType Container)) {
+        throw "Zip source directory not found: $SourceDirectory"
+    }
+
+    $destinationDirectory = Split-Path -Parent $DestinationPath
+    if (-not [string]::IsNullOrWhiteSpace($destinationDirectory) -and -not (Test-Path -LiteralPath $destinationDirectory)) {
+        New-Item -ItemType Directory -Path $destinationDirectory | Out-Null
+    }
+
+    if (Test-Path -LiteralPath $DestinationPath) {
+        Remove-Item -LiteralPath $DestinationPath -Force
+    }
+
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $SourceDirectory,
+        $DestinationPath,
+        [System.IO.Compression.CompressionLevel]::Optimal,
+        $false
+    )
+}
+
 function New-PortableStageDirectory {
     param(
         [Parameter(Mandatory = $true)][ValidateSet("standard", "offline")][string]$Variant,
@@ -192,12 +220,7 @@ function Publish-PortableArtifacts {
     New-Item -ItemType Directory -Path $variantDirectory | Out-Null
 
     $archivePath = Join-Path $variantDirectory "oni-world-filter-$Version-Portable-$Variant.zip"
-    Push-Location $stageRoot
-    try {
-        Compress-Archive -LiteralPath (Split-Path -Leaf $packageRoot) -DestinationPath $archivePath -Force
-    } finally {
-        Pop-Location
-    }
+    New-ZipArchiveFromDirectory -SourceDirectory $packageRoot -DestinationPath $archivePath
 
     return $archivePath
 }

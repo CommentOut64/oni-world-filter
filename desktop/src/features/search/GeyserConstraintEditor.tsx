@@ -4,10 +4,10 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import type { GeyserOption } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { sortGeyserOptionsByAvailability } from "../../lib/geyserOrdering.ts";
 import {
-  buildGeyserOptionAvailability,
-  collectSiblingSelectedGeysers,
-  findFirstAvailableGeyser,
+  buildSectionGeyserOptionAvailability,
+  findFirstAvailableGeyserForSection,
 } from "./geyserConstraintOptions";
 import type { SearchFormValues } from "./searchSchema";
 
@@ -31,37 +31,35 @@ export default function GeyserConstraintEditor({
   } = useFormContext<SearchFormValues>();
   const required = useWatch({ control, name: "required" }) ?? [];
   const forbidden = useWatch({ control, name: "forbidden" }) ?? [];
+  const distance = useWatch({ control, name: "distance" }) ?? [];
+  const count = useWatch({ control, name: "count" }) ?? [];
   const { fields, append, remove } = useFieldArray({
     control,
     name: type,
   });
 
   const fieldErrors = errors[type];
-  const currentRows = type === "required" ? required : forbidden;
-  const oppositeRows = type === "required" ? forbidden : required;
-  const oppositeSelected = collectSiblingSelectedGeysers(oppositeRows);
-  const distance = useWatch({ control, name: "distance" }) ?? [];
-  const blockers =
-    type === "required"
-      ? [
-          {
-            keys: oppositeSelected,
-            reason: "已在必须排除中",
-          },
-        ]
-      : [
-          {
-            keys: oppositeSelected,
-            reason: "已在必须包含中",
-          },
-          {
-            keys: collectSiblingSelectedGeysers(distance),
-            reason: "已存在距离规则",
-          },
-        ];
-  const firstEnabledGeyser = findFirstAvailableGeyser({
+  const baseAvailability = buildSectionGeyserOptionAvailability({
+    section: type,
     geyserKeys: geysers.map((item) => item.key),
-    blockers,
+    constraints: {
+      required,
+      forbidden,
+      distance,
+      count,
+    },
+    worldDisabledKeys: disabledGeyserKeys,
+  });
+  const orderedBaseGeysers = sortGeyserOptionsByAvailability(geysers, baseAvailability);
+  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+    section: type,
+    geyserKeys: orderedBaseGeysers.map((item) => item.key),
+    constraints: {
+      required,
+      forbidden,
+      distance,
+      count,
+    },
     worldDisabledKeys: disabledGeyserKeys,
   });
 
@@ -80,35 +78,45 @@ export default function GeyserConstraintEditor({
       </header>
       {fields.length === 0 ? <Typography.Text className="hint">暂无规则</Typography.Text> : null}
       {fields.map((field, index) => {
-        const availability = buildGeyserOptionAvailability({
-          geyserKeys: geysers.map((item) => item.key),
-          currentValue: currentRows[index]?.geyser ?? "",
-          blockers,
-          worldDisabledKeys: disabledGeyserKeys,
-        });
-
         return (
           <div className="constraint-row" key={field.id}>
             <Controller
               control={control}
               name={`${type}.${index}.geyser` as const}
-              render={({ field: controllerField }) => (
-                <Select
-                  className="constraint-select"
-                  placeholder="请选择喷口"
-                  value={controllerField.value || undefined}
-                  options={geysers.map((item) => ({
-                    label: `${formatGeyserNameByKey(item.key)}${
-                      availability[item.key] ? ` (${availability[item.key]})` : ""
-                    }`,
-                    value: item.key,
-                    disabled: availability[item.key] !== null,
-                  }))}
-                  onChange={controllerField.onChange}
-                />
-              )}
+              render={({ field: controllerField }) => {
+                const availability = buildSectionGeyserOptionAvailability({
+                  section: type,
+                  geyserKeys: geysers.map((item) => item.key),
+                  currentValue: controllerField.value ?? "",
+                  constraints: {
+                    required,
+                    forbidden,
+                    distance,
+                    count,
+                  },
+                  worldDisabledKeys: disabledGeyserKeys,
+                });
+                const orderedOptions = sortGeyserOptionsByAvailability(geysers, availability);
+
+                return (
+                  <Select
+                    className="constraint-select"
+                    size="small"
+                    placeholder="请选择喷口"
+                    value={controllerField.value || undefined}
+                    options={orderedOptions.map((item) => ({
+                      label: `${formatGeyserNameByKey(item.key)}${
+                        availability[item.key] ? ` (${availability[item.key]})` : ""
+                      }`,
+                      value: item.key,
+                      disabled: availability[item.key] !== null,
+                    }))}
+                    onChange={controllerField.onChange}
+                  />
+                );
+              }}
             />
-            <Button htmlType="button" onClick={() => remove(index)}>
+            <Button htmlType="button" size="small" onClick={() => remove(index)}>
               删除
             </Button>
             {fieldErrors?.[index]?.geyser ? (

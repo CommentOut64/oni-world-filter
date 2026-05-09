@@ -106,6 +106,107 @@ int ComputeRuleMaxPerExecution(const TemplateSpawnRules &rule)
     return 0;
 }
 
+std::vector<const WorldTrait *> BuildTraitSelectionPool(const SettingsCache &settings)
+{
+    std::vector<const WorldTrait *> total;
+    total.reserve(settings.traits.size());
+    for (const auto &pair : settings.traits) {
+        if (pair.first.empty() || pair.first[0] != 't') {
+            continue;
+        }
+        if (settings.IsSpaceOutEnabled() && pair.second.ForbiddenSpaceOut()) {
+            continue;
+        }
+        total.push_back(&pair.second);
+    }
+    if (!settings.IsSpaceOutEnabled()) {
+        return total;
+    }
+    for (const auto &pair : settings.traits) {
+        if (pair.first.empty() || pair.first[0] != 'e') {
+            continue;
+        }
+        total.push_back(&pair.second);
+    }
+    return total;
+}
+
+const WorldTrait *FindTraitByPath(const std::vector<const WorldTrait *> &traits,
+                                  const std::string &filePath)
+{
+    const auto itr = std::ranges::find(traits, filePath, &WorldTrait::filePath);
+    return (itr == traits.end()) ? nullptr : *itr;
+}
+
+bool TraitAffectsEnvelope(const WorldTrait &trait)
+{
+    return !trait.additionalSubworldFiles.empty() ||
+           !trait.additionalUnknownCellFilters.empty() ||
+           !trait.additionalWorldTemplateRules.empty() ||
+           !trait.removeWorldTemplateRulesById.empty();
+}
+
+bool RuleAllowsTrait(const TraitRule &rule, const WorldTrait &trait, const World &world)
+{
+    if (!rule.requiredTags.empty() &&
+        !std::ranges::all_of(
+            trait.traitTags, [&rule](const std::string &elem) {
+                return std::ranges::contains(rule.requiredTags, elem);
+            })) {
+        return false;
+    }
+    if (!rule.forbiddenTags.empty() &&
+        std::ranges::any_of(
+            trait.traitTags, [&rule](const std::string &elem) {
+                return std::ranges::contains(rule.forbiddenTags, elem);
+            })) {
+        return false;
+    }
+    if (std::ranges::contains(rule.forbiddenTraits, trait.filePath)) {
+        return false;
+    }
+    return trait.IsValid(world);
+}
+
+std::vector<const WorldTrait *> CollectPotentialEnvelopeTraits(const SettingsCache &settings,
+                                                              const World &world)
+{
+    std::vector<const WorldTrait *> result;
+    if (world.disableWorldTraits || world.worldTraitRules.empty()) {
+        return result;
+    }
+
+    const auto total = BuildTraitSelectionPool(settings);
+    std::set<std::string> dedup;
+    auto tryAppend = [&](const WorldTrait *trait) {
+        if (trait == nullptr || !TraitAffectsEnvelope(*trait)) {
+            return;
+        }
+        if (!dedup.insert(trait->filePath).second) {
+            return;
+        }
+        result.push_back(trait);
+    };
+
+    for (const auto &rule : world.worldTraitRules) {
+        for (const auto &specificTrait : rule.specificTraits) {
+            tryAppend(FindTraitByPath(total, specificTrait));
+        }
+
+        if (rule.min <= 0 && rule.max <= 0) {
+            continue;
+        }
+
+        for (const auto *trait : total) {
+            if (trait == nullptr || !RuleAllowsTrait(rule, *trait, world)) {
+                continue;
+            }
+            tryAppend(trait);
+        }
+    }
+    return result;
+}
+
 std::vector<World *> CollectClusterWorlds(SettingsCache *settings)
 {
     std::vector<World *> worlds;
@@ -652,9 +753,17 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
         }
     }
 
-    BuildGeyserEnvelope(settings, *targetWorld, &profile);
+    World analysisWorld = *targetWorld;
+    for (const auto *trait : CollectPotentialEnvelopeTraits(settings, analysisWorld)) {
+        if (trait == nullptr) {
+            continue;
+        }
+        analysisWorld.ApplayTraits(*trait, settings);
+    }
+
+    BuildGeyserEnvelope(settings, analysisWorld, &profile);
     if (options.includeSpatialEnvelopes) {
-        BuildSpatialEnvelopes(settings, *targetWorld, &profile);
+        BuildSpatialEnvelopes(settings, analysisWorld, &profile);
     } else {
         profile.spatialEnvelopes.push_back(SpatialEnvelope{
             .envelopeId = "global",

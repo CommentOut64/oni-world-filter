@@ -121,6 +121,15 @@ int RunAllTests()
         }
         return false;
     };
+    auto HasWarning = [](const std::vector<SearchAnalysis::ValidationIssue> &issues,
+                         const char *code) {
+        for (const auto &issue : issues) {
+            if (issue.code == code) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     {
         SearchAnalysis::SearchAnalysisRequest request;
@@ -175,6 +184,104 @@ int RunAllTests()
                    "distance-only normalize should preserve distance rule",
                    failures);
         }
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 0, .maxCount = 0},
+        };
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "range.count_min_less_than_one"),
+               "count.min=0 should be rejected in layer1",
+               failures);
+        Expect(HasIssue(result.errors, "range.count_max_less_than_one"),
+               "count.max=0 should be rejected in layer1",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.required = {"hot_water"};
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 1, .maxCount = 2},
+        };
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "conflict.required_with_count"),
+               "required + count should be rejected in layer3",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.required = {"hot_water"};
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 80.0},
+        };
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "conflict.required_with_distance"),
+               "required + distance should be rejected in layer3",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.forbidden = {"hot_water"};
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 1, .maxCount = 2},
+        };
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "conflict.forbidden_with_count"),
+               "forbidden + count should be rejected in layer3",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.count = {
+            {.geyserId = "hot_water", .minCount = 1, .maxCount = 2},
+        };
+        request.constraints.distance = {
+            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 80.0},
+        };
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 400.0;
+        profile.possibleMaxCountByType["hot_water"] = 3;
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(!HasIssue(result.errors, "conflict.required_with_count"),
+               "count + distance should remain legal",
+               failures);
+        Expect(!HasIssue(result.errors, "conflict.required_with_distance"),
+               "count + distance should not be mistaken for required conflict",
+               failures);
+        Expect(!HasIssue(result.errors, "conflict.forbidden_with_distance"),
+               "count + distance should not be mistaken for forbidden conflict",
+               failures);
     }
 
     {
@@ -417,12 +524,7 @@ int RunAllTests()
         request.worldType = 1;
         request.seedStart = 100;
         request.seedEnd = 200;
-        request.constraints.distance = {
-            {.geyserId = "hot_water", .minDist = 0.0, .maxDist = 50.0},
-        };
-        request.constraints.count = {
-            {.geyserId = "hot_water", .minCount = 0, .maxCount = 0},
-        };
+        request.constraints.forbidden = {"methane"};
 
         SearchAnalysis::WorldEnvelopeProfile profile;
         profile.valid = true;
@@ -433,8 +535,11 @@ int RunAllTests()
         const auto result = SearchAnalysis::RunSearchAnalysis(request,
                                                               BuildMockCatalog(),
                                                               &profile);
-        Expect(HasIssue(result.errors, "conflict.forbidden_with_distance"),
-               "count.max=0 with distance should be treated as forbidden conflict",
+        Expect(result.errors.empty(),
+               "forbidden-only impossible geyser should not become a hard error",
+               failures);
+        Expect(HasWarning(result.warnings, "world.forbidden_geyser_already_impossible"),
+               "forbidden-only impossible geyser should become a warning",
                failures);
     }
 
