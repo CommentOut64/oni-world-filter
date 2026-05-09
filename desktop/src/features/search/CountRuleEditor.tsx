@@ -4,6 +4,7 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import type { GeyserOption } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { sortGeyserOptionsByAvailability } from "../../lib/geyserOrdering.ts";
 import {
   buildSectionGeyserOptionAvailability,
   findFirstAvailableGeyserForSection,
@@ -47,9 +48,21 @@ export default function CountRuleEditor({ geysers, disabledGeyserKeys }: CountRu
     control,
     name: "count",
   });
-  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+  const baseAvailability = buildSectionGeyserOptionAvailability({
     section: "count",
     geyserKeys: geysers.map((item) => item.key),
+    constraints: {
+      required,
+      forbidden,
+      distance,
+      count: countRules,
+    },
+    worldDisabledKeys: disabledGeyserKeys,
+  });
+  const orderedBaseGeysers = sortGeyserOptionsByAvailability(geysers, baseAvailability);
+  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+    section: "count",
+    geyserKeys: orderedBaseGeysers.map((item) => item.key),
     constraints: {
       required,
       forbidden,
@@ -101,6 +114,7 @@ export default function CountRuleEditor({ geysers, disabledGeyserKeys }: CountRu
                   },
                   worldDisabledKeys: disabledGeyserKeys,
                 });
+                const orderedOptions = sortGeyserOptionsByAvailability(geysers, availability);
 
                 return (
                   <Select
@@ -108,7 +122,7 @@ export default function CountRuleEditor({ geysers, disabledGeyserKeys }: CountRu
                     size="small"
                     placeholder="请选择喷口"
                     value={controllerField.value || undefined}
-                    options={geysers.map((item) => ({
+                    options={orderedOptions.map((item) => ({
                       label: `${formatGeyserNameByKey(item.key)}${
                         availability[item.key] ? ` (${availability[item.key]})` : ""
                       }`,

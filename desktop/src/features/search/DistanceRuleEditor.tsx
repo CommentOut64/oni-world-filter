@@ -4,6 +4,7 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import type { GeyserOption } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { sortGeyserOptionsByAvailability } from "../../lib/geyserOrdering.ts";
 import {
   buildSectionGeyserOptionAvailability,
   findFirstAvailableGeyserForSection,
@@ -29,9 +30,21 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
     control,
     name: "distance",
   });
-  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+  const baseAvailability = buildSectionGeyserOptionAvailability({
     section: "distance",
     geyserKeys: geysers.map((item) => item.key),
+    constraints: {
+      required,
+      forbidden,
+      distance: distanceRules,
+      count,
+    },
+    worldDisabledKeys: disabledGeyserKeys,
+  });
+  const orderedBaseGeysers = sortGeyserOptionsByAvailability(geysers, baseAvailability);
+  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+    section: "distance",
+    geyserKeys: orderedBaseGeysers.map((item) => item.key),
     constraints: {
       required,
       forbidden,
@@ -82,6 +95,7 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
                   },
                   worldDisabledKeys: disabledGeyserKeys,
                 });
+                const orderedOptions = sortGeyserOptionsByAvailability(geysers, availability);
 
                 return (
                   <Select
@@ -89,7 +103,7 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
                     size="small"
                     placeholder="请选择喷口"
                     value={controllerField.value || undefined}
-                    options={geysers.map((item) => ({
+                    options={orderedOptions.map((item) => ({
                       label: `${formatGeyserNameByKey(item.key)}${
                         availability[item.key] ? ` (${availability[item.key]})` : ""
                       }`,

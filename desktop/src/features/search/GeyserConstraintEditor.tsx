@@ -4,6 +4,7 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import type { GeyserOption } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { sortGeyserOptionsByAvailability } from "../../lib/geyserOrdering.ts";
 import {
   buildSectionGeyserOptionAvailability,
   findFirstAvailableGeyserForSection,
@@ -38,9 +39,21 @@ export default function GeyserConstraintEditor({
   });
 
   const fieldErrors = errors[type];
-  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+  const baseAvailability = buildSectionGeyserOptionAvailability({
     section: type,
     geyserKeys: geysers.map((item) => item.key),
+    constraints: {
+      required,
+      forbidden,
+      distance,
+      count,
+    },
+    worldDisabledKeys: disabledGeyserKeys,
+  });
+  const orderedBaseGeysers = sortGeyserOptionsByAvailability(geysers, baseAvailability);
+  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+    section: type,
+    geyserKeys: orderedBaseGeysers.map((item) => item.key),
     constraints: {
       required,
       forbidden,
@@ -83,6 +96,7 @@ export default function GeyserConstraintEditor({
                   },
                   worldDisabledKeys: disabledGeyserKeys,
                 });
+                const orderedOptions = sortGeyserOptionsByAvailability(geysers, availability);
 
                 return (
                   <Select
@@ -90,7 +104,7 @@ export default function GeyserConstraintEditor({
                     size="small"
                     placeholder="请选择喷口"
                     value={controllerField.value || undefined}
-                    options={geysers.map((item) => ({
+                    options={orderedOptions.map((item) => ({
                       label: `${formatGeyserNameByKey(item.key)}${
                         availability[item.key] ? ` (${availability[item.key]})` : ""
                       }`,
