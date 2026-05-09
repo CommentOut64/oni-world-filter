@@ -3,6 +3,7 @@ import { Card, Descriptions, Empty, Tag } from "antd";
 
 import { formatGeyserNameFromSummary, formatPlayerBiomeNameByZoneType } from "../../lib/displayResolvers";
 import type { PreviewPayload } from "../../lib/contracts";
+import { resolveTraitDisplayName } from "../../lib/traitDisplayResolvers";
 import { useSearchStore } from "../../state/searchStore";
 
 interface PreviewDetailsProps {
@@ -11,10 +12,6 @@ interface PreviewDetailsProps {
   selectedRegion: { id: string; zoneType: number } | null;
   hoverGeyserIndex: number | null;
   selectedGeyserIndex: number | null;
-}
-
-function traitLabel(trait: number): string {
-  return `trait#${trait}`;
 }
 
 export default function PreviewDetails({
@@ -26,6 +23,7 @@ export default function PreviewDetails({
 }: PreviewDetailsProps) {
   void React;
   const geysers = useSearchStore((state) => state.geysers);
+  const catalog = useSearchStore((state) => state.catalog);
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
 
   if (!preview) {
@@ -42,6 +40,9 @@ export default function PreviewDetails({
     focusRegion === null ? null : formatPlayerBiomeNameByZoneType(focusRegion.zoneType);
   const focusGeyser =
     focusIndex === null ? null : preview.summary.geysers[focusIndex] ?? null;
+  const traitNames = preview.summary.traits.map((traitIndex) =>
+    resolveTraitDisplayName(traitIndex, catalog)
+  );
   const focusDistance =
     focusGeyser === null
       ? null
@@ -83,9 +84,7 @@ export default function PreviewDetails({
           {
             key: "traits",
             label: "特质",
-            children: preview.summary.traits.length
-              ? preview.summary.traits.map(traitLabel).join(", ")
-              : "-",
+            children: traitNames.length ? traitNames.join("、") : "-",
           },
           {
             key: "region",
