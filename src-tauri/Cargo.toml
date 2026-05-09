@@ -1,6 +1,6 @@
 [package]
 name = "oni-world-filter"
-version = "0.0.3"
+version = "0.0.4"
 description = "oni-world-filter desktop host"
 authors = ["wgh"]
 license = "MIT"

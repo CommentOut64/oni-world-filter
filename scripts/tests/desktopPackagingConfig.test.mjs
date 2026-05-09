@@ -12,7 +12,7 @@ test("desktop release version has a single source synchronized to package metada
   const desktopPackage = JSON.parse(readText("desktop/package.json"));
   const cargoVersion = tauriCargo.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
 
-  assert.equal(releaseVersion, "0.0.3");
+  assert.equal(releaseVersion, "0.0.4");
   assert.equal(cargoVersion, releaseVersion);
   assert.equal(tauriConfig.version, releaseVersion);
   assert.equal(desktopPackage.version, releaseVersion);
@@ -69,6 +69,14 @@ test("release verification expects setup installer and two portable archives", (
   assert.match(verifyScript, /Portable-standard\.zip/);
   assert.match(verifyScript, /portable-offline/);
   assert.match(verifyScript, /Portable-offline\.zip/);
+});
+
+test("portable packaging uses .NET ZipFile instead of Compress-Archive", () => {
+  const buildScript = readText("scripts/build-desktop.ps1");
+
+  assert.match(buildScript, /System\.IO\.Compression\.ZipFile/);
+  assert.match(buildScript, /CreateFromDirectory/);
+  assert.doesNotMatch(buildScript, /Compress-Archive/);
 });
 
 test("host debug no longer logs forwarded stdout events", () => {

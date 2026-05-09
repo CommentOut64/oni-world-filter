@@ -1,14 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="planet1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4facfe"/>
-      <stop offset="100%" style="stop-color:#00f2fe"/>
-    </linearGradient>
-  </defs>
-  <circle cx="256" cy="256" r="194" fill="url(#planet1)" opacity="0.98"/>
-  <ellipse cx="256" cy="256" rx="248" ry="72" fill="none" stroke="#00f2fe" stroke-width="22" opacity="0.82" transform="rotate(-20 256 256)"/>
-  <ellipse cx="256" cy="256" rx="270" ry="88" fill="none" stroke="#4facfe" stroke-width="12" opacity="0.42" transform="rotate(-20 256 256)"/>
-  <circle cx="186" cy="204" r="34" fill="rgba(255,255,255,0.18)"/>
-  <circle cx="316" cy="290" r="22" fill="rgba(255,255,255,0.12)"/>
-  <circle cx="232" cy="334" r="15" fill="rgba(255,255,255,0.10)"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#58a6ff" d="M5 3c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm10.78 2H19v12.18c-.26-.8-1.31-1.39-2.2-1.39h-1v-3a1 1 0 0 0-1-1h-6v-2h2a1 1 0 0 0 1-1v-2h2c1.03 0 1.87-.79 1.98-1.79M5 10.29l4.8 4.5v1a2 2 0 0 0 2 2V19H5z"/></svg>
