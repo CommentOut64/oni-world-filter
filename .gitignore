@@ -45,3 +45,16 @@ Desktop.ini
 /src-tauri/target/
 /src-tauri/gen/
 /src-tauri/binaries/
+
+# Ignore heavy image resources (keep SVG trackable)
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.ico
+*.icns
+src-tauri/icons/android/
