@@ -11,7 +11,11 @@ import GeyserConstraintEditor from "../src/features/search/GeyserConstraintEdito
 import MixingSelector from "../src/features/search/MixingSelector.tsx";
 import SearchActions from "../src/features/search/SearchActions.tsx";
 import WorldSelector from "../src/features/search/WorldSelector.tsx";
-import { encodeMixingFromLevels, MIXING_SLOT_COUNT } from "../src/features/search/searchSchema.ts";
+import {
+  COUNT_MAX_SENTINEL,
+  encodeMixingFromLevels,
+  MIXING_SLOT_COUNT,
+} from "../src/features/search/searchSchema.ts";
 
 const GEYSERS = [
   { id: 1, key: "steam", name: "Steam" },
@@ -146,7 +150,7 @@ function GeyserConstraintHarness() {
       },
     },
     createElement(GeyserConstraintEditor, {
-      title: "必须包含(required)",
+      title: "必须包含",
       type: "required",
       geysers: GEYSERS,
     })
@@ -172,7 +176,7 @@ function CountRuleHarness() {
     SearchFormHarness,
     {
       defaultValues: {
-        count: [{ geyser: "steam", minCount: 0, maxCount: 1 }],
+        count: [{ geyser: "steam", minCount: 1, maxCount: COUNT_MAX_SENTINEL }],
       },
     },
     createElement(CountRuleEditor, {
@@ -273,12 +277,17 @@ test("GeyserConstraintEditor renders antd controls", () => {
   const markup = renderToStaticMarkup(createElement(GeyserConstraintHarness));
 
   assert.match(markup, /ant-select/);
+  assert.match(markup, /ant-select-sm/);
   assert.match(markup, /ant-btn/);
 });
 
 test("DistanceRuleEditor renders antd numeric inputs", () => {
   const markup = renderToStaticMarkup(createElement(DistanceRuleHarness));
 
+  assert.match(markup, /最小/);
+  assert.match(markup, /最大/);
+  assert.match(markup, /ant-select-sm/);
+  assert.match(markup, /ant-input-number-sm/);
   assert.match(markup, /ant-input-number/);
   assert.match(markup, /ant-btn/);
 });
@@ -286,6 +295,16 @@ test("DistanceRuleEditor renders antd numeric inputs", () => {
 test("CountRuleEditor renders antd numeric inputs", () => {
   const markup = renderToStaticMarkup(createElement(CountRuleHarness));
 
+  assert.match(markup, /必须包含/);
+  assert.match(markup, /最小/);
+  assert.match(markup, /最大/);
+  assert.doesNotMatch(markup, /数量规则/);
+  assert.match(markup, /Max/);
+  assert.match(markup, /max-toggle-button/);
+  assert.match(markup, /ant-select-sm/);
+  assert.match(markup, /ant-btn-sm"><span>删 除<\/span><\/button>/);
+  assert.doesNotMatch(markup, /constraint-number-group/);
+  assert.match(markup, /ant-input-number-sm/);
   assert.match(markup, /ant-input-number/);
   assert.match(markup, /ant-btn/);
 });
