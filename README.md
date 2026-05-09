@@ -8,6 +8,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8DB?logo=tauri&logoColor=white)
 
+<img src="./public/00.png" width="100%" alt="oniWorldApp Preview">
 
 oniWorldApp is a local desktop tool for generating, searching, and previewing Oxygen Not Included world seeds. It reuses the C++ world-generation core and provides a Windows desktop interface through Tauri and React.
 
