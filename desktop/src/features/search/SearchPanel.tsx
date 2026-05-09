@@ -1,5 +1,4 @@
 import {
-  Alert,
   Card,
   Checkbox,
   Flex,
@@ -30,12 +29,16 @@ import MixingSelector from "./MixingSelector";
 import CoordQuickSearch from "./CoordQuickSearch";
 import { runCoordPreviewFlow } from "./coordPreviewFlow";
 import SearchActions from "./SearchActions";
+import SearchConstraintAlerts from "./SearchConstraintAlerts";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
+import { buildWorldConstraintAlertItems } from "./geyserConstraintPresentation.ts";
 import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay";
 import { shouldShowSearchWarningConfirmation } from "./searchWarningPolicy";
 import {
+  COUNT_MAX_SENTINEL,
   createSearchSchema,
   getDefaultAllowLowPerfForCpuMode,
+  resolveCountAutoMax,
   toSearchDraft,
   toSearchFormValues,
   type SearchFormValues,
@@ -47,6 +50,40 @@ interface SearchPanelProps {
   onThemeModeChange: (mode: DesktopThemeMode) => void;
   onSearchStarted?: () => void;
   onViewResults?: () => void;
+}
+
+async function loadWorldProfile(worldType: number, mixing: number): Promise<SearchAnalysisPayload["worldProfile"]> {
+  const analysis = await analyzeSearchRequest({
+    jobId: `analyze-profile-${Date.now()}`,
+    worldType,
+    seedStart: 0,
+    seedEnd: 0,
+    mixing,
+    constraints: {
+      required: [],
+      forbidden: [],
+      distance: [],
+      count: [],
+    },
+  });
+  return analysis.worldProfile;
+}
+
+function hasCountAutoMax(draft: SearchDraft): boolean {
+  return draft.constraints.count.some((item) => item.maxCount === COUNT_MAX_SENTINEL);
+}
+
+function hasCompletePossibleMaxMap(
+  draft: SearchDraft,
+  possibleMaxCountByType: Record<string, number>
+): boolean {
+  return draft.constraints.count.every((item) => {
+    if (item.maxCount !== COUNT_MAX_SENTINEL) {
+      return true;
+    }
+    const possibleMax = possibleMaxCountByType[item.geyser];
+    return Number.isInteger(possibleMax) && possibleMax >= 0;
+  });
 }
 
 export default function SearchPanel({
@@ -86,14 +123,33 @@ export default function SearchPanel({
   const [isSearchSubmitting, setIsSearchSubmitting] = useState(false);
   const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
   const [disabledMixingSlots, setDisabledMixingSlots] = useState<Set<number>>(new Set());
+  const [possibleMaxCountByType, setPossibleMaxCountByType] = useState<Record<string, number>>({});
   const [pendingWarningConfirmation, setPendingWarningConfirmation] = useState<{
-    draft: SearchDraft;
+    uiDraft: SearchDraft;
+    submitDraft: SearchDraft;
     analysis: SearchAnalysisPayload;
   } | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
   const watchCpuMode = methods.watch("cpuMode");
+  const watchRequired = methods.watch("required") ?? [];
+  const watchForbidden = methods.watch("forbidden") ?? [];
+  const watchDistance = methods.watch("distance") ?? [];
+  const watchCount = methods.watch("count") ?? [];
   const previousCpuModeRef = useRef(watchCpuMode);
+  const worldConstraintAlerts = useMemo(
+    () =>
+      buildWorldConstraintAlertItems({
+        constraints: {
+          required: watchRequired,
+          forbidden: watchForbidden,
+          distance: watchDistance,
+          count: watchCount,
+        },
+        disabledGeyserKeys,
+      }),
+    [disabledGeyserKeys, watchCount, watchDistance, watchForbidden, watchRequired]
+  );
 
   useEffect(() => {
     const previousCpuMode = previousCpuModeRef.current;
@@ -110,27 +166,20 @@ export default function SearchPanel({
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const analysis = await analyzeSearchRequest({
-          jobId: `analyze-profile-${Date.now()}`,
-          worldType: Number.isFinite(watchWorldType) ? watchWorldType : draft.worldType,
-          seedStart: 0,
-          seedEnd: 0,
-          mixing: Number.isFinite(watchMixing) ? watchMixing : draft.mixing,
-          constraints: {
-            required: [],
-            forbidden: [],
-            distance: [],
-            count: [],
-          },
-        });
+        const worldProfile = await loadWorldProfile(
+          Number.isFinite(watchWorldType) ? watchWorldType : draft.worldType,
+          Number.isFinite(watchMixing) ? watchMixing : draft.mixing
+        );
         if (!cancelled) {
-          setDisabledGeyserKeys(new Set(analysis.worldProfile.impossibleGeyserTypes));
-          setDisabledMixingSlots(new Set(analysis.worldProfile.disabledMixingSlots));
+          setDisabledGeyserKeys(new Set(worldProfile.impossibleGeyserTypes));
+          setDisabledMixingSlots(new Set(worldProfile.disabledMixingSlots));
+          setPossibleMaxCountByType(worldProfile.possibleMaxCountByType);
         }
       } catch {
         if (!cancelled) {
           setDisabledGeyserKeys(new Set());
           setDisabledMixingSlots(new Set());
+          setPossibleMaxCountByType({});
         }
       }
     }, 150);
@@ -141,20 +190,33 @@ export default function SearchPanel({
     };
   }, [draft.mixing, draft.worldType, watchMixing, watchWorldType]);
 
-  const startSearchWithDraft = async (nextDraft: SearchDraft) => {
-    setDraft(nextDraft);
+  const startSearchWithDraft = async (uiDraft: SearchDraft, submitDraft: SearchDraft) => {
+    setDraft(uiDraft);
     clearPreview();
-    const started = await startSearchJob(nextDraft);
+    const started = await startSearchJob(submitDraft);
+    setDraft(uiDraft);
     if (started) {
       onSearchStarted?.();
     }
   };
 
   const submit = methods.handleSubmit(async (values) => {
-    const nextDraft = toSearchDraft(values);
+    const uiDraft = toSearchDraft(values);
+    let nextDraft = uiDraft;
     setPendingWarningConfirmation(null);
     setIsSearchSubmitting(true);
     try {
+      if (hasCountAutoMax(uiDraft)) {
+        let resolvedPossibleMaxCountByType = possibleMaxCountByType;
+        if (!hasCompletePossibleMaxMap(uiDraft, resolvedPossibleMaxCountByType)) {
+          const worldProfile = await loadWorldProfile(uiDraft.worldType, uiDraft.mixing);
+          resolvedPossibleMaxCountByType = worldProfile.possibleMaxCountByType;
+          setDisabledGeyserKeys(new Set(worldProfile.impossibleGeyserTypes));
+          setDisabledMixingSlots(new Set(worldProfile.disabledMixingSlots));
+          setPossibleMaxCountByType(worldProfile.possibleMaxCountByType);
+        }
+        nextDraft = resolveCountAutoMax(uiDraft, resolvedPossibleMaxCountByType);
+      }
       const analysis = await analyzeSearchRequest({
         jobId: `analyze-${Date.now()}`,
         worldType: nextDraft.worldType,
@@ -177,7 +239,7 @@ export default function SearchPanel({
         return;
       }
       if (shouldShowSearchWarningConfirmation(analysis)) {
-        setPendingWarningConfirmation({ draft: nextDraft, analysis });
+        setPendingWarningConfirmation({ uiDraft, submitDraft: nextDraft, analysis });
         return;
       }
     } catch (error) {
@@ -187,16 +249,17 @@ export default function SearchPanel({
       setIsSearchSubmitting(false);
     }
 
-    await startSearchWithDraft(nextDraft);
+    await startSearchWithDraft(uiDraft, nextDraft);
   });
 
   const handleWarningContinue = () => {
     if (!pendingWarningConfirmation) {
       return;
     }
-    const nextDraft = pendingWarningConfirmation.draft;
+    const nextUiDraft = pendingWarningConfirmation.uiDraft;
+    const nextSubmitDraft = pendingWarningConfirmation.submitDraft;
     setPendingWarningConfirmation(null);
-    void startSearchWithDraft(nextDraft);
+    void startSearchWithDraft(nextUiDraft, nextSubmitDraft);
   };
 
   const handleWarningAbandon = () => {
@@ -258,16 +321,11 @@ export default function SearchPanel({
             </div>
             <ThemeModeToggle mode={themeMode} onModeChange={onThemeModeChange} />
           </div>
-          {lastError ? (
-            <Alert
-              className="search-panel-alert"
-              type="error"
-              showIcon
-              closable
-              title={`参数提示: ${lastError}`}
-              onClose={clearError}
-            />
-          ) : null}
+          <SearchConstraintAlerts
+            lastError={lastError}
+            items={worldConstraintAlerts}
+            onCloseLastError={clearError}
+          />
         </header>
 
         <form className="search-panel-form" onSubmit={submit}>
@@ -397,25 +455,18 @@ export default function SearchPanel({
               <header className="search-section-header">
                 <Typography.Title level={4}>喷口约束</Typography.Title>
                 <Typography.Paragraph>
-                  距离规则：第一栏为最小距离，第二栏为最大距离（从出生点到喷口的直线距离，单位：格）。
-                  数量规则：第一栏为最小数量，第二栏为最大数量。均为全图数量（如果预测为0%，可能是最大数量值太小了）
+                    “必须包含”表示该喷口在整张地图里的总出现次数范围，“距离规则”表示至少有一个目标喷口落在指定范围内。
                 </Typography.Paragraph>
               </header>
               <div className="search-rule-grid">
+                <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
                 <GeyserConstraintEditor
-                  title="必须包含(required)"
-                  type="required"
-                  geysers={geysers}
-                  disabledGeyserKeys={disabledGeyserKeys}
-                />
-                <GeyserConstraintEditor
-                  title="必须排除(forbidden)"
+                  title="必须排除"
                   type="forbidden"
                   geysers={geysers}
                   disabledGeyserKeys={disabledGeyserKeys}
                 />
                 <DistanceRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
-                <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
               </div>
             </Card>
             <SearchActions

@@ -105,5 +105,109 @@ test("formatAnalysisErrorMessage maps geyser ids to Chinese names", () => {
 
   const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
 
-  assert.equal(message, "当前 worldType + mixing 下 geyser 不可能出现: 清水泉");
+  assert.equal(message, "当前世界不会生成这个喷口：清水泉");
+});
+
+test("formatAnalysisErrorMessage rewrites required with count conflict into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer3",
+    code: "conflict.required_with_count",
+    field: "constraints.required/constraints.count",
+    message: "同一 geyser 不能同时设置 required 和 count: hot_water",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "这个喷口已经在“必须包含”里设置了数量，不要再单独添加旧的包含条件：清水泉");
+});
+
+test("formatAnalysisErrorMessage rewrites required with distance conflict into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer3",
+    code: "conflict.required_with_distance",
+    field: "constraints.required/constraints.distance",
+    message: "同一 geyser 不能同时设置 required 和 distance: hot_water",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "这个喷口已经设置了距离规则，不要再单独添加“必须包含”：清水泉");
+});
+
+test("formatAnalysisErrorMessage rewrites forbidden with count conflict into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer3",
+    code: "conflict.forbidden_with_count",
+    field: "constraints.forbidden/constraints.count",
+    message: "同一 geyser 不能同时设置 forbidden 和 count: hot_water",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "这个喷口已经设置了“必须排除”，不能再设置“必须包含”：清水泉");
+});
+
+test("formatAnalysisErrorMessage rewrites impossible forbidden warning into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer2",
+    code: "world.forbidden_geyser_already_impossible",
+    field: "constraints.forbidden",
+    message: "当前 worldType + mixing 下 geyser 已天然不可能出现: hot_water",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "当前世界已经天然排除了这个喷口：清水泉。相关“必须排除”条件可以考虑删除。");
+});
+
+test("formatAnalysisErrorMessage rewrites required and forbidden conflict into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer3",
+    code: "conflict.required_forbidden",
+    field: "constraints.required/constraints.forbidden",
+    message: "同一 geyser 不能同时 required 和 forbidden: hot_water",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "同一个喷口不能同时设置“必须包含”和“必须排除”：清水泉");
+});
+
+test("formatAnalysisErrorMessage rewrites forbidden with distance conflict into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer3",
+    code: "conflict.forbidden_with_distance",
+    field: "constraints.distance",
+    message: "已被排空的 geyser 不能同时设置 distance: hot_water",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "这个喷口已经设置了“必须排除”，不能再设置距离规则：清水泉");
+});
+
+test("formatAnalysisErrorMessage rewrites world count upper bound issue into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer2",
+    code: "world.count_max_gt_possible_max",
+    field: "constraints.count",
+    message: "count.maxCount 超过当前世界上界: hot_water",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "这个喷口在当前世界里达不到你设置的“必须包含”数量上限：清水泉");
+});
+
+test("formatAnalysisErrorMessage rewrites count range issue into user copy", () => {
+  const issue: ValidationIssue = {
+    layer: "layer1",
+    code: "range.count_min_gt_max",
+    field: "constraints.count[0].maxCount",
+    message: "count.minCount 必须 <= count.maxCount",
+  };
+
+  const message = formatAnalysisErrorMessage(issue, createAnalysis(issue), draft, mixingSlots, geysers);
+
+  assert.equal(message, "必须包含的最大数量不能小于最小数量。");
 });

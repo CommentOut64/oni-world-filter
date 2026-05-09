@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 import { Button, Card, Typography } from "antd";
-import { formatGeyserNameFromSummary } from "../../lib/displayResolvers";
+import { formatGeyserNameFromSummary, geyserKeyFromType } from "../../lib/displayResolvers";
 import type { GeyserSummary } from "../../lib/contracts";
+import { sortResolvedGeyserItems } from "../../lib/geyserOrdering.ts";
 import { useSearchStore } from "../../state/searchStore";
 
 interface GeyserListOverlayProps {
@@ -17,13 +18,19 @@ export default function GeyserListOverlay({
   const geysers = useSearchStore((state) => state.geysers);
 
   const sorted = useMemo(() => {
-    return [...geysersData]
-      .map((geyser, index) => ({
+    return sortResolvedGeyserItems(
+      geysersData.map((geyser, index) => ({
         geyser,
         name: formatGeyserNameFromSummary(geyser, geysers),
-        key: `${geyser.type}-${index}`,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, "zh-Hans"));
+        key: `${geyser.id ?? geyser.type}-${index}`,
+      })),
+      (item) => ({
+        geyserKey: item.geyser.id ?? geyserKeyFromType(item.geyser.type, geysers),
+        name: item.name,
+        disabled: false,
+        stableKey: item.key,
+      })
+    );
   }, [geysersData, geysers]);
 
   return (

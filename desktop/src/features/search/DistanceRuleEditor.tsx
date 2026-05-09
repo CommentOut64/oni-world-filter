@@ -4,10 +4,10 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import type { GeyserOption } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { sortGeyserOptionsByAvailability } from "../../lib/geyserOrdering.ts";
 import {
-  buildGeyserOptionAvailability,
-  collectSiblingSelectedGeysers,
-  findFirstAvailableGeyser,
+  buildSectionGeyserOptionAvailability,
+  findFirstAvailableGeyserForSection,
 } from "./geyserConstraintOptions";
 import type { SearchFormValues } from "./searchSchema";
 
@@ -23,31 +23,48 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
     formState: { errors },
   } = useFormContext<SearchFormValues>();
   const distanceRules = useWatch({ control, name: "distance" }) ?? [];
+  const required = useWatch({ control, name: "required" }) ?? [];
   const forbidden = useWatch({ control, name: "forbidden" }) ?? [];
+  const count = useWatch({ control, name: "count" }) ?? [];
   const { fields, append, remove } = useFieldArray({
     control,
     name: "distance",
   });
-  const forbiddenSelected = collectSiblingSelectedGeysers(forbidden);
-  const firstEnabledGeyser = findFirstAvailableGeyser({
+  const baseAvailability = buildSectionGeyserOptionAvailability({
+    section: "distance",
     geyserKeys: geysers.map((item) => item.key),
-    blockers: [
-      {
-        keys: collectSiblingSelectedGeysers(distanceRules),
-        reason: "已存在距离规则",
-      },
-      {
-        keys: forbiddenSelected,
-        reason: "已在必须排除中",
-      },
-    ],
+    constraints: {
+      required,
+      forbidden,
+      distance: distanceRules,
+      count,
+    },
+    worldDisabledKeys: disabledGeyserKeys,
+  });
+  const orderedBaseGeysers = sortGeyserOptionsByAvailability(geysers, baseAvailability);
+  const firstEnabledGeyser = findFirstAvailableGeyserForSection({
+    section: "distance",
+    geyserKeys: orderedBaseGeysers.map((item) => item.key),
+    constraints: {
+      required,
+      forbidden,
+      distance: distanceRules,
+      count,
+    },
     worldDisabledKeys: disabledGeyserKeys,
   });
 
   return (
     <section className="constraint-editor">
-      <header className="constraint-editor-header">
-        <Typography.Text strong>距离规则</Typography.Text>
+      <header className="constraint-editor-header distance-rule-header">
+        <Typography.Text strong>
+          距离规则
+          <Typography.Text type="secondary" style={{ fontSize: "0.85em", fontWeight: "normal" }}>
+            （单位：格）
+          </Typography.Text>
+        </Typography.Text>
+        <Typography.Text className="distance-rule-column-label">最小</Typography.Text>
+        <Typography.Text className="distance-rule-column-label">最大</Typography.Text>
         <Button
           htmlType="button"
           size="small"
@@ -65,42 +82,43 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
       </header>
       {fields.length === 0 ? <Typography.Text className="hint">暂无规则</Typography.Text> : null}
       {fields.map((field, index) => {
-        const availability = buildGeyserOptionAvailability({
-          geyserKeys: geysers.map((item) => item.key),
-          currentValue: distanceRules[index]?.geyser ?? "",
-          blockers: [
-            {
-              keys: collectSiblingSelectedGeysers(distanceRules, index),
-              reason: "已存在距离规则",
-            },
-            {
-              keys: forbiddenSelected,
-              reason: "已在必须排除中",
-            },
-          ],
-          worldDisabledKeys: disabledGeyserKeys,
-        });
-
         return (
-          <div className="distance-row" key={field.id}>
+          <div className="distance-row distance-rule-row" key={field.id}>
             <Controller
               control={control}
               name={`distance.${index}.geyser` as const}
-              render={({ field: controllerField }) => (
-                <Select
-                  className="constraint-select"
-                  placeholder="请选择喷口"
-                  value={controllerField.value || undefined}
-                  options={geysers.map((item) => ({
-                    label: `${formatGeyserNameByKey(item.key)}${
-                      availability[item.key] ? ` (${availability[item.key]})` : ""
-                    }`,
-                    value: item.key,
-                    disabled: availability[item.key] !== null,
-                  }))}
-                  onChange={controllerField.onChange}
-                />
-              )}
+              render={({ field: controllerField }) => {
+                const availability = buildSectionGeyserOptionAvailability({
+                  section: "distance",
+                  geyserKeys: geysers.map((item) => item.key),
+                  currentValue: controllerField.value ?? "",
+                  constraints: {
+                    required,
+                    forbidden,
+                    distance: distanceRules,
+                    count,
+                  },
+                  worldDisabledKeys: disabledGeyserKeys,
+                });
+                const orderedOptions = sortGeyserOptionsByAvailability(geysers, availability);
+
+                return (
+                  <Select
+                    className="constraint-select"
+                    size="small"
+                    placeholder="请选择喷口"
+                    value={controllerField.value || undefined}
+                    options={orderedOptions.map((item) => ({
+                      label: `${formatGeyserNameByKey(item.key)}${
+                        availability[item.key] ? ` (${availability[item.key]})` : ""
+                      }`,
+                      value: item.key,
+                      disabled: availability[item.key] !== null,
+                    }))}
+                    onChange={controllerField.onChange}
+                  />
+                );
+              }}
             />
             <Controller
               control={control}
@@ -108,6 +126,7 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
               render={({ field: controllerField }) => (
                 <InputNumber
                   className="constraint-number"
+                  size="small"
                   min={0}
                   step={1}
                   value={controllerField.value}
@@ -121,6 +140,7 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
               render={({ field: controllerField }) => (
                 <InputNumber
                   className="constraint-number"
+                  size="small"
                   min={0}
                   step={1}
                   value={controllerField.value}
@@ -128,7 +148,7 @@ export default function DistanceRuleEditor({ geysers, disabledGeyserKeys }: Dist
                 />
               )}
             />
-            <Button htmlType="button" onClick={() => remove(index)}>
+            <Button htmlType="button" size="small" onClick={() => remove(index)}>
               删除
             </Button>
             <div className="distance-errors">

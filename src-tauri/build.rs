@@ -2,6 +2,7 @@ const DEVELOPMENT_PLACEHOLDER: &[u8] = b"development-placeholder";
 
 fn main() {
     ensure_sidecar_resource();
+    ensure_icon_resources();
     tauri_build::build()
 }
 
@@ -39,4 +40,22 @@ fn ensure_sidecar_resource() {
     if !sidecar_required && !has_real_sidecar {
         let _ = std::fs::write(&sidecar_path, DEVELOPMENT_PLACEHOLDER);
     }
+}
+
+fn ensure_icon_resources() {
+    let manifest_dir = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string()),
+    );
+    let icon_ico_path = manifest_dir.join("icons").join("icon.ico");
+    let icon_svg_path = manifest_dir.join("icons").join("icon.svg");
+    let source_svg_path = manifest_dir
+        .parent()
+        .unwrap_or(&manifest_dir)
+        .join("desktop")
+        .join("public")
+        .join("icon.svg");
+
+    println!("cargo:rerun-if-changed={}", icon_ico_path.display());
+    println!("cargo:rerun-if-changed={}", icon_svg_path.display());
+    println!("cargo:rerun-if-changed={}", source_svg_path.display());
 }

@@ -21,6 +21,17 @@ function RootApp() {
     syncDesktopThemeMode(themeMode, document.documentElement);
   }, [themeMode]);
 
+  useEffect(() => {
+    const preventContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    window.addEventListener("contextmenu", preventContextMenu);
+    return () => {
+      window.removeEventListener("contextmenu", preventContextMenu);
+    };
+  }, []);
+
   return (
     <ConfigProvider theme={createDesktopTheme(themeMode)}>
       <AntdApp>

@@ -180,6 +180,35 @@ function Assert-RustAndCargoTauri {
     }
 }
 
+function Sync-AppIconAssets {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $sourceIcon = Join-Path $RepoRoot "desktop/public/icon.svg"
+    if (-not (Test-Path -LiteralPath $sourceIcon -PathType Leaf)) {
+        throw "Desktop icon source not found: $sourceIcon"
+    }
+
+    $resolvedSourceIcon = (Resolve-Path -LiteralPath $sourceIcon).Path
+    $outputDirectory = Join-Path $RepoRoot "src-tauri/icons"
+    if (-not (Test-Path -LiteralPath $outputDirectory)) {
+        New-Item -ItemType Directory -Path $outputDirectory | Out-Null
+    }
+
+    Copy-Item -LiteralPath $resolvedSourceIcon -Destination (Join-Path $outputDirectory "icon.svg") -Force
+
+    Push-Location (Join-Path $RepoRoot "src-tauri")
+    try {
+        cargo tauri icon $resolvedSourceIcon --output $outputDirectory
+        if ($LASTEXITCODE -ne 0) {
+            throw "cargo tauri icon failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Repair-StaleCMakeCache {
     param(
         [string[]]$Presets = @("x64-debug", "x64-release")

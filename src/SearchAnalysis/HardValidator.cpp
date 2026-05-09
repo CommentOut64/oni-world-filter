@@ -99,21 +99,21 @@ void ValidateLayer1(const SearchAnalysisRequest &request,
 
     for (size_t i = 0; i < request.constraints.count.size(); ++i) {
         const auto &rule = request.constraints.count[i];
-        if (rule.minCount < 0) {
+        if (rule.minCount < 1) {
             AddIssue(errors,
                      "layer1",
-                     "range.count_min_negative",
+                     "range.count_min_less_than_one",
                      "constraints.count[" + std::to_string(i) + "].minCount",
-                     "count.minCount 不能为负数");
+                     "count.minCount 必须 >= 1");
         }
-        if (rule.maxCount < 0) {
+        if (rule.maxCount < 1) {
             AddIssue(errors,
                      "layer1",
-                     "range.count_max_negative",
+                     "range.count_max_less_than_one",
                      "constraints.count[" + std::to_string(i) + "].maxCount",
-                     "count.maxCount 不能为负数");
+                     "count.maxCount 必须 >= 1");
         }
-        if (rule.minCount > rule.maxCount) {
+        if (rule.minCount >= 1 && rule.maxCount >= 1 && rule.minCount > rule.maxCount) {
             AddIssue(errors,
                      "layer1",
                      "range.count_min_gt_max",
@@ -128,7 +128,8 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
                     const NormalizedSearchRequest &request,
                     const SearchCatalog &catalog,
                     const WorldEnvelopeProfile *worldProfile,
-                    std::vector<ValidationIssue> *errors)
+                    std::vector<ValidationIssue> *errors,
+                    std::vector<ValidationIssue> *warnings)
 {
     if (request.worldType < 0 ||
         request.worldType >= static_cast<int>(catalog.worlds.size())) {
@@ -201,6 +202,17 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
         const int possibleMax =
             (itr == worldProfile->possibleMaxCountByType.end()) ? 0 : itr->second;
         if (possibleMax <= 0) {
+            const bool isPureForbidden =
+                group.hasForbidden && !group.hasRequired && !group.hasExplicitCount &&
+                group.distanceRules.empty();
+            if (isPureForbidden) {
+                AddIssue(warnings,
+                         "layer2",
+                         "world.forbidden_geyser_already_impossible",
+                         "constraints.forbidden",
+                         "当前 worldType + mixing 下 geyser 已天然不可能出现: " + group.geyserId);
+                continue;
+            }
             AddIssue(errors,
                      "layer2",
                      "world.geyser_impossible",
@@ -231,8 +243,6 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
                     std::vector<ValidationIssue> *errors)
 {
     for (const auto &group : request.groups) {
-        const bool emptiedByUpperBound =
-            (group.hasForbidden || group.hasExplicitCount) && group.maxCount <= 0;
         if (group.hasRequired && group.hasForbidden) {
             AddIssue(errors,
                      "layer3",
@@ -247,7 +257,28 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
                      "constraints.count",
                      "归并后 minCount > maxCount: " + group.geyserId);
         }
-        if (emptiedByUpperBound && !group.distanceRules.empty()) {
+        if (group.hasRequired && group.hasExplicitCount) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.required_with_count",
+                     "constraints.required/constraints.count",
+                     "同一 geyser 不能同时设置 required 和 count: " + group.geyserId);
+        }
+        if (group.hasRequired && !group.distanceRules.empty()) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.required_with_distance",
+                     "constraints.required/constraints.distance",
+                     "同一 geyser 不能同时设置 required 和 distance: " + group.geyserId);
+        }
+        if (group.hasForbidden && group.hasExplicitCount) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.forbidden_with_count",
+                     "constraints.forbidden/constraints.count",
+                     "同一 geyser 不能同时设置 forbidden 和 count: " + group.geyserId);
+        }
+        if (group.hasForbidden && !group.distanceRules.empty()) {
             AddIssue(errors,
                      "layer3",
                      "conflict.forbidden_with_distance",
@@ -264,12 +295,18 @@ SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
                                        const WorldEnvelopeProfile *worldProfile)
 {
     SearchAnalysisResult result;
+    std::vector<ValidationIssue> layer2Warnings;
     if (worldProfile != nullptr) {
         result.worldProfile = *worldProfile;
     }
     result.normalizedRequest = NormalizeSearchRequest(request);
     ValidateLayer1(request, &result.errors);
-    ValidateLayer2(request, result.normalizedRequest, catalog, worldProfile, &result.errors);
+    ValidateLayer2(request,
+                   result.normalizedRequest,
+                   catalog,
+                   worldProfile,
+                   &result.errors,
+                   &layer2Warnings);
     ValidateLayer3(result.normalizedRequest, &result.errors);
     if (result.errors.empty()) {
         RunBottleneckSelectivityPredictor(result.normalizedRequest,
@@ -277,6 +314,9 @@ SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
                                           &result.warnings,
                                           &result.bottlenecks,
                                           &result.predictedBottleneckProbability);
+        result.warnings.insert(result.warnings.begin(), layer2Warnings.begin(), layer2Warnings.end());
+    } else {
+        result.warnings = std::move(layer2Warnings);
     }
     return result;
 }
