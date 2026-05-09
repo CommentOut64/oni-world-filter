@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 import type { SearchDraft } from "../../state/searchStore";
-
 const nonNegativeInt = z.coerce.number().int().min(0);
 const cpuModeSchema = z.enum(["balanced", "turbo"]);
 type SearchCpuMode = z.infer<typeof cpuModeSchema>;
 export const MIXING_SLOT_COUNT = 11;
 export const MIXING_LEVEL_MIN = 0;
 export const MIXING_LEVEL_MAX = 4;
+export const COUNT_MAX_SENTINEL = -1;
 
 export function getDefaultAllowLowPerfForCpuMode(cpuMode: SearchCpuMode): boolean {
   return cpuMode === "turbo";
@@ -58,10 +58,20 @@ const distanceRuleSchema = z.object({
   maxDist: z.coerce.number().min(0, "最大距离不能为负数"),
 });
 
+function isCountAutoMax(value: number): boolean {
+  return value === COUNT_MAX_SENTINEL;
+}
+
 const countRuleSchema = z.object({
   geyser: z.string().min(1, "请选择喷口类型"),
-  minCount: z.coerce.number().int().min(0, "最小数量不能为负数"),
-  maxCount: z.coerce.number().int().min(0, "最大数量不能为负数"),
+  minCount: z.coerce.number().int().min(1, "必须包含的数量至少为 1"),
+  maxCount: z.coerce
+    .number()
+    .int()
+    .refine(
+      (value) => isCountAutoMax(value) || value >= 1,
+      "必须包含的数量至少为 1"
+    ),
 });
 
 function normalizeBlankNumberInput(value: unknown): unknown {
@@ -150,17 +160,22 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
           ctx.addIssue({
             path: ["distance", i, "maxDist"],
             code: z.ZodIssueCode.custom,
-            message: "maxDist 必须大于等于 minDist",
+            message: "距离上限不能小于下限",
           });
         }
       }
 
       for (let i = 0; i < value.count.length; i += 1) {
-        if (value.count[i].minCount > value.count[i].maxCount) {
+        if (
+          value.count[i].minCount >= 1 &&
+          !isCountAutoMax(value.count[i].maxCount) &&
+          value.count[i].maxCount >= 1 &&
+          value.count[i].minCount > value.count[i].maxCount
+        ) {
           ctx.addIssue({
             path: ["count", i, "maxCount"],
             code: z.ZodIssueCode.custom,
-            message: "maxCount 必须大于等于 minCount",
+            message: "必须包含的最大数量不能小于最小数量",
           });
         }
       }
@@ -184,10 +199,10 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
         });
       };
 
-      checkUnique(value.required, "required", "required 约束中存在重复喷口");
-      checkUnique(value.forbidden, "forbidden", "forbidden 约束中存在重复喷口");
-      checkUnique(value.distance, "distance", "distance 规则中存在重复喷口");
-      checkUnique(value.count, "count", "count 规则中存在重复喷口");
+      checkUnique(value.required, "required", "“必须包含”里有重复喷口");
+      checkUnique(value.forbidden, "forbidden", "“必须排除”里有重复喷口");
+      checkUnique(value.distance, "distance", "同一个喷口只能设置一条距离规则");
+      checkUnique(value.count, "count", "同一个喷口只能在“必须包含”里设置一次");
 
       const requiredSet = new Set(value.required.map((item) => item.geyser));
       value.forbidden.forEach((item, index) => {
@@ -197,7 +212,7 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
         ctx.addIssue({
           path: ["forbidden", index, "geyser"],
           code: z.ZodIssueCode.custom,
-          message: "同一喷口不能同时设置为 required 和 forbidden",
+          message: "同一个喷口不能同时出现在“必须包含”和“必须排除”里",
         });
       });
 
@@ -209,7 +224,42 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
         ctx.addIssue({
           path: ["distance", index, "geyser"],
           code: z.ZodIssueCode.custom,
-          message: "forbidden 喷口不能同时设置距离规则",
+          message: "已经设置“必须排除”时，不能再设置距离规则",
+        });
+      });
+
+      const countSet = new Set(value.count.map((item) => item.geyser));
+      value.required.forEach((item, index) => {
+        if (!countSet.has(item.geyser)) {
+          return;
+        }
+        ctx.addIssue({
+          path: ["required", index, "geyser"],
+          code: z.ZodIssueCode.custom,
+          message: "这个喷口已经在“必须包含”里设置了数量，不要再单独添加旧的包含条件",
+        });
+      });
+
+      const distanceSet = new Set(value.distance.map((item) => item.geyser));
+      value.required.forEach((item, index) => {
+        if (!distanceSet.has(item.geyser)) {
+          return;
+        }
+        ctx.addIssue({
+          path: ["required", index, "geyser"],
+          code: z.ZodIssueCode.custom,
+          message: "已经设置距离规则时，不要再单独添加“必须包含”条件",
+        });
+      });
+
+      value.count.forEach((item, index) => {
+        if (!forbiddenSet.has(item.geyser)) {
+          return;
+        }
+        ctx.addIssue({
+          path: ["count", index, "geyser"],
+          code: z.ZodIssueCode.custom,
+          message: "已经设置“必须排除”时，不能再设置“必须包含”",
         });
       });
     });
@@ -218,6 +268,53 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
 export const searchSchema = createSearchSchema();
 
 export type SearchFormValues = z.infer<typeof searchSchema>;
+
+function mergeRequiredIntoCountRows(
+  constraints: SearchDraft["constraints"]
+): Array<{ geyser: string; minCount: number; maxCount: number }> {
+  const rows = constraints.count.map((item) => ({
+    geyser: item.geyser,
+    minCount: item.minCount,
+    maxCount: item.maxCount,
+  }));
+  const existing = new Set(rows.map((item) => item.geyser));
+  constraints.required.forEach((geyser) => {
+    if (!geyser || existing.has(geyser)) {
+      return;
+    }
+    rows.push({
+      geyser,
+      minCount: 1,
+      maxCount: COUNT_MAX_SENTINEL,
+    });
+  });
+  return rows;
+}
+
+export function resolveCountAutoMax(
+  draft: SearchDraft,
+  possibleMaxCountByType: Record<string, number>
+): SearchDraft {
+  return {
+    ...draft,
+    constraints: {
+      ...draft.constraints,
+      count: draft.constraints.count.map((item) => {
+        if (!isCountAutoMax(item.maxCount)) {
+          return item;
+        }
+        const resolvedMax = possibleMaxCountByType[item.geyser];
+        if (!Number.isInteger(resolvedMax) || resolvedMax < 0) {
+          throw new Error(`缺少喷口上界: ${item.geyser}`);
+        }
+        return {
+          ...item,
+          maxCount: resolvedMax,
+        };
+      }),
+    },
+  };
+}
 
 export function toSearchDraft(values: SearchFormValues): SearchDraft {
   return {
@@ -232,7 +329,7 @@ export function toSearchDraft(values: SearchFormValues): SearchDraft {
       placement: "strict",
     },
     constraints: {
-      required: values.required.map((item) => item.geyser),
+      required: [],
       forbidden: values.forbidden.map((item) => item.geyser),
       distance: values.distance.map((item) => ({
         geyser: item.geyser,
@@ -257,17 +354,13 @@ export function toSearchFormValues(draft: SearchDraft): SearchFormValues {
     cpuMode: draft.cpu.mode,
     cpuAllowSmt: draft.cpu.allowSmt,
     cpuAllowLowPerf: draft.cpu.allowLowPerf,
-    required: draft.constraints.required.map((geyser) => ({ geyser })),
+    required: [],
     forbidden: draft.constraints.forbidden.map((geyser) => ({ geyser })),
     distance: draft.constraints.distance.map((item) => ({
       geyser: item.geyser,
       minDist: item.minDist,
       maxDist: item.maxDist,
     })),
-    count: draft.constraints.count.map((item) => ({
-      geyser: item.geyser,
-      minCount: item.minCount,
-      maxCount: item.maxCount,
-    })),
+    count: mergeRequiredIntoCountRows(draft.constraints),
   };
 }
