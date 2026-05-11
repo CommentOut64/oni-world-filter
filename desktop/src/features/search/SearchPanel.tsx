@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, FormProvider, useForm } from "react-hook-form";
 
 import type { SearchAnalysisPayload } from "../../lib/contracts";
-import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
+import { FALLBACK_SEARCH_CATALOG, getParameterSpecStaticMax } from "../../lib/searchCatalog";
 import type { SearchDraft } from "../../state/searchStore";
 import {
   analyzeSearchRequest,
@@ -28,6 +28,7 @@ import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
 import CoordQuickSearch from "./CoordQuickSearch";
 import { runCoordPreviewFlow } from "./coordPreviewFlow";
+import { validateNativeCoordInput } from "./nativeCoordValidation";
 import SearchActions from "./SearchActions";
 import SearchConstraintAlerts from "./SearchConstraintAlerts";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
@@ -272,6 +273,14 @@ export default function SearchPanel({
     }
 
     const coord = coordInput.trim();
+    const coordError = validateNativeCoordInput(
+      coord,
+      (worlds.length > 0 ? worlds : FALLBACK_SEARCH_CATALOG.worlds).map((item) => item.code)
+    );
+    if (coordError) {
+      useSearchStore.setState({ lastError: coordError });
+      return;
+    }
     setIsCoordSubmitting(true);
     clearError();
     try {

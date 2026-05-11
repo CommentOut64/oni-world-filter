@@ -68,6 +68,8 @@ set(ONI_BASE_SOURCES
     "SearchAnalysis/WorldEnvelopeProfile.hpp"
     "SearchAnalysis/WorldEnvelopeProfile.cpp"
     "Setting/ComposableDictionary.hpp"
+    "Setting/NativeCoordinate.hpp"
+    "Setting/NativeCoordinate.cpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
     "Setting/WorldGenClasses.cpp"
