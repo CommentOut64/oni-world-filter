@@ -25,6 +25,7 @@
 #include "Batch/SidecarProtocol.hpp"
 #include "Batch/ThreadPolicy.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
+#include "Geyser/GeyserParameterCalculator.hpp"
 #include "SearchAnalysis/HardValidator.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "SearchAnalysis/WorldEnvelopeProfile.hpp"
@@ -68,6 +69,8 @@ const char *DescribeCommand(Batch::SidecarCommandType command)
         return "search";
     case Batch::SidecarCommandType::Preview:
         return "preview";
+    case Batch::SidecarCommandType::PreviewGeyserDetails:
+        return "preview_geyser_details";
     case Batch::SidecarCommandType::PreviewCoord:
         return "preview_coord";
     case Batch::SidecarCommandType::Cancel:
@@ -346,6 +349,89 @@ bool ReadSettingsBlob(std::vector<char> &data, std::string *errorMessage)
     return true;
 }
 
+bool BuildWorldList(SettingsCache &settings,
+                    std::vector<World *> &worlds,
+                    std::string *errorMessage)
+{
+    worlds.clear();
+    if (settings.cluster == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "cluster is null";
+        }
+        return false;
+    }
+    for (auto &worldPlacement : settings.cluster->worldPlacements) {
+        auto itr = settings.worlds.find(worldPlacement.world);
+        if (itr == settings.worlds.end()) {
+            if (errorMessage != nullptr) {
+                *errorMessage = "world placement target is missing";
+            }
+            return false;
+        }
+        itr->second.locationType = worldPlacement.locationType;
+        worlds.push_back(&itr->second);
+    }
+    if (worlds.size() == 1) {
+        worlds[0]->locationType = LocationType::StartWorld;
+    }
+    return true;
+}
+
+bool ResolveGeyserSeed(int worldType,
+                       int seed,
+                       int mixing,
+                       int *geyserSeed,
+                       std::string *errorMessage)
+{
+    if (geyserSeed == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "geyserSeed output is null";
+        }
+        return false;
+    }
+
+    std::string code;
+    if (!BuildWorldCode(worldType, seed, mixing, &code)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "invalid worldType";
+        }
+        return false;
+    }
+
+    std::string sharedError;
+    const auto shared = SharedSettingsCache::GetOrCreate(ReadSettingsBlob, &sharedError);
+    if (shared == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = sharedError.empty() ? "failed to load shared settings cache"
+                                                : sharedError;
+        }
+        return false;
+    }
+
+    SettingsCache settings = *shared;
+    if (!settings.CoordinateChanged(code, settings)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "parse world code failed";
+        }
+        return false;
+    }
+
+    std::vector<World *> worlds;
+    if (!BuildWorldList(settings, worlds, errorMessage)) {
+        return false;
+    }
+    settings.DoSubworldMixing(worlds);
+    if (settings.cluster == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "cluster is null after mixing";
+        }
+        return false;
+    }
+
+    *geyserSeed = settings.seed + static_cast<int>(settings.cluster->worldPlacements.size()) - 1;
+    return true;
+}
+
 class PreviewCaptureSink final : public ResultSink
 {
 public:
@@ -566,6 +652,33 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
                                           &resolved.code));
 }
 
+void RunPreviewGeyserDetailsCommand(const Batch::SidecarPreviewGeyserDetailsRequest &request)
+{
+    EmitDiagnostic("RunPreviewGeyserDetailsCommand jobId=" + request.jobId +
+                   " worldType=" + std::to_string(request.worldType) +
+                   " seed=" + std::to_string(request.seed) +
+                   " mixing=" + std::to_string(request.mixing) +
+                   " worldHeight=" + std::to_string(request.worldHeight) +
+                   " geysers=" + std::to_string(request.geysers.size()));
+
+    int geyserSeed = 0;
+    std::string errorMessage;
+    if (!ResolveGeyserSeed(request.worldType,
+                           request.seed,
+                           request.mixing,
+                           &geyserSeed,
+                           &errorMessage)) {
+        EmitLine(Batch::SerializeFailedEvent(request.jobId,
+                                             errorMessage.empty() ? "resolve geyser seed failed"
+                                                                  : errorMessage));
+        return;
+    }
+
+    const auto details =
+        GeyserCalc::BuildGeyserDetails(geyserSeed, request.worldHeight, request.geysers);
+    EmitLine(Batch::SerializePreviewGeyserDetailsEvent(request.jobId, request, details));
+}
+
 void RunGetSearchCatalogCommand(const Batch::SidecarGetSearchCatalogRequest &request)
 {
     EmitDiagnostic("RunGetSearchCatalogCommand jobId=" + request.jobId);
@@ -678,6 +791,9 @@ int main()
                 break;
             case Batch::SidecarCommandType::Preview:
                 RunPreviewCommand(parsed.request.preview);
+                break;
+            case Batch::SidecarCommandType::PreviewGeyserDetails:
+                RunPreviewGeyserDetailsCommand(parsed.request.previewGeyserDetails);
                 break;
             case Batch::SidecarCommandType::PreviewCoord:
                 RunPreviewCoordCommand(parsed.request.previewCoord);

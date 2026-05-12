@@ -119,6 +119,41 @@ int RunAllTests()
     }
 
     {
+        const auto path = FixturePath("preview-geyser-details-request.json");
+        const auto jsonText = ReadText(path);
+        Expect(!jsonText.empty(), "preview_geyser_details fixture should be readable", failures);
+
+        const auto result = Batch::ParseSidecarRequest(jsonText);
+        Expect(result.Ok(), "preview_geyser_details request should parse", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::PreviewGeyserDetails,
+               "preview_geyser_details request command mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.jobId == "job-preview-geyser-details-001",
+               "preview_geyser_details request jobId mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.worldType == 13,
+               "preview_geyser_details request worldType mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.seed == 100123,
+               "preview_geyser_details request seed mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.mixing == 625,
+               "preview_geyser_details request mixing mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.worldHeight == 384,
+               "preview_geyser_details request worldHeight mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.geysers.size() == 2,
+               "preview_geyser_details request geyser size mismatch",
+               failures);
+        if (result.request.previewGeyserDetails.geysers.size() == 2) {
+            Expect(result.request.previewGeyserDetails.geysers[1].x == 75,
+                   "preview_geyser_details request geyser x mismatch",
+                   failures);
+        }
+    }
+
+    {
         const auto result = Batch::ParseSidecarRequest(
             R"({"command":"preview_coord","jobId":"job-preview-coord-001","coord":"V-SNDST-C-123456-0-D3-HD"})");
         Expect(result.Ok(), "preview_coord request should parse", failures);
@@ -305,6 +340,13 @@ int RunAllTests()
         previewRequest.worldType = 13;
         previewRequest.seed = 100123;
         previewRequest.mixing = 625;
+        Batch::SidecarPreviewGeyserDetailsRequest previewGeyserDetailsRequest;
+        previewGeyserDetailsRequest.jobId = "job-preview-geyser-details-001";
+        previewGeyserDetailsRequest.worldType = 13;
+        previewGeyserDetailsRequest.seed = 100123;
+        previewGeyserDetailsRequest.mixing = 625;
+        previewGeyserDetailsRequest.worldHeight = 384;
+        previewGeyserDetailsRequest.geysers = {{steam, 70, 90}, {27, 75, 120}};
         const std::string previewCoord = "V-SNDST-C-100123-0-D3-HD";
 
         GeneratedWorldPreview preview;
@@ -320,6 +362,31 @@ int RunAllTests()
         polygon.vertices.push_back({1, 2});
         polygon.vertices.push_back({3, 4});
         preview.polygons.push_back(std::move(polygon));
+
+        GeyserDetail geyserDetail;
+        geyserDetail.index = 0;
+        geyserDetail.summary = {steam, 70, 90};
+        geyserDetail.hasParameters = true;
+        geyserDetail.parameterKind = "geyser";
+        geyserDetail.native.averageActiveYieldKgPerCycle = 1234.5f;
+        geyserDetail.native.eruptionPeriodSeconds = 800.0f;
+        geyserDetail.native.eruptionRatio = 0.4f;
+        geyserDetail.native.activePeriodSeconds = 60000.0f;
+        geyserDetail.native.activeRatio = 0.5f;
+        geyserDetail.derived.eruptionRateKgPerSecond = 10.2f;
+        geyserDetail.derived.averageOverallYieldGPerSecond = 2056.7f;
+        geyserDetail.derived.eruptionSeconds = 320.0f;
+        geyserDetail.derived.activeSeconds = 30000.0f;
+        geyserDetail.derived.activeCycles = 50.0f;
+        geyserDetail.derived.totalCycles = 100.0f;
+        geyserDetail.derived.temperatureCelsius = 110.0f;
+
+        GeyserDetail reservoirDetail;
+        reservoirDetail.index = 1;
+        reservoirDetail.summary = {27, 75, 120};
+        reservoirDetail.hasParameters = false;
+        reservoirDetail.parameterKind = "reservoir";
+        const std::vector<GeyserDetail> geyserDetails = {geyserDetail, reservoirDetail};
 
         SearchAnalysis::SearchCatalog catalog;
         catalog.worlds.push_back({.id = 13, .code = "V-SNDST-C-"});
@@ -445,6 +512,12 @@ int RunAllTests()
             Batch::SerializePreviewEvent("job-preview-001", previewRequest, preview, &previewCoord),
             failures,
             "preview event json parse failed");
+        const auto previewGeyserDetailsJson = ParseJsonObject(
+            Batch::SerializePreviewGeyserDetailsEvent("job-preview-geyser-details-001",
+                                                      previewGeyserDetailsRequest,
+                                                      geyserDetails),
+            failures,
+            "preview geyser details event json parse failed");
         const auto searchCatalogJson = ParseJsonObject(
             Batch::SerializeSearchCatalogEvent("job-search-catalog-001", catalog),
             failures,
@@ -464,6 +537,9 @@ int RunAllTests()
         Expect(failedJson["event"].asString() == "failed", "failed event type mismatch", failures);
         Expect(cancelledJson["event"].asString() == "cancelled", "cancelled event type mismatch", failures);
         Expect(previewJson["event"].asString() == "preview", "preview event type mismatch", failures);
+        Expect(previewGeyserDetailsJson["event"].asString() == "preview_geyser_details",
+               "preview_geyser_details event type mismatch",
+               failures);
 
         Expect(matchJson["summary"]["geysers"].size() == 1, "match event geyser size mismatch", failures);
         Expect(matchJson["summary"]["geysers"][0]["id"].asString() == "steam",
@@ -474,6 +550,21 @@ int RunAllTests()
         Expect(previewJson["coord"].asString() == previewCoord, "preview coord mismatch", failures);
         Expect(previewJson["preview"]["summary"]["seed"].asInt() == 100123,
                "preview summary seed mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"].size() == 2,
+               "preview_geyser_details size mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][0]["summary"]["id"].asString() == "steam",
+               "preview_geyser_details first id mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][0]["native"]["eruptionPeriodSeconds"].asFloat() == 800.0f,
+               "preview_geyser_details native field mismatch",
+               failures);
+        Expect(!previewGeyserDetailsJson["geyserDetails"][1]["hasParameters"].asBool(),
+               "preview_geyser_details reservoir should stay no-parameter",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][1]["parameterKind"].asString() == "reservoir",
+               "preview_geyser_details reservoir kind mismatch",
                failures);
         Expect(searchCatalogJson["event"].asString() == "search_catalog",
                "search catalog event type mismatch",

@@ -70,6 +70,7 @@ fn main() {
             commands::start_search,
             commands::cancel_search,
             commands::load_preview,
+            commands::load_preview_geyser_details,
             commands::load_preview_by_coord,
             commands::list_worlds,
             commands::list_geysers,

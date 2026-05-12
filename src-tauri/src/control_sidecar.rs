@@ -10,7 +10,8 @@ use tauri::AppHandle;
 use crate::error::HostError;
 use crate::diagnostics;
 use crate::sidecar::{
-    self, CoordPreviewRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
+    self, CoordPreviewRequestPayload, PreviewGeyserDetailsEventPayload,
+    PreviewGeyserDetailsRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
     SearchCatalogPayload, SearchRequestPayload,
 };
 
@@ -166,6 +167,35 @@ pub fn load_preview(
     }
 
     Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
+}
+
+pub fn load_preview_geyser_details(
+    app: Option<&AppHandle>,
+    manager: &ControlSidecarManager,
+    request: &PreviewGeyserDetailsRequestPayload,
+) -> Result<PreviewGeyserDetailsEventPayload, HostError> {
+    sidecar::validate_preview_geyser_details_request(request)?;
+    let payload = sidecar::build_preview_geyser_details_command(request);
+    let events = manager.request_or_fallback(app, &payload)?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("preview_geyser_details 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("preview_geyser_details")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return sidecar::deserialize_preview_geyser_details_event(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest(
+        "未收到 preview_geyser_details 事件".to_string(),
+    ))
 }
 
 pub fn load_preview_by_coord(
@@ -491,6 +521,7 @@ fn drain_stderr_into(stderr: ChildStderr, lines: Arc<Mutex<Vec<String>>>) {
 fn terminal_event_name(request: &Value) -> Result<&'static str, HostError> {
     match request.get("command").and_then(Value::as_str) {
         Some("preview" | "preview_coord") => Ok("preview"),
+        Some("preview_geyser_details") => Ok("preview_geyser_details"),
         Some("get_search_catalog") => Ok("search_catalog"),
         Some("analyze_search_request") => Ok("search_analysis"),
         Some(other) => Err(HostError::InvalidRequest(format!(
@@ -515,7 +546,7 @@ mod tests {
 
     use crate::state::{JobRegistry, RunningJobHandles};
 
-    use super::{ControlSidecarManager, SidecarLauncher};
+    use super::{load_preview_geyser_details, ControlSidecarManager, SidecarLauncher};
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -624,6 +655,66 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 spawnCount = $spawnCount
                 preview = @{
                     seed = $request.seed
+                }
+            }
+        }
+        'preview_geyser_details' {
+            if ($Mode -eq 'preview-geyser-details-failed') {
+                $event = @{
+                    event = 'failed'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    message = 'preview_geyser_details failed'
+                }
+            } elseif ($Mode -eq 'preview-geyser-details-missing-field') {
+                $event = @{
+                    event = 'preview_geyser_details'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    worldType = $request.worldType
+                    seed = $request.seed
+                    mixing = $request.mixing
+                }
+            } else {
+                $event = @{
+                    event = 'preview_geyser_details'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    worldType = $request.worldType
+                    seed = $request.seed
+                    mixing = $request.mixing
+                    geyserDetails = @(
+                        @{
+                            index = 0
+                            summary = @{
+                                type = 0
+                                x = 70
+                                y = 90
+                                id = 'steam'
+                            }
+                            hasParameters = $true
+                            parameterKind = 'geyser'
+                            native = @{
+                                averageActiveYieldKgPerCycle = 1443.45
+                                eruptionPeriodSeconds = 646.84
+                                eruptionRatio = 0.62
+                                activePeriodSeconds = 66194.12
+                                activeRatio = 0.65
+                            }
+                            derived = @{
+                                eruptionRateKgPerSecond = 3.85
+                                averageOverallYieldGPerSecond = 1560.99
+                                eruptionSeconds = 403.64
+                                activeSeconds = 42950.63
+                                activeCycles = 71.58
+                                totalCycles = 110.32
+                                temperatureCelsius = 110.0
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -759,6 +850,80 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
         assert_eq!(preview_events[0]["event"].as_str(), Some("preview"));
         assert_eq!(registry.get_status("streaming-job"), Some(crate::state::JobStatus::Running));
         assert_eq!(registry.get_status("preview-001"), None);
+    }
+
+    #[test]
+    fn control_sidecar_load_preview_geyser_details_should_return_payload() {
+        let root = create_temp_root("preview-geyser-details");
+        let manager = create_test_manager(&root, "persistent", true);
+
+        let payload = load_preview_geyser_details(
+            None,
+            &manager,
+            &crate::sidecar::PreviewGeyserDetailsRequestPayload {
+                job_id: "preview-geyser-details-001".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+                world_height: 384,
+                geysers: vec![crate::sidecar::GeyserSummaryPayload {
+                    r#type: 0,
+                    x: 70,
+                    y: 90,
+                    id: Some("steam".to_string()),
+                }],
+            },
+        )
+        .expect("preview_geyser_details request should succeed");
+
+        assert_eq!(payload.event, "preview_geyser_details");
+        assert_eq!(payload.job_id, "preview-geyser-details-001");
+        assert_eq!(payload.geyser_details.len(), 1);
+        assert_eq!(payload.geyser_details[0].summary.id.as_deref(), Some("steam"));
+    }
+
+    #[test]
+    fn control_sidecar_load_preview_geyser_details_should_surface_failed_event() {
+        let root = create_temp_root("preview-geyser-details-failed");
+        let manager = create_test_manager(&root, "preview-geyser-details-failed", true);
+
+        let error = load_preview_geyser_details(
+            None,
+            &manager,
+            &crate::sidecar::PreviewGeyserDetailsRequestPayload {
+                job_id: "preview-geyser-details-002".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+                world_height: 384,
+                geysers: vec![],
+            },
+        )
+        .expect_err("failed event should surface as host error");
+
+        assert!(error.to_string().contains("preview_geyser_details failed"));
+    }
+
+    #[test]
+    fn control_sidecar_load_preview_geyser_details_should_reject_missing_fields() {
+        let root = create_temp_root("preview-geyser-details-missing-field");
+        let manager = create_test_manager(&root, "preview-geyser-details-missing-field", true);
+
+        let error = load_preview_geyser_details(
+            None,
+            &manager,
+            &crate::sidecar::PreviewGeyserDetailsRequestPayload {
+                job_id: "preview-geyser-details-003".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+                world_height: 384,
+                geysers: vec![],
+            },
+        )
+        .expect_err("missing geyserDetails field should be rejected");
+
+        assert!(error.to_string().contains("preview_geyser_details"));
     }
 
     #[test]

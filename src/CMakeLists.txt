@@ -104,6 +104,8 @@ set(ONI_BASE_SOURCES
     "BatchCpu/SearchCpuGovernor.cpp"
     "BatchCpu/CpuOptimization.hpp"
     "BatchCpu/CpuOptimization.cpp"
+    "Geyser/GeyserParameterCalculator.hpp"
+    "Geyser/GeyserParameterCalculator.cpp"
 )
 
 if(ONI_BUILD_SIDECAR)
@@ -288,6 +290,19 @@ target_include_directories(test_sidecar_protocol
 )
 target_link_libraries(test_sidecar_protocol PRIVATE jsoncpp)
 add_test(NAME test_sidecar_protocol COMMAND test_sidecar_protocol)
+
+add_executable(test_geyser_parameter_calculator
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_geyser_parameter_calculator.cpp"
+    "Geyser/GeyserParameterCalculator.cpp"
+    "Batch/FilterConfig.cpp"
+    "Utils/KRandom.cpp"
+)
+target_include_directories(test_geyser_parameter_calculator
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(test_geyser_parameter_calculator PRIVATE jsoncpp)
+add_test(NAME test_geyser_parameter_calculator COMMAND test_geyser_parameter_calculator)
 
 add_executable(test_sidecar_shutdown
     "../tests/native/test_main.cpp"
