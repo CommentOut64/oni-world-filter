@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Typography } from "antd";
+import { Alert, message, Typography } from "antd";
 
 import type { DesktopThemeMode } from "../../app/antdTheme";
 import ThemeModeToggle from "../../components/layout/ThemeModeToggle";
 import { formatTauriError } from "../../lib/tauri.ts";
 import { usePreviewStore } from "../../state/previewStore";
 import { useSearchStore } from "../../state/searchStore";
+import { exportWorldReport } from "../report/exportWorldReport.ts";
 import PreviewCanvas, { type PreviewCanvasHandle } from "./PreviewCanvas";
 import PreviewDetails from "./PreviewDetails";
 import GeyserParameterPopover, { type GeyserParameterAnchor } from "./GeyserParameterPopover";
@@ -23,6 +24,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
   const selectedSeed = useSearchStore((state) => state.selectedSeed);
   const results = useSearchStore((state) => state.results);
   const geysers = useSearchStore((state) => state.geysers);
+  const catalog = useSearchStore((state) => state.catalog);
 
   const previewSessionKey = usePreviewStore((state) => state.activeKey);
   const loadByMatch = usePreviewStore((state) => state.loadByMatch);
@@ -51,6 +53,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
   const [selectedGeyserIndex, setSelectedGeyserIndex] = useState<number | null>(null);
   const [selectedGeyserAnchor, setSelectedGeyserAnchor] = useState<GeyserParameterAnchor | null>(null);
   const [showGeyserList, setShowGeyserList] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const selectedMatch =
     selectedSeed === null
@@ -71,13 +74,31 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
     setSelectedGeyserAnchor(null);
   }, [preview, selectedGeyserIndex]);
 
-  const handleExportPng = () => {
+  const handleGenerateReport = () => {
+    if (!selectedMatch) {
+      return;
+    }
     usePreviewStore.setState({ lastError: null });
-    void canvasRef.current?.exportPng().catch((error) => {
-      usePreviewStore.setState({
-        lastError: `导出 PNG 失败: ${formatTauriError(error)}`,
-      });
-    });
+    setIsGeneratingReport(true);
+    void (async () => {
+      try {
+        const exported = await exportWorldReport({
+          match: selectedMatch,
+          geysers,
+          catalog,
+          themeMode,
+        });
+        if (exported) {
+          void message.success("报告已生成。");
+        }
+      } catch (error) {
+        usePreviewStore.setState({
+          lastError: `生成报告失败: ${formatTauriError(error)}`,
+        });
+      } finally {
+        setIsGeneratingReport(false);
+      }
+    })();
   };
 
   const selectedGeyser =
@@ -111,7 +132,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
           type="error"
           showIcon
           closable
-          title={`预览失败: ${lastError}`}
+          title={`操作失败: ${lastError}`}
           onClose={clearError}
         />
       ) : null}
@@ -120,11 +141,12 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
         showLabels={showLabels}
         showGeysers={showGeysers}
         geyserCount={preview?.summary.geysers.length ?? 0}
+        isGeneratingReport={isGeneratingReport}
         onToggleBoundaries={() => setShowBoundaries((current) => !current)}
         onToggleLabels={() => setShowLabels((current) => !current)}
         onToggleGeysers={() => setShowGeysers((current) => !current)}
         onResetView={() => canvasRef.current?.resetView()}
-        onExportPng={handleExportPng}
+        onGenerateReport={handleGenerateReport}
         onOpenGeyserList={() => setShowGeyserList(true)}
       />
       <div className="preview-canvas-container" ref={previewCanvasContainerRef}>
