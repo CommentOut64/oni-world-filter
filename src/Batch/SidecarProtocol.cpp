@@ -395,6 +395,21 @@ Json::Value BuildGeyserDetailJson(const GeyserDetail &detail)
     return root;
 }
 
+Json::Value BuildWorldReportJson(const WorldReportData &report)
+{
+    Json::Value root(Json::objectValue);
+    root["preview"] = BuildPreviewJson(report.preview);
+
+    Json::Value geyserDetails(Json::arrayValue);
+    for (const auto &detail : report.geyserDetails) {
+        geyserDetails.append(BuildGeyserDetailJson(detail));
+    }
+    root["geyserDetails"] = geyserDetails;
+    root["mixing"] = report.mixing;
+    root["coord"] = report.coord;
+    return root;
+}
+
 Json::Value BuildSearchCatalogJson(const SearchAnalysis::SearchCatalog &catalog)
 {
     Json::Value root(Json::objectValue);
@@ -740,6 +755,22 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         return result;
     }
 
+    if (command == "world_report") {
+        result.request.command = SidecarCommandType::WorldReport;
+        auto &request = result.request.worldReport;
+        if (!RequireString(root, "jobId", &request.jobId, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "worldType", &request.worldType, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "seed", &request.seed, &result.error)) {
+            return result;
+        }
+        request.mixing = root.get("mixing", request.mixing).asInt();
+        return result;
+    }
+
     if (command == "cancel") {
         result.request.command = SidecarCommandType::Cancel;
         if (!RequireString(root, "jobId", &result.request.cancel.jobId, &result.error)) {
@@ -1010,6 +1041,18 @@ std::string SerializePreviewGeyserDetailsEvent(
         details.append(BuildGeyserDetailJson(detail));
     }
     root["geyserDetails"] = details;
+    return WriteCompactJson(root);
+}
+
+std::string SerializeWorldReportEvent(const std::string &jobId,
+                                      const SidecarWorldReportRequest &request,
+                                      const WorldReportData &report)
+{
+    Json::Value root = BuildBaseEventJson("world_report", jobId);
+    root["worldType"] = request.worldType;
+    root["seed"] = request.seed;
+    root["mixing"] = request.mixing;
+    root["report"] = BuildWorldReportJson(report);
     return WriteCompactJson(root);
 }
 

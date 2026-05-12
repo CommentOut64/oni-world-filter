@@ -17,6 +17,7 @@ enum class SidecarCommandType {
     Preview,
     PreviewGeyserDetails,
     PreviewCoord,
+    WorldReport,
     Cancel,
     SetSearchActiveWorkers,
     GetSearchCatalog,
@@ -81,6 +82,13 @@ struct SidecarPreviewCoordRequest {
     std::string coord;
 };
 
+struct SidecarWorldReportRequest {
+    std::string jobId;
+    int worldType = 0;
+    int seed = 0;
+    int mixing = 0;
+};
+
 struct SidecarCancelRequest {
     std::string jobId;
 };
@@ -110,6 +118,7 @@ struct SidecarRequest {
     SidecarPreviewRequest preview;
     SidecarPreviewGeyserDetailsRequest previewGeyserDetails;
     SidecarPreviewCoordRequest previewCoord;
+    SidecarWorldReportRequest worldReport;
     SidecarCancelRequest cancel;
     SidecarSetSearchActiveWorkersRequest setSearchActiveWorkers;
     SidecarGetSearchCatalogRequest getSearchCatalog;
@@ -152,6 +161,9 @@ std::string SerializePreviewGeyserDetailsEvent(
     const std::string &jobId,
     const SidecarPreviewGeyserDetailsRequest &request,
     const std::vector<GeyserDetail> &geyserDetails);
+std::string SerializeWorldReportEvent(const std::string &jobId,
+                                      const SidecarWorldReportRequest &request,
+                                      const WorldReportData &report);
 std::string SerializeSearchCatalogEvent(const std::string &jobId,
                                         const SearchAnalysis::SearchCatalog &catalog);
 std::string SerializeSearchAnalysisEvent(const std::string &jobId,

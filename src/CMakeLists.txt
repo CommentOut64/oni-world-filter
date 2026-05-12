@@ -322,6 +322,24 @@ target_link_libraries(test_sidecar_shutdown PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_sidecar_shutdown COMMAND test_sidecar_shutdown)
 
+add_executable(test_sidecar_world_report
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_sidecar_world_report.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_sidecar_world_report
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_sidecar_world_report PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_sidecar_world_report PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_sidecar_world_report COMMAND test_sidecar_world_report)
+
 add_executable(test_recoverable_diagnostics
     "../tests/native/test_main.cpp"
     "../tests/native/test_recoverable_diagnostics.cpp"

@@ -170,6 +170,27 @@ int RunAllTests()
 
     {
         const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"world_report","jobId":"job-world-report-001","worldType":13,"seed":100123,"mixing":625})");
+        Expect(result.Ok(), "world_report request should parse", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::WorldReport,
+               "world_report request command mismatch",
+               failures);
+        Expect(result.request.worldReport.jobId == "job-world-report-001",
+               "world_report request jobId mismatch",
+               failures);
+        Expect(result.request.worldReport.worldType == 13,
+               "world_report request worldType mismatch",
+               failures);
+        Expect(result.request.worldReport.seed == 100123,
+               "world_report request seed mismatch",
+               failures);
+        Expect(result.request.worldReport.mixing == 625,
+               "world_report request mixing mismatch",
+               failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
             R"({"command":"search","jobId":"job-binding-001","worldType":13,"seedStart":1,"seedEnd":1,"cpu":{"mode":"balanced","allowSmt":true,"allowLowPerf":true,"binding":"strict"}})");
         Expect(result.Ok(), "search request with binding alias should parse", failures);
         Expect(result.request.search.cpu.hasValue,
@@ -348,6 +369,11 @@ int RunAllTests()
         previewGeyserDetailsRequest.worldHeight = 384;
         previewGeyserDetailsRequest.geysers = {{steam, 70, 90}, {27, 75, 120}};
         const std::string previewCoord = "V-SNDST-C-100123-0-D3-HD";
+        Batch::SidecarWorldReportRequest worldReportRequest;
+        worldReportRequest.jobId = "job-world-report-001";
+        worldReportRequest.worldType = 13;
+        worldReportRequest.seed = 100123;
+        worldReportRequest.mixing = 625;
 
         GeneratedWorldPreview preview;
         preview.summary.seed = 100123;
@@ -387,6 +413,11 @@ int RunAllTests()
         reservoirDetail.hasParameters = false;
         reservoirDetail.parameterKind = "reservoir";
         const std::vector<GeyserDetail> geyserDetails = {geyserDetail, reservoirDetail};
+        WorldReportData worldReport;
+        worldReport.preview = preview;
+        worldReport.geyserDetails = geyserDetails;
+        worldReport.mixing = 625;
+        worldReport.coord = previewCoord;
 
         SearchAnalysis::SearchCatalog catalog;
         catalog.worlds.push_back({.id = 13, .code = "V-SNDST-C-"});
@@ -518,6 +549,10 @@ int RunAllTests()
                                                       geyserDetails),
             failures,
             "preview geyser details event json parse failed");
+        const auto worldReportJson = ParseJsonObject(
+            Batch::SerializeWorldReportEvent("job-world-report-001", worldReportRequest, worldReport),
+            failures,
+            "world_report event json parse failed");
         const auto searchCatalogJson = ParseJsonObject(
             Batch::SerializeSearchCatalogEvent("job-search-catalog-001", catalog),
             failures,
@@ -539,6 +574,9 @@ int RunAllTests()
         Expect(previewJson["event"].asString() == "preview", "preview event type mismatch", failures);
         Expect(previewGeyserDetailsJson["event"].asString() == "preview_geyser_details",
                "preview_geyser_details event type mismatch",
+               failures);
+        Expect(worldReportJson["event"].asString() == "world_report",
+               "world_report event type mismatch",
                failures);
 
         Expect(matchJson["summary"]["geysers"].size() == 1, "match event geyser size mismatch", failures);
@@ -565,6 +603,21 @@ int RunAllTests()
                failures);
         Expect(previewGeyserDetailsJson["geyserDetails"][1]["parameterKind"].asString() == "reservoir",
                "preview_geyser_details reservoir kind mismatch",
+               failures);
+        Expect(worldReportJson["report"]["coord"].asString() == previewCoord,
+               "world_report coord mismatch",
+               failures);
+        Expect(worldReportJson["report"]["mixing"].asInt() == 625,
+               "world_report mixing mismatch",
+               failures);
+        Expect(worldReportJson["report"]["preview"]["summary"]["seed"].asInt() == 100123,
+               "world_report preview seed mismatch",
+               failures);
+        Expect(worldReportJson["report"]["geyserDetails"].size() == 2,
+               "world_report geyserDetails size mismatch",
+               failures);
+        Expect(worldReportJson["report"]["geyserDetails"][0]["summary"]["id"].asString() == "steam",
+               "world_report first geyser id mismatch",
                failures);
         Expect(searchCatalogJson["event"].asString() == "search_catalog",
                "search catalog event type mismatch",
