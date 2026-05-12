@@ -29,6 +29,20 @@ test("createDesktopTheme exposes a light palette backed by antd default algorith
   assert.equal(desktopTheme.token?.colorBorder, "#d4d4d8");
 });
 
+test("createDesktopTheme keeps tooltip colors aligned with the active theme and narrows width", () => {
+  const darkTheme = createDesktopTheme("dark");
+  const lightTheme = createDesktopTheme("light");
+
+  assert.deepEqual(darkTheme.components?.Tooltip, {
+    colorBgSpotlight: "#0f1b2d",
+    maxWidth: 220,
+  });
+  assert.deepEqual(lightTheme.components?.Tooltip, {
+    colorBgSpotlight: "#ffffff",
+    maxWidth: 220,
+  });
+});
+
 test("getPreferredDesktopThemeMode falls back to dark when matchMedia is unavailable", () => {
   assert.equal(getPreferredDesktopThemeMode(undefined), "dark");
 });
@@ -53,4 +67,15 @@ test("syncDesktopThemeMode writes data-theme on the document element", () => {
 test("app.css defines both light and dark css variable scopes", () => {
   assert.match(APP_CSS, /html\[data-theme="dark"\]\s*\{/);
   assert.match(APP_CSS, /html\[data-theme="light"\]\s*\{/);
+});
+
+test("app.css applies compact tooltip styling that follows the desktop theme", () => {
+  assert.match(
+    APP_CSS,
+    /\.ant-tooltip\s+\.ant-tooltip-container\s*\{[\s\S]*color:\s*var\(--text-main\);[\s\S]*font-size:\s*12px;[\s\S]*padding:\s*6px 8px;[\s\S]*background:\s*var\(--bg-overlay\);[\s\S]*border:\s*1px solid var\(--line-panel\);[\s\S]*\}/
+  );
+  assert.match(
+    APP_CSS,
+    /\.ant-tooltip\s+\.ant-tooltip-arrow::before,\s*\.ant-tooltip\s+\.ant-tooltip-arrow::after\s*\{[\s\S]*background:\s*var\(--bg-overlay\);[\s\S]*\}/
+  );
 });

@@ -5,8 +5,9 @@ import { Circle, Layer, Line, Rect, Stage, Text } from "react-konva";
 import type { DesktopThemeMode } from "../../app/antdTheme";
 import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
 import { exportPreviewPng } from "./exportPreviewPng";
+import type { GeyserParameterAnchor } from "./GeyserParameterPopover";
 import { createPreviewPalette, zoneFillColor } from "./previewPalette";
-import { toPreviewViewModel } from "./previewModel";
+import { toPreviewViewModel, type PreviewGeyserMarker } from "./previewModel";
 import {
   reconcileViewportOnStageResize,
   resetViewport,
@@ -23,10 +24,12 @@ interface PreviewCanvasProps {
   showBoundaries: boolean;
   showLabels: boolean;
   showGeysers: boolean;
+  selectedGeyserIndex: number | null;
   onHoverRegionChange: (region: { id: string; zoneType: number } | null) => void;
   onSelectedRegionChange: (region: { id: string; zoneType: number } | null) => void;
   onHoverGeyserChange: (index: number | null) => void;
   onSelectedGeyserChange: (index: number | null) => void;
+  onSelectedGeyserAnchorChange: (anchor: GeyserParameterAnchor | null) => void;
 }
 
 export interface PreviewCanvasHandle {
@@ -177,6 +180,30 @@ function resolveVisibleLabels(
   return result;
 }
 
+const GEYSER_POPOVER_MARGIN = 12;
+const GEYSER_POPOVER_WIDTH = 320;
+const GEYSER_POPOVER_HEIGHT = 240;
+
+function resolveSelectedGeyserAnchor(
+  marker: PreviewGeyserMarker,
+  viewport: ViewportState,
+  stageSize: { width: number; height: number }
+): GeyserParameterAnchor {
+  const screenX = marker.x * viewport.scale + viewport.x;
+  const screenY = marker.y * viewport.scale + viewport.y;
+
+  return {
+    left: Math.max(
+      GEYSER_POPOVER_MARGIN,
+      Math.min(screenX + GEYSER_POPOVER_MARGIN, stageSize.width - GEYSER_POPOVER_WIDTH - GEYSER_POPOVER_MARGIN)
+    ),
+    top: Math.max(
+      GEYSER_POPOVER_MARGIN,
+      Math.min(screenY + GEYSER_POPOVER_MARGIN, stageSize.height - GEYSER_POPOVER_HEIGHT - GEYSER_POPOVER_MARGIN)
+    ),
+  };
+}
+
 const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(function PreviewCanvas(
   {
     themeMode,
@@ -186,10 +213,12 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
     showBoundaries,
     showLabels,
     showGeysers,
+    selectedGeyserIndex,
     onHoverRegionChange,
     onSelectedRegionChange,
     onHoverGeyserChange,
     onSelectedGeyserChange,
+    onSelectedGeyserAnchorChange,
   },
   ref
 ) {
@@ -206,7 +235,6 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
   const [hoverRegionId, setHoverRegionId] = useState<string | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [hoverGeyserIndex, setHoverGeyserIndex] = useState<number | null>(null);
-  const [selectedGeyserIndex, setSelectedGeyserIndex] = useState<number | null>(null);
   const [hasManualViewportInteraction, setHasManualViewportInteraction] = useState(false);
 
   const model = useMemo(() => (preview ? toPreviewViewModel(preview, geysers) : null), [geysers, preview]);
@@ -261,12 +289,19 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
     setHoverRegionId(null);
     setSelectedRegionId(null);
     setHoverGeyserIndex(null);
-    setSelectedGeyserIndex(null);
     onHoverRegionChange(null);
     onSelectedRegionChange(null);
     onHoverGeyserChange(null);
     onSelectedGeyserChange(null);
-  }, [onHoverGeyserChange, onHoverRegionChange, onSelectedGeyserChange, onSelectedRegionChange, sessionKey]);
+    onSelectedGeyserAnchorChange(null);
+  }, [
+    onHoverGeyserChange,
+    onHoverRegionChange,
+    onSelectedGeyserAnchorChange,
+    onSelectedGeyserChange,
+    onSelectedRegionChange,
+    sessionKey,
+  ]);
 
   useEffect(() => {
     if (!sessionKey || !model) {
@@ -291,6 +326,42 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
       })
     );
   }, [fittedViewport, hasManualViewportInteraction]);
+
+  useEffect(() => {
+    if (showGeysers || selectedGeyserIndex === null) {
+      return;
+    }
+    setHoverGeyserIndex(null);
+    onHoverGeyserChange(null);
+    onSelectedGeyserChange(null);
+    onSelectedGeyserAnchorChange(null);
+  }, [
+    onHoverGeyserChange,
+    onSelectedGeyserAnchorChange,
+    onSelectedGeyserChange,
+    selectedGeyserIndex,
+    showGeysers,
+  ]);
+
+  useEffect(() => {
+    if (!model || !showGeysers || selectedGeyserIndex === null) {
+      onSelectedGeyserAnchorChange(null);
+      return;
+    }
+    const marker = model.geysers.find((item) => item.index === selectedGeyserIndex);
+    if (!marker) {
+      onSelectedGeyserAnchorChange(null);
+      return;
+    }
+    onSelectedGeyserAnchorChange(resolveSelectedGeyserAnchor(marker, viewport, stageSize));
+  }, [
+    model,
+    onSelectedGeyserAnchorChange,
+    selectedGeyserIndex,
+    showGeysers,
+    stageSize,
+    viewport,
+  ]);
 
   useImperativeHandle(
     ref,
@@ -354,6 +425,15 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
         scaleY={viewport.scale}
         draggable
         onWheel={handleWheel}
+        onClick={(event) => {
+          if (event.target !== event.target.getStage()) {
+            return;
+          }
+          setHoverGeyserIndex(null);
+          onHoverGeyserChange(null);
+          onSelectedGeyserChange(null);
+          onSelectedGeyserAnchorChange(null);
+        }}
         onDragEnd={(event) => {
           setHasManualViewportInteraction(true);
           setViewport((current) => ({
@@ -439,12 +519,13 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
                 }}
                 onClick={() => {
                   setHasManualViewportInteraction(true);
-                  setSelectedGeyserIndex(geyser.index);
+                  const nextSelectedGeyserIndex =
+                    selectedGeyserIndex === geyser.index ? null : geyser.index;
                   setHoverGeyserIndex((current) =>
                     current === geyser.index ? null : current
                   );
                   onHoverGeyserChange(null);
-                  onSelectedGeyserChange(geyser.index);
+                  onSelectedGeyserChange(nextSelectedGeyserIndex);
                 }}
               />
             ))}
