@@ -1,5 +1,6 @@
 .vs/
 .vscode/
+.tools/
 out/
 
 # CMake (covers accidental in-source builds)
