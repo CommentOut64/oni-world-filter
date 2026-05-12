@@ -4,7 +4,7 @@
 
 - 喷口参数不是地图里“额外再随机一层”的黑盒值。
 - 对于同一个世界坐标，喷口类型与原生参数都是确定性的。
-- 真正的随机源只有世界种子和喷口实例坐标；地图生成后，喷口参数可以直接复算。
+- 真正的随机源只有进入喷口生成链路的 `globalWorldSeed` 和喷口实例坐标；地图生成后，喷口参数可以直接复算。
 
 ## 1. 生成入口
 
@@ -16,8 +16,23 @@
 对应源码：
 
 - `src/WorldGen.cpp` 的 `GetGeysers()`
+- `src/App/AppRuntime.cpp` 的 `BuildSummary()`
 - `src/Setting/SettingsCache.cpp` 的 `ParseAndApplyMixingSettingsCode()`
 - `src/entry_sidecar.cpp` 的坐标解析链路
+
+这里需要特别区分两种 seed：
+
+- 世界坐标里的展示 seed，例如 `V-SNDST-C-1927980015-0-3A-0` 里的 `1927980015`
+- 真正传给 `WorldGen::GetGeysers(...)` 和喷口参数复算的 `globalWorldSeed`
+
+在当前仓库的 preview 链路里，权威做法已经和游戏实现对齐：
+
+```cpp
+int geyserSeed = baseSeed + static_cast<int>(cluster->worldPlacements.size()) - 1;
+```
+
+因此 `BuildGeyserDetails(...)` 必须使用这个 `geyserSeed`，不能直接把 `preview.summary.seed`
+当成喷口参数的随机源。
 
 ## 2. 喷口类型确定
 
@@ -176,11 +191,7 @@ total cycles = active period / 600
 - `95.9 cycles / 63.7 cycles`
 - `355.6 g/s`
 
-## 7. 结论
-
-如果世界码和喷口坐标不变，喷口参数就是确定的，可提前批量计算。
-
-## 8. 已验证类型样例
+## 7. 已验证类型区间
 
 以下是本仓库已按该算法复核过的两类喷口区间：
 
@@ -199,9 +210,33 @@ total cycles = active period / 600
 - 喷发占比：`0.016666668..0.1`
 - 活跃周期：`15000..135000 s`
 - 活跃占比：`0.4..0.8`
-*** Add File: f:\oni_world_app-master\llmdoc\reference\geyser-parameter-algorithm.md
-# 喷口参数算法
 
-> Type: Reference | Status: Active
+## 8. 结论
 
-请以 `docs/api/geyser-parameter-algorithm.md` 为准。
+当前已经可以确认：
+
+- 喷口参数绑定 `globalWorldSeed` 与喷口实例坐标，不是地图生成后的额外黑盒随机
+- 统一的参数抽样算法形式已经明确
+- `GeyserGenericConfig.GenerateConfigs()` 的 26 类权威区间表已经可以从官方资料与游戏反编译中恢复
+
+## 9. 当前实现状态
+
+当前仓库内与算法直接相关的 native 实现已经具备以下能力：
+
+1. `src/Geyser/GeyserParameterCalculator.cpp` 已实现 `GeyserGenericConfig.GenerateConfigs()` 的等价区间表。
+2. `BuildGeyserDetails(...)` 已按游戏的 5 次随机抽样顺序复算原生参数。
+3. `BuildGeyserDetails(...)` 与 `BuildWorldReportData(...)` 都以真实 `geyserSeed` 为输入，不再混用展示 world seed。
+4. `oil_reservoir`、`warp_portal` 等非适用对象会显式返回 `hasParameters = false`，不伪造喷口参数。
+
+当前仓库内与该算法配套的协议 / 宿主接入也已经具备以下能力：
+
+1. `preview_geyser_details` sidecar 协议已落地，可直接返回 `geyserDetails[]`。
+2. Rust host / Tauri 已暴露 `load_preview_geyser_details`，并完成请求校验、命令构造与事件反序列化。
+3. control sidecar 已支持 `preview_geyser_details` 的 one-shot 收集与终态事件判定。
+
+当前仓库内与该算法配套的前端预览链路也已经完成闭环：
+
+1. `previewStore` 已按 `previewKey(worldType:seed:mixing)` 聚合 preview 主体与 `geyserDetails[]`，并区分 `activePreview`、`activeGeyserDetailsStatus`、`activeGeyserDetailsError`。
+2. 地图预览采用“两阶段”体验：地图主体先显示，喷口详情随后异步补齐；旧请求只允许写 cache，不能回写当前激活项。
+3. `PreviewCanvas` / `PreviewPane` 已通过容器内锚点 + Ant Design `Popover` 的受控浮层，在喷口点位附近展示温度、喷发率、平均总产出、喷发期和活跃期。
+4. 当前仍然只预留 `WorldReportData` / `get_world_report` 的结构化合同；仓库内没有新增 PDF / HTML 导出逻辑，也没有新增报告导出按钮。
