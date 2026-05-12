@@ -90,6 +90,44 @@ bool ParseStringArray(const Json::Value &array,
     return true;
 }
 
+bool ParseGeyserSummaries(const Json::Value &array,
+                         const char *field,
+                         std::vector<GeyserSummary> *out,
+                         std::string *error)
+{
+    if (out == nullptr || error == nullptr) {
+        return false;
+    }
+    if (!array.isArray()) {
+        *error = std::string("field must be geyser array: ") + field;
+        return false;
+    }
+
+    int index = 0;
+    for (const auto &item : array) {
+        if (!item.isObject()) {
+            *error = std::string(field) + "[" + std::to_string(index) + "] must be object";
+            return false;
+        }
+        GeyserSummary summary;
+        if (!RequireInt(item, "type", &summary.type, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        if (!RequireInt(item, "x", &summary.x, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        if (!RequireInt(item, "y", &summary.y, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        out->push_back(summary);
+        ++index;
+    }
+    return true;
+}
+
 bool ParseCpuConfig(const Json::Value &root,
                     SidecarCpuConfig *cpu,
                     SidecarParseResult *result)
@@ -313,6 +351,47 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
         polygons.append(polygonJson);
     }
     root["polygons"] = polygons;
+    return root;
+}
+
+Json::Value BuildGeyserSummaryJson(const GeyserSummary &summary)
+{
+    Json::Value geyser(Json::objectValue);
+    geyser["type"] = summary.type;
+    geyser["x"] = summary.x;
+    geyser["y"] = summary.y;
+    const auto &ids = GetGeyserIds();
+    if (summary.type >= 0 && summary.type < static_cast<int>(ids.size())) {
+        geyser["id"] = ids[static_cast<size_t>(summary.type)];
+    }
+    return geyser;
+}
+
+Json::Value BuildGeyserDetailJson(const GeyserDetail &detail)
+{
+    Json::Value root(Json::objectValue);
+    root["index"] = detail.index;
+    root["summary"] = BuildGeyserSummaryJson(detail.summary);
+    root["hasParameters"] = detail.hasParameters;
+    root["parameterKind"] = detail.parameterKind;
+
+    Json::Value native(Json::objectValue);
+    native["averageActiveYieldKgPerCycle"] = detail.native.averageActiveYieldKgPerCycle;
+    native["eruptionPeriodSeconds"] = detail.native.eruptionPeriodSeconds;
+    native["eruptionRatio"] = detail.native.eruptionRatio;
+    native["activePeriodSeconds"] = detail.native.activePeriodSeconds;
+    native["activeRatio"] = detail.native.activeRatio;
+    root["native"] = native;
+
+    Json::Value derived(Json::objectValue);
+    derived["eruptionRateKgPerSecond"] = detail.derived.eruptionRateKgPerSecond;
+    derived["averageOverallYieldGPerSecond"] = detail.derived.averageOverallYieldGPerSecond;
+    derived["eruptionSeconds"] = detail.derived.eruptionSeconds;
+    derived["activeSeconds"] = detail.derived.activeSeconds;
+    derived["activeCycles"] = detail.derived.activeCycles;
+    derived["totalCycles"] = detail.derived.totalCycles;
+    derived["temperatureCelsius"] = detail.derived.temperatureCelsius;
+    root["derived"] = derived;
     return root;
 }
 
@@ -624,6 +703,31 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         return result;
     }
 
+    if (command == "preview_geyser_details") {
+        result.request.command = SidecarCommandType::PreviewGeyserDetails;
+        auto &request = result.request.previewGeyserDetails;
+        if (!RequireString(root, "jobId", &request.jobId, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "worldType", &request.worldType, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "seed", &request.seed, &result.error)) {
+            return result;
+        }
+        request.mixing = root.get("mixing", request.mixing).asInt();
+        if (!RequireInt(root, "worldHeight", &request.worldHeight, &result.error)) {
+            return result;
+        }
+        if (!ParseGeyserSummaries(root["geysers"],
+                                  "geysers",
+                                  &request.geysers,
+                                  &result.error)) {
+            return result;
+        }
+        return result;
+    }
+
     if (command == "preview_coord") {
         result.request.command = SidecarCommandType::PreviewCoord;
         auto &request = result.request.previewCoord;
@@ -889,6 +993,23 @@ std::string SerializePreviewEvent(const std::string &jobId,
         root["coord"] = *coordOverride;
     }
     root["preview"] = BuildPreviewJson(preview);
+    return WriteCompactJson(root);
+}
+
+std::string SerializePreviewGeyserDetailsEvent(
+    const std::string &jobId,
+    const SidecarPreviewGeyserDetailsRequest &request,
+    const std::vector<GeyserDetail> &geyserDetails)
+{
+    Json::Value root = BuildBaseEventJson("preview_geyser_details", jobId);
+    root["worldType"] = request.worldType;
+    root["seed"] = request.seed;
+    root["mixing"] = request.mixing;
+    Json::Value details(Json::arrayValue);
+    for (const auto &detail : geyserDetails) {
+        details.append(BuildGeyserDetailJson(detail));
+    }
+    root["geyserDetails"] = details;
     return WriteCompactJson(root);
 }
 

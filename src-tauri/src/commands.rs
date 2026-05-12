@@ -4,8 +4,9 @@ use crate::app_paths::{self, HostPathsPayload};
 use crate::control_sidecar;
 use crate::diagnostics;
 use crate::sidecar::{
-    self, CoordPreviewRequestPayload, GeyserOption, PreviewRequestPayload,
-    SearchAnalysisPayload, SearchCatalogPayload, SearchRequestPayload, WorldOption,
+    self, CoordPreviewRequestPayload, GeyserOption, PreviewGeyserDetailsEventPayload,
+    PreviewGeyserDetailsRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
+    SearchCatalogPayload, SearchRequestPayload, WorldOption,
 };
 use crate::state::AppState;
 
@@ -67,6 +68,43 @@ pub async fn load_preview(
     .map_err(|error| error.to_string());
     if let Err(error) = &result {
         diagnostics::log(Some(&app), "command.load_preview.error", error);
+    }
+    result
+}
+
+#[tauri::command]
+pub async fn load_preview_geyser_details(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    request: PreviewGeyserDetailsRequestPayload,
+) -> Result<PreviewGeyserDetailsEventPayload, String> {
+    diagnostics::log(
+        Some(&app),
+        "command.load_preview_geyser_details",
+        format!(
+            "jobId={}, worldType={}, seed={}, mixing={}, worldHeight={}, geysers={}",
+            request.job_id,
+            request.world_type,
+            request.seed,
+            request.mixing,
+            request.world_height,
+            request.geysers.len()
+        ),
+    );
+    let app_handle = app.clone();
+    let control_sidecar = state.control_sidecar.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        control_sidecar::load_preview_geyser_details(Some(&app_handle), &control_sidecar, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        diagnostics::log(
+            Some(&app),
+            "command.load_preview_geyser_details.error",
+            error,
+        );
     }
     result
 }

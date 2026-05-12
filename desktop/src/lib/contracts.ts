@@ -198,6 +198,35 @@ export interface GeyserSummary {
   id?: string;
 }
 
+export interface GeyserNativeParameters {
+  averageActiveYieldKgPerCycle: number;
+  eruptionPeriodSeconds: number;
+  eruptionRatio: number;
+  activePeriodSeconds: number;
+  activeRatio: number;
+}
+
+export interface GeyserDerivedParameters {
+  eruptionRateKgPerSecond: number;
+  averageOverallYieldGPerSecond: number;
+  eruptionSeconds: number;
+  activeSeconds: number;
+  activeCycles: number;
+  totalCycles: number;
+  temperatureCelsius: number;
+}
+
+export interface GeyserDetail {
+  index: number;
+  summary: GeyserSummary;
+  hasParameters: boolean;
+  parameterKind: string;
+  native: GeyserNativeParameters;
+  derived: GeyserDerivedParameters;
+}
+
+export type GeyserDetailsStatus = "idle" | "loading" | "ready" | "failed";
+
 export interface SearchMatchPayload {
   start: Point;
   worldSize: WorldSize;
@@ -294,6 +323,44 @@ export interface PreviewPayload {
   polygons: PreviewPolygon[];
 }
 
+export interface WorldReportData {
+  preview: PreviewPayload;
+  geyserDetails: GeyserDetail[];
+  mixing: number;
+  coord: string;
+}
+
+export interface PreviewGeyserDetailsRequest {
+  jobId: string;
+  worldType: number;
+  seed: number;
+  mixing: number;
+  worldHeight: number;
+  geysers: GeyserSummary[];
+}
+
+export interface WorldReportRequest {
+  jobId: string;
+  worldType: number;
+  seed: number;
+  mixing: number;
+}
+
+export interface PreviewGeyserDetailsEvent {
+  event: "preview_geyser_details";
+  jobId: string;
+  worldType: number;
+  seed: number;
+  mixing: number;
+  geyserDetails: GeyserDetail[];
+}
+
+export interface WorldReportEvent {
+  event: "world_report";
+  jobId: string;
+  report: WorldReportData;
+}
+
 export interface PreviewEvent {
   event: "preview";
   jobId: string;
@@ -320,7 +387,8 @@ export type SidecarEvent =
   | SearchCancelledEvent
   | SearchFailedEvent
   | PreviewEvent
-  | CoordPreviewEvent;
+  | CoordPreviewEvent
+  | WorldReportEvent;
 
 export interface SearchMatchSummary {
   seed: number;

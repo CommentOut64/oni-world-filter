@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 #include "Utils/Vector2f.hpp"
 
@@ -11,6 +12,33 @@ struct GeyserSummary {
     int type{};
     int x{};
     int y{};
+};
+
+struct GeyserNativeParameters {
+    float averageActiveYieldKgPerCycle{};
+    float eruptionPeriodSeconds{};
+    float eruptionRatio{};
+    float activePeriodSeconds{};
+    float activeRatio{};
+};
+
+struct GeyserDerivedParameters {
+    float eruptionRateKgPerSecond{};
+    float averageOverallYieldGPerSecond{};
+    float eruptionSeconds{};
+    float activeSeconds{};
+    float activeCycles{};
+    float totalCycles{};
+    float temperatureCelsius{};
+};
+
+struct GeyserDetail {
+    int index{};
+    GeyserSummary summary{};
+    bool hasParameters{false};
+    std::string parameterKind;
+    GeyserNativeParameters native{};
+    GeyserDerivedParameters derived{};
 };
 
 struct PolygonSummary {
@@ -33,6 +61,13 @@ struct GeneratedWorldSummary {
 struct GeneratedWorldPreview {
     GeneratedWorldSummary summary;
     std::vector<PolygonSummary> polygons;
+};
+
+struct WorldReportData {
+    GeneratedWorldPreview preview;
+    std::vector<GeyserDetail> geyserDetails;
+    int mixing{};
+    std::string coord;
 };
 
 inline const GeneratedWorldPreview *FindPrimaryGeneratedWorldPreview(

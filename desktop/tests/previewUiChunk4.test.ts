@@ -17,6 +17,15 @@ const PREVIEW_PANE_SOURCE = readFileSync(
   new URL("../src/features/preview/PreviewPane.tsx", import.meta.url),
   "utf8"
 );
+const CONTRACTS_SOURCE = readFileSync(new URL("../src/lib/contracts.ts", import.meta.url), "utf8");
+const PREVIEW_CANVAS_SOURCE = readFileSync(
+  new URL("../src/features/preview/PreviewCanvas.tsx", import.meta.url),
+  "utf8"
+);
+const GEYSER_POPOVER_SOURCE = readFileSync(
+  new URL("../src/features/preview/GeyserParameterPopover.tsx", import.meta.url),
+  "utf8"
+);
 
 const PREVIEW = {
   summary: {
@@ -68,7 +77,7 @@ test("PreviewLegend renders antd tags", () => {
 test("PreviewLegend is mounted inside preview canvas container", () => {
   assert.match(
     PREVIEW_PANE_SOURCE,
-    /<div className="preview-canvas-container">[\s\S]*<PreviewLegend\s*\/>[\s\S]*<\/div>\s*<PreviewDetails/
+    /<div className="preview-canvas-container"[\s\S]*<PreviewLegend\s*\/>[\s\S]*<\/div>\s*<PreviewDetails/
   );
 });
 
@@ -76,6 +85,24 @@ test("PreviewPane forwards themeMode to PreviewCanvas", () => {
   assert.match(
     PREVIEW_PANE_SOURCE,
     /<PreviewCanvas[\s\S]*themeMode=\{themeMode\}/
+  );
+});
+
+test("PreviewPane wires selected geyser popover inside preview canvas container", () => {
+  assert.match(
+    PREVIEW_PANE_SOURCE,
+    /<PreviewCanvas[\s\S]*selectedGeyserIndex=\{selectedGeyserIndex\}[\s\S]*onSelectedGeyserAnchorChange=\{setSelectedGeyserAnchor\}/
+  );
+  assert.match(
+    PREVIEW_PANE_SOURCE,
+    /<div className="preview-canvas-container"[\s\S]*ref=\{previewCanvasContainerRef\}[\s\S]*<PreviewLegend\s*\/>[\s\S]*<GeyserParameterPopover[\s\S]*popupContainer=\{previewCanvasContainer\}[\s\S]*geyserDetailsStatus=\{activeGeyserDetailsStatus\}[\s\S]*<\/div>\s*<PreviewDetails/
+  );
+});
+
+test("PreviewPane forwards active geyser detail state into GeyserListOverlay", () => {
+  assert.match(
+    PREVIEW_PANE_SOURCE,
+    /<GeyserListOverlay[\s\S]*geyserDetails=\{activeGeyserDetails\}[\s\S]*geyserDetailsStatus=\{activeGeyserDetailsStatus\}[\s\S]*popupContainer=\{previewCanvasContainer\}/
   );
 });
 
@@ -88,6 +115,36 @@ test("PreviewLegend uses floating vertical layout styling", () => {
     APP_CSS,
     /\.preview-legend\s*\{\s*margin-top:\s*0;[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*stretch;[\s\S]*\}/
   );
+});
+
+test("Geyser parameter popover uses controlled Popover anchor styling above other preview overlays", () => {
+  assert.match(GEYSER_POPOVER_SOURCE, /import\s*\{\s*Button,\s*Descriptions,\s*Popover,\s*Space,\s*Typography\s*\}\s*from "antd"/);
+  assert.match(GEYSER_POPOVER_SOURCE, /export function resolveGeyserPopoverWidth/);
+  assert.match(
+    GEYSER_POPOVER_SOURCE,
+    /popupContainer\.clientWidth\s*-\s*GEYSER_POPOVER_CONTAINER_MARGIN/
+  );
+  assert.match(GEYSER_POPOVER_SOURCE, /<Popover[\s\S]*open=\{Boolean\(anchor && geyser\)\}/);
+  assert.match(GEYSER_POPOVER_SOURCE, /overlayClassName="geyser-parameter-popover-overlay"/);
+  assert.match(
+    GEYSER_POPOVER_SOURCE,
+    /overlayStyle=\{\{\s*width:\s*overlayWidth,\s*maxWidth:\s*overlayWidth\s*\}\}/
+  );
+  assert.match(GEYSER_POPOVER_SOURCE, /<span className="geyser-parameter-anchor" style=\{\{ left: anchor\.left, top: anchor\.top \}\} \/>/);
+  assert.match(
+    APP_CSS,
+    /\.geyser-parameter-anchor\s*\{\s*position:\s*absolute;[\s\S]*pointer-events:\s*none;[\s\S]*z-index:\s*11;[\s\S]*\}/
+  );
+  assert.match(
+    APP_CSS,
+    /\.geyser-parameter-popover-overlay \.ant-popover-inner\s*\{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*box-sizing:\s*border-box;[\s\S]*\}/
+  );
+});
+
+test("Contracts reserve WorldReportData and world_report event shape", () => {
+  assert.match(CONTRACTS_SOURCE, /export interface WorldReportData \{\s*preview: PreviewPayload;\s*geyserDetails: GeyserDetail\[\];\s*mixing: number;\s*coord: string;\s*\}/);
+  assert.match(CONTRACTS_SOURCE, /export interface WorldReportRequest \{\s*jobId: string;\s*worldType: number;\s*seed: number;\s*mixing: number;\s*\}/);
+  assert.match(CONTRACTS_SOURCE, /export interface WorldReportEvent \{\s*event: "world_report";\s*jobId: string;\s*report: WorldReportData;\s*\}/);
 });
 
 test("PreviewDetails renders antd empty state without preview", () => {
@@ -201,6 +258,21 @@ test("GeyserListOverlay renders antd overlay shell", () => {
 
   assert.match(markup, /ant-card|ant-list/);
   assert.match(markup, /ant-btn/);
+});
+
+test("PreviewCanvas computes selected geyser anchor and clears selection on blank click", () => {
+  assert.match(
+    PREVIEW_CANVAS_SOURCE,
+    /onSelectedGeyserAnchorChange:\s*\(anchor:\s*GeyserParameterAnchor\s*\|\s*null\)\s*=>\s*void/
+  );
+  assert.match(
+    PREVIEW_CANVAS_SOURCE,
+    /resolveSelectedGeyserAnchor\(marker,\s*viewport,\s*stageSize\)/
+  );
+  assert.match(
+    PREVIEW_CANVAS_SOURCE,
+    /if \(event\.target !== event\.target\.getStage\(\)\)\s*\{\s*return;\s*\}[\s\S]*onSelectedGeyserChange\(null\);[\s\S]*onSelectedGeyserAnchorChange\(null\);/
+  );
 });
 
 test("HostDebugWindow renders antd container shell", () => {

@@ -6,6 +6,8 @@ import type {
   CoordPreviewRequest,
   GeyserOption,
   PreviewEvent,
+  PreviewGeyserDetailsEvent,
+  PreviewGeyserDetailsRequest,
   PreviewRequest,
   SearchAnalysisPayload,
   SearchAnalyzeRequest,
@@ -66,6 +68,15 @@ export async function loadPreview(request: PreviewRequest): Promise<PreviewEvent
     throw new Error("当前不在 Tauri 运行时，无法加载预览。");
   }
   return invoke<PreviewEvent>("load_preview", { request });
+}
+
+export async function loadPreviewGeyserDetails(
+  request: PreviewGeyserDetailsRequest
+): Promise<PreviewGeyserDetailsEvent> {
+  if (!inTauriRuntime()) {
+    throw new Error("当前不在 Tauri 运行时，无法加载喷口参数详情。");
+  }
+  return invoke<PreviewGeyserDetailsEvent>("load_preview_geyser_details", { request });
 }
 
 export async function loadPreviewByCoord(
