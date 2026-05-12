@@ -361,6 +361,12 @@ export interface WorldReportEvent {
   report: WorldReportData;
 }
 
+export interface ExportReportPdfRequest {
+  html: string;
+  outputPath: string;
+  title: string;
+}
+
 export interface PreviewEvent {
   event: "preview";
   jobId: string;

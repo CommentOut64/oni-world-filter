@@ -73,6 +73,8 @@ const char *DescribeCommand(Batch::SidecarCommandType command)
         return "preview_geyser_details";
     case Batch::SidecarCommandType::PreviewCoord:
         return "preview_coord";
+    case Batch::SidecarCommandType::WorldReport:
+        return "world_report";
     case Batch::SidecarCommandType::Cancel:
         return "cancel";
     case Batch::SidecarCommandType::SetSearchActiveWorkers:
@@ -679,6 +681,50 @@ void RunPreviewGeyserDetailsCommand(const Batch::SidecarPreviewGeyserDetailsRequ
     EmitLine(Batch::SerializePreviewGeyserDetailsEvent(request.jobId, request, details));
 }
 
+void RunGetWorldReportCommand(const Batch::SidecarWorldReportRequest &request)
+{
+    EmitDiagnostic("RunGetWorldReportCommand jobId=" + request.jobId +
+                   " worldType=" + std::to_string(request.worldType) +
+                   " seed=" + std::to_string(request.seed) +
+                   " mixing=" + std::to_string(request.mixing));
+    PreviewCaptureSink previewSink;
+    auto *runtime = AppRuntime::Instance();
+    runtime->SetResultSink(&previewSink);
+    runtime->SetSkipPolygons(false);
+    runtime->Initialize(0);
+
+    std::string code;
+    if (!BuildWorldCode(request.worldType, request.seed, request.mixing, &code)) {
+        EmitLine(Batch::SerializeFailedEvent(request.jobId, "invalid worldType"));
+        return;
+    }
+    if (!runtime->Generate(code, 0)) {
+        EmitLine(Batch::SerializeFailedEvent(request.jobId, "world report generate failed"));
+        return;
+    }
+    const GeneratedWorldPreview *primaryPreview = previewSink.PrimaryPreview();
+    if (primaryPreview == nullptr) {
+        EmitLine(Batch::SerializeFailedEvent(request.jobId, "world report payload is empty"));
+        return;
+    }
+
+    int geyserSeed = 0;
+    std::string errorMessage;
+    if (!ResolveGeyserSeed(request.worldType,
+                           request.seed,
+                           request.mixing,
+                           &geyserSeed,
+                           &errorMessage)) {
+        EmitLine(Batch::SerializeFailedEvent(request.jobId,
+                                             errorMessage.empty() ? "resolve geyser seed failed"
+                                                                  : errorMessage));
+        return;
+    }
+
+    const auto report =
+        GeyserCalc::BuildWorldReportData(*primaryPreview, geyserSeed, request.mixing, code);
+    EmitLine(Batch::SerializeWorldReportEvent(request.jobId, request, report));
+}
 void RunGetSearchCatalogCommand(const Batch::SidecarGetSearchCatalogRequest &request)
 {
     EmitDiagnostic("RunGetSearchCatalogCommand jobId=" + request.jobId);
@@ -797,6 +843,9 @@ int main()
                 break;
             case Batch::SidecarCommandType::PreviewCoord:
                 RunPreviewCoordCommand(parsed.request.previewCoord);
+                break;
+            case Batch::SidecarCommandType::WorldReport:
+                RunGetWorldReportCommand(parsed.request.worldReport);
                 break;
             case Batch::SidecarCommandType::Cancel:
                 if (!RequestSearchCancel(parsed.request.cancel.jobId)) {

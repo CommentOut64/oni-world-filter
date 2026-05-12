@@ -227,6 +227,16 @@ pub struct CoordPreviewRequestPayload {
     pub coord: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldReportRequestPayload {
+    pub job_id: String,
+    pub world_type: i32,
+    pub seed: i32,
+    #[serde(default)]
+    pub mixing: i32,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GeyserNativeParametersPayload {
@@ -717,6 +727,40 @@ pub fn load_preview_geyser_details(
 
     Err(HostError::InvalidRequest(
         "未收到 preview_geyser_details 事件".to_string(),
+    ))
+}
+
+pub fn load_world_report(
+    app: Option<&AppHandle>,
+    request: &WorldReportRequestPayload,
+) -> Result<Value, HostError> {
+    validate_world_report_request(request)?;
+    let sidecar_path = resolve_sidecar_path(app)?;
+    let payload = build_world_report_command(request);
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+        app,
+    )?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("world_report 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("world_report")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return Ok(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest(
+        "未收到 world_report 事件".to_string(),
     ))
 }
 
@@ -1316,6 +1360,20 @@ pub(crate) fn validate_preview_geyser_details_request(
     Ok(())
 }
 
+pub(crate) fn validate_world_report_request(
+    request: &WorldReportRequestPayload,
+) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+        return Err(HostError::InvalidRequest(
+            "worldType 超出有效范围".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_analyze_search_request(
     request: &SearchRequestPayload,
 ) -> Result<(), HostError> {
@@ -1365,6 +1423,16 @@ pub(crate) fn build_preview_geyser_details_command(
         "mixing": request.mixing,
         "worldHeight": request.world_height,
         "geysers": geysers
+    })
+}
+
+pub(crate) fn build_world_report_command(request: &WorldReportRequestPayload) -> Value {
+    json!({
+        "command": "world_report",
+        "jobId": request.job_id,
+        "worldType": request.world_type,
+        "seed": request.seed,
+        "mixing": request.mixing
     })
 }
 
@@ -1791,6 +1859,7 @@ mod tests {
     use super::{
         abort_all_running_jobs_for_shutdown, begin_host_cancellation,
         build_preview_coord_command, build_preview_geyser_details_command,
+        build_world_report_command,
         collect_sidecar_candidates, deserialize_preview_geyser_details_event,
         finalize_cancelled_from_snapshot, finalize_cancelled_from_stdout_eof,
         first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
@@ -1800,7 +1869,7 @@ mod tests {
         sidecar_spawn_creation_flags, validate_preview_coord_request,
         validate_preview_geyser_details_request, CoordPreviewRequestPayload,
         PreviewCpuSetInfo, PreviewGeyserDetailsRequestPayload, SearchCatalogPayload,
-        SidecarProcessPriority,
+        SidecarProcessPriority, WorldReportRequestPayload, validate_world_report_request,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -2638,6 +2707,57 @@ mod tests {
         assert_eq!(payload.geyser_details.len(), 1);
         assert_eq!(payload.geyser_details[0].summary.id.as_deref(), Some("steam"));
         assert!(payload.geyser_details[0].has_parameters);
+    }
+
+    #[test]
+    fn sidecar_world_report_source_should_define_request_validation_and_command_builder() {
+        let source = include_str!("sidecar.rs");
+
+        assert!(
+            source.contains(&["WorldReport", "RequestPayload"].join("")),
+            "sidecar.rs 应定义 WorldReportRequestPayload"
+        );
+        assert!(
+            source.contains(&["validate_", "world_report_request"].join("")),
+            "sidecar.rs 应定义 world_report 请求校验"
+        );
+        assert!(
+            source.contains(&["build_", "world_report_command"].join("")),
+            "sidecar.rs 应定义 world_report 命令构造"
+        );
+        assert!(
+            source.contains(&["load_", "world_report"].join("")),
+            "sidecar.rs 应定义 world_report 加载入口"
+        );
+    }
+
+    #[test]
+    fn build_world_report_command_should_emit_full_payload() {
+        let command = build_world_report_command(&WorldReportRequestPayload {
+            job_id: "world-report-001".to_string(),
+            world_type: 13,
+            seed: 100123,
+            mixing: 625,
+        });
+
+        assert_eq!(command["command"].as_str(), Some("world_report"));
+        assert_eq!(command["jobId"].as_str(), Some("world-report-001"));
+        assert_eq!(command["worldType"].as_i64(), Some(13));
+        assert_eq!(command["seed"].as_i64(), Some(100123));
+        assert_eq!(command["mixing"].as_i64(), Some(625));
+    }
+
+    #[test]
+    fn validate_world_report_request_should_reject_invalid_world_type() {
+        let error = validate_world_report_request(&WorldReportRequestPayload {
+            job_id: "world-report-002".to_string(),
+            world_type: -1,
+            seed: 100123,
+            mixing: 625,
+        })
+        .expect_err("invalid world type should be rejected");
+
+        assert!(error.to_string().contains("worldType"));
     }
 
     #[test]

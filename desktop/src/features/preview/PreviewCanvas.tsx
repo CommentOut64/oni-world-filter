@@ -4,8 +4,8 @@ import { Circle, Layer, Line, Rect, Stage, Text } from "react-konva";
 
 import type { DesktopThemeMode } from "../../app/antdTheme";
 import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
-import { exportPreviewPng } from "./exportPreviewPng";
 import type { GeyserParameterAnchor } from "./GeyserParameterPopover";
+import { LABEL_FONT_PX, resolveVisibleLabels, type ResolvedLabel } from "./previewLabelLayout.ts";
 import { createPreviewPalette, zoneFillColor } from "./previewPalette";
 import { toPreviewViewModel, type PreviewGeyserMarker } from "./previewModel";
 import {
@@ -34,151 +34,9 @@ interface PreviewCanvasProps {
 
 export interface PreviewCanvasHandle {
   resetView: () => void;
-  exportPng: () => Promise<void>;
 }
 
 const DEFAULT_STAGE = { width: 560, height: 560 };
-
-// 标签屏幕像素常量
-const LABEL_FONT_PX = 11;
-const LABEL_CHAR_WIDTH = 0.55; // 近似每字符宽度系数
-const LABEL_PADDING = 4; // 碰撞检测额外间距
-
-interface LabelRect {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
-
-function labelScreenRect(
-  label: { x: number; y: number; text: string; kind: "start" | "geyser" | "region" },
-  scale: number
-): LabelRect {
-  const charW = LABEL_FONT_PX * LABEL_CHAR_WIDTH;
-  const textW = label.text.length * charW;
-  const h = LABEL_FONT_PX;
-  const pad = LABEL_PADDING;
-
-  // 屏幕坐标 = world * scale，标签大小固定为屏幕像素
-  const sx = label.x * scale;
-  const sy = label.y * scale;
-
-  if (label.kind === "region") {
-    // 居中对齐
-    return {
-      left: sx - textW / 2 - pad,
-      right: sx + textW / 2 + pad,
-      top: sy - h / 2 - pad,
-      bottom: sy + h / 2 + pad,
-    };
-  }
-  // 喷口/起点：左上角偏移 +1px
-  return {
-    left: sx + 1 - pad,
-    right: sx + 1 + textW + pad,
-    top: sy + 1 - pad,
-    bottom: sy + 1 + h + pad,
-  };
-}
-
-function rectsOverlap(a: LabelRect, b: LabelRect): boolean {
-  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-}
-
-// 区域标签偏移尝试方向（屏幕像素）
-const NUDGE_OFFSETS: [number, number][] = [
-  [0, 0],      // 原位（质心）
-  [0, -20],    // 上
-  [0, 20],     // 下
-  [-25, 0],    // 左
-  [25, 0],     // 右
-  [-20, -15],  // 左上
-  [20, -15],   // 右上
-  [-20, 15],   // 左下
-  [20, 15],    // 右下
-];
-
-interface ResolvedLabel {
-  x: number; // 最终世界坐标
-  y: number;
-}
-
-/** 按优先级排序标签并进行碰撞检测，返回可见标签最终位置 */
-function resolveVisibleLabels(
-  candidates: readonly { id: string; x: number; y: number; text: string; kind: "start" | "geyser" | "region" }[],
-  scale: number,
-  selectedGeyserIndex: number | null,
-  showGeysers: boolean
-): Map<string, ResolvedLabel> {
-  const kindPriority = { start: 0, geyser: 1, region: 2 } as const;
-
-  const eligible = candidates.filter((label) => {
-    if (label.kind === "geyser" && !showGeysers) return false;
-    if (label.kind === "region" && scale < 1.8) return false;
-    if (scale < 1.8) {
-      if (label.kind === "start") return true;
-      if (label.kind === "geyser") {
-        return selectedGeyserIndex !== null && label.id === `geyser-${selectedGeyserIndex}-label`;
-      }
-      return false;
-    }
-    return true;
-  });
-
-  // 按优先级排序：start > 选中喷口 > 其他喷口 > 区域
-  eligible.sort((a, b) => {
-    const pa = kindPriority[a.kind];
-    const pb = kindPriority[b.kind];
-    if (pa !== pb) return pa - pb;
-    if (a.kind === "geyser" && b.kind === "geyser" && selectedGeyserIndex !== null) {
-      const aSelected = a.id === `geyser-${selectedGeyserIndex}-label` ? 0 : 1;
-      const bSelected = b.id === `geyser-${selectedGeyserIndex}-label` ? 0 : 1;
-      return aSelected - bSelected;
-    }
-    return 0;
-  });
-
-  const placed: LabelRect[] = [];
-  const result = new Map<string, ResolvedLabel>();
-
-  for (const label of eligible) {
-    if (label.kind !== "region") {
-      // 起点/喷口标签：原位放置，不偏移
-      const rect = labelScreenRect(label, scale);
-      const overlaps = placed.some((p) => rectsOverlap(rect, p));
-      if (!overlaps) {
-        placed.push(rect);
-        result.set(label.id, { x: label.x, y: label.y });
-      }
-      continue;
-    }
-
-    // 区域标签：尝试多个偏移位置，找到第一个不重叠的
-    let bestRect: LabelRect | null = null;
-    let bestPos: ResolvedLabel = { x: label.x, y: label.y };
-
-    for (const [dx, dy] of NUDGE_OFFSETS) {
-      const nudged = { ...label, x: label.x + dx / scale, y: label.y + dy / scale };
-      const rect = labelScreenRect(nudged, scale);
-      if (!placed.some((p) => rectsOverlap(rect, p))) {
-        bestRect = rect;
-        bestPos = { x: nudged.x, y: nudged.y };
-        break;
-      }
-    }
-
-    // 所有位置都重叠时，仍然显示在质心
-    if (!bestRect) {
-      bestRect = labelScreenRect(label, scale);
-    }
-
-    placed.push(bestRect);
-    result.set(label.id, bestPos);
-  }
-
-  return result;
-}
 
 const GEYSER_POPOVER_MARGIN = 12;
 const GEYSER_POPOVER_WIDTH = 320;
@@ -251,6 +109,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
     return resolveVisibleLabels(
       model.labelCandidates,
       viewport.scale,
+      1,
       selectedGeyserIndex,
       showGeysers
     );
@@ -373,17 +232,8 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
         setHasManualViewportInteraction(false);
         setViewport(resetViewport(model, stageSize.width, stageSize.height));
       },
-      exportPng: async () => {
-        if (!stageRef.current || !preview) {
-          return;
-        }
-        await exportPreviewPng({
-          dataUrl: stageRef.current.toDataURL({ pixelRatio: 2 }),
-          seed: preview.summary.seed,
-        });
-      },
     }),
-    [model, preview, stageSize.height, stageSize.width]
+    [model, stageSize.height, stageSize.width]
   );
 
   if (!preview || !model) {
@@ -551,7 +401,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
                   x={resolved.x}
                   y={resolved.y}
                   text={label.text}
-                  fontSize={11 / viewport.scale}
+                  fontSize={LABEL_FONT_PX / viewport.scale}
                   fill={previewPalette.label}
                   align={label.kind === "region" ? "center" : "left"}
                   verticalAlign={label.kind === "region" ? "middle" : "top"}

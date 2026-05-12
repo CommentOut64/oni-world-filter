@@ -15,6 +15,9 @@ import type {
   SearchRequest,
   SidecarEvent,
   SidecarStderrEvent,
+  ExportReportPdfRequest,
+  WorldReportEvent,
+  WorldReportRequest,
   WorldOption,
 } from "./contracts";
 import { FALLBACK_SEARCH_CATALOG, normalizeSearchCatalog } from "./searchCatalog.ts";
@@ -86,6 +89,24 @@ export async function loadPreviewByCoord(
     throw new Error("当前不在 Tauri 运行时，无法加载坐标预览。");
   }
   return invoke<CoordPreviewEvent>("load_preview_by_coord", { request });
+}
+
+export async function getWorldReport(
+  request: WorldReportRequest
+): Promise<WorldReportEvent> {
+  if (!inTauriRuntime()) {
+    throw new Error("当前不在 Tauri 运行时，无法加载地图报告。");
+  }
+  return invoke<WorldReportEvent>("get_world_report", { request });
+}
+
+export async function exportReportPdf(
+  request: ExportReportPdfRequest
+): Promise<void> {
+  if (!inTauriRuntime()) {
+    throw new Error("当前不在 Tauri 运行时，无法导出 PDF 报告。");
+  }
+  await invoke("export_report_pdf", { request });
 }
 
 export async function listWorlds(): Promise<WorldOption[]> {

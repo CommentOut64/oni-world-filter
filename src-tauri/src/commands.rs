@@ -3,10 +3,11 @@ use tauri::{AppHandle, State};
 use crate::app_paths::{self, HostPathsPayload};
 use crate::control_sidecar;
 use crate::diagnostics;
+use crate::report_pdf::ExportReportPdfRequest;
 use crate::sidecar::{
     self, CoordPreviewRequestPayload, GeyserOption, PreviewGeyserDetailsEventPayload,
     PreviewGeyserDetailsRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
-    SearchCatalogPayload, SearchRequestPayload, WorldOption,
+    SearchCatalogPayload, SearchRequestPayload, WorldOption, WorldReportRequestPayload,
 };
 use crate::state::AppState;
 
@@ -135,6 +136,34 @@ pub async fn load_preview_by_coord(
 }
 
 #[tauri::command]
+pub async fn get_world_report(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    request: WorldReportRequestPayload,
+) -> Result<serde_json::Value, String> {
+    diagnostics::log(
+        Some(&app),
+        "command.get_world_report",
+        format!(
+            "jobId={}, worldType={}, seed={}, mixing={}",
+            request.job_id, request.world_type, request.seed, request.mixing
+        ),
+    );
+    let app_handle = app.clone();
+    let control_sidecar = state.control_sidecar.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        control_sidecar::load_world_report(Some(&app_handle), &control_sidecar, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        diagnostics::log(Some(&app), "command.get_world_report.error", error);
+    }
+    result
+}
+
+#[tauri::command]
 pub fn list_worlds() -> Vec<WorldOption> {
     sidecar::list_world_options()
 }
@@ -147,6 +176,34 @@ pub fn list_geysers() -> Vec<GeyserOption> {
 #[tauri::command]
 pub fn get_host_paths(app: AppHandle) -> Result<HostPathsPayload, String> {
     app_paths::collect_host_paths(&app).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn export_report_pdf(
+    app: AppHandle,
+    request: ExportReportPdfRequest,
+) -> Result<(), String> {
+    diagnostics::log(
+        Some(&app),
+        "command.export_report_pdf",
+        format!(
+            "title={}, outputPath={}, htmlLength={}",
+            request.title,
+            request.output_path,
+            request.html.len()
+        ),
+    );
+    let app_handle = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        crate::report_pdf::export_report_pdf(&app_handle, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        diagnostics::log(Some(&app), "command.export_report_pdf.error", error);
+    }
+    result
 }
 
 #[tauri::command]

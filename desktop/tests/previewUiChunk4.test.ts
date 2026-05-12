@@ -18,6 +18,7 @@ const PREVIEW_PANE_SOURCE = readFileSync(
   "utf8"
 );
 const CONTRACTS_SOURCE = readFileSync(new URL("../src/lib/contracts.ts", import.meta.url), "utf8");
+const TAURI_SOURCE = readFileSync(new URL("../src/lib/tauri.ts", import.meta.url), "utf8");
 const PREVIEW_CANVAS_SOURCE = readFileSync(
   new URL("../src/features/preview/PreviewCanvas.tsx", import.meta.url),
   "utf8"
@@ -56,11 +57,12 @@ test("PreviewToolbar renders antd controls", () => {
       showLabels: true,
       showGeysers: true,
       geyserCount: 2,
+      isGeneratingReport: false,
       onToggleBoundaries: () => undefined,
       onToggleLabels: () => undefined,
       onToggleGeysers: () => undefined,
       onResetView: () => undefined,
-      onExportPng: () => undefined,
+      onGenerateReport: () => undefined,
       onOpenGeyserList: () => undefined,
     })
   );
@@ -86,6 +88,15 @@ test("PreviewPane forwards themeMode to PreviewCanvas", () => {
     PREVIEW_PANE_SOURCE,
     /<PreviewCanvas[\s\S]*themeMode=\{themeMode\}/
   );
+});
+
+test("PreviewToolbar replaces export png button with generate report action", () => {
+  assert.match(PREVIEW_PANE_SOURCE, /onGenerateReport=\{handleGenerateReport\}/);
+  assert.match(
+    PREVIEW_PANE_SOURCE,
+    /<PreviewToolbar[\s\S]*onGenerateReport=\{handleGenerateReport\}/
+  );
+  assert.match(PREVIEW_PANE_SOURCE, /生成报告/);
 });
 
 test("PreviewPane wires selected geyser popover inside preview canvas container", () => {
@@ -145,6 +156,40 @@ test("Contracts reserve WorldReportData and world_report event shape", () => {
   assert.match(CONTRACTS_SOURCE, /export interface WorldReportData \{\s*preview: PreviewPayload;\s*geyserDetails: GeyserDetail\[\];\s*mixing: number;\s*coord: string;\s*\}/);
   assert.match(CONTRACTS_SOURCE, /export interface WorldReportRequest \{\s*jobId: string;\s*worldType: number;\s*seed: number;\s*mixing: number;\s*\}/);
   assert.match(CONTRACTS_SOURCE, /export interface WorldReportEvent \{\s*event: "world_report";\s*jobId: string;\s*report: WorldReportData;\s*\}/);
+});
+
+test("tauri exports getWorldReport for report generation flow", () => {
+  assert.match(
+    TAURI_SOURCE,
+    /export async function getWorldReport\(\s*request: WorldReportRequest\s*\): Promise<WorldReportEvent>/
+  );
+  assert.match(
+    TAURI_SOURCE,
+    /throw new Error\("当前不在 Tauri 运行时，无法加载地图报告。"\);/
+  );
+  assert.match(
+    TAURI_SOURCE,
+    /return invoke<WorldReportEvent>\("get_world_report", \{ request \}\);/
+  );
+});
+
+test("tauri exports exportReportPdf for host-side PDF printing", () => {
+  assert.match(
+    CONTRACTS_SOURCE,
+    /export interface ExportReportPdfRequest \{\s*html: string;\s*outputPath: string;\s*title: string;\s*\}/
+  );
+  assert.match(
+    TAURI_SOURCE,
+    /export async function exportReportPdf\(\s*request: ExportReportPdfRequest\s*\): Promise<void>/
+  );
+  assert.match(
+    TAURI_SOURCE,
+    /throw new Error\("当前不在 Tauri 运行时，无法导出 PDF 报告。"\);/
+  );
+  assert.match(
+    TAURI_SOURCE,
+    /await invoke\("export_report_pdf", \{ request \}\);/
+  );
 });
 
 test("PreviewDetails renders antd empty state without preview", () => {
