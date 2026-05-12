@@ -119,9 +119,12 @@ GeyserDetail MakeParameterDetail(int index,
                                  const GeyserSummary &summary,
                                  const GeyserTypeSpec &spec,
                                  int geyserSeed,
-                                 int worldHeight)
+                                 int worldHeight,
+                                 int worldOffsetX,
+                                 int worldOffsetY)
 {
-    KRandom random(geyserSeed + summary.x + (worldHeight - summary.y));
+    KRandom random(geyserSeed + (summary.x + worldOffsetX) +
+                   ((worldHeight - summary.y) + worldOffsetY));
 
     const float rateRoll = random.NextSingle();
     const float iterationLengthRoll = random.NextSingle();
@@ -160,7 +163,9 @@ GeyserDetail MakeParameterDetail(int index,
 
 std::vector<GeyserDetail> BuildGeyserDetails(int geyserSeed,
                                              int worldHeight,
-                                             const std::vector<GeyserSummary> &geysers)
+                                             const std::vector<GeyserSummary> &geysers,
+                                             int worldOffsetX,
+                                             int worldOffsetY)
 {
     std::vector<GeyserDetail> details;
     details.reserve(geysers.size());
@@ -173,7 +178,8 @@ std::vector<GeyserDetail> BuildGeyserDetails(int geyserSeed,
             details.push_back(MakeNoParameterDetail(index, summary, std::move(kind)));
             continue;
         }
-        details.push_back(MakeParameterDetail(index, summary, *spec, geyserSeed, worldHeight));
+        details.push_back(
+            MakeParameterDetail(index, summary, *spec, geyserSeed, worldHeight, worldOffsetX, worldOffsetY));
     }
     return details;
 }
@@ -181,13 +187,17 @@ std::vector<GeyserDetail> BuildGeyserDetails(int geyserSeed,
 WorldReportData BuildWorldReportData(const GeneratedWorldPreview &preview,
                                      int geyserSeed,
                                      int mixing,
-                                     const std::string &coord)
+                                     const std::string &coord,
+                                     int worldOffsetX,
+                                     int worldOffsetY)
 {
     WorldReportData report;
     report.preview = preview;
     report.geyserDetails = BuildGeyserDetails(geyserSeed,
                                               preview.summary.worldSize.y,
-                                              preview.summary.geysers);
+                                              preview.summary.geysers,
+                                              worldOffsetX,
+                                              worldOffsetY);
     report.mixing = mixing;
     report.coord = coord;
     return report;

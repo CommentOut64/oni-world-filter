@@ -379,15 +379,40 @@ bool BuildWorldList(SettingsCache &settings,
     return true;
 }
 
-bool ResolveGeyserSeed(int worldType,
-                       int seed,
-                       int mixing,
-                       int *geyserSeed,
-                       std::string *errorMessage)
+struct GeyserSeedContext {
+    int geyserSeed{};
+    int worldOffsetX{};
+    int worldOffsetY{};
+};
+
+void ResolvePrimaryWorldOffset(const SettingsCache &settings, GeyserSeedContext *context)
 {
-    if (geyserSeed == nullptr) {
+    if (context == nullptr || settings.cluster == nullptr) {
+        return;
+    }
+
+    // 游戏在 cluster 初始化阶段会通过 BestFitWorlds 给 asteroid 分配全局 worldOffset。
+    // 当前 sidecar 只会对主世界做 geyser detail 复算，因此这里只补齐主世界的非零 offset。
+    const std::string &prefix = settings.cluster->coordinatePrefix;
+    if (prefix == "M-CERS-C" || prefix == "M-BAD-C") {
+        context->worldOffsetX = 82;
+        return;
+    }
+    if (prefix == "M-FLIP-C" || prefix == "M-FRZ-C" ||
+        prefix == "M-SWMP-C" || prefix == "M-RAD-C") {
+        context->worldOffsetX = 212;
+    }
+}
+
+bool ResolveGeyserSeedContext(int worldType,
+                              int seed,
+                              int mixing,
+                              GeyserSeedContext *context,
+                              std::string *errorMessage)
+{
+    if (context == nullptr) {
         if (errorMessage != nullptr) {
-            *errorMessage = "geyserSeed output is null";
+            *errorMessage = "geyser context output is null";
         }
         return false;
     }
@@ -430,7 +455,10 @@ bool ResolveGeyserSeed(int worldType,
         return false;
     }
 
-    *geyserSeed = settings.seed + static_cast<int>(settings.cluster->worldPlacements.size()) - 1;
+    context->geyserSeed = settings.seed + static_cast<int>(settings.cluster->worldPlacements.size()) - 1;
+    context->worldOffsetX = 0;
+    context->worldOffsetY = 0;
+    ResolvePrimaryWorldOffset(settings, context);
     return true;
 }
 
@@ -663,13 +691,13 @@ void RunPreviewGeyserDetailsCommand(const Batch::SidecarPreviewGeyserDetailsRequ
                    " worldHeight=" + std::to_string(request.worldHeight) +
                    " geysers=" + std::to_string(request.geysers.size()));
 
-    int geyserSeed = 0;
+    GeyserSeedContext geyserContext;
     std::string errorMessage;
-    if (!ResolveGeyserSeed(request.worldType,
-                           request.seed,
-                           request.mixing,
-                           &geyserSeed,
-                           &errorMessage)) {
+    if (!ResolveGeyserSeedContext(request.worldType,
+                                  request.seed,
+                                  request.mixing,
+                                  &geyserContext,
+                                  &errorMessage)) {
         EmitLine(Batch::SerializeFailedEvent(request.jobId,
                                              errorMessage.empty() ? "resolve geyser seed failed"
                                                                   : errorMessage));
@@ -677,7 +705,11 @@ void RunPreviewGeyserDetailsCommand(const Batch::SidecarPreviewGeyserDetailsRequ
     }
 
     const auto details =
-        GeyserCalc::BuildGeyserDetails(geyserSeed, request.worldHeight, request.geysers);
+        GeyserCalc::BuildGeyserDetails(geyserContext.geyserSeed,
+                                       request.worldHeight,
+                                       request.geysers,
+                                       geyserContext.worldOffsetX,
+                                       geyserContext.worldOffsetY);
     EmitLine(Batch::SerializePreviewGeyserDetailsEvent(request.jobId, request, details));
 }
 
@@ -708,13 +740,13 @@ void RunGetWorldReportCommand(const Batch::SidecarWorldReportRequest &request)
         return;
     }
 
-    int geyserSeed = 0;
+    GeyserSeedContext geyserContext;
     std::string errorMessage;
-    if (!ResolveGeyserSeed(request.worldType,
-                           request.seed,
-                           request.mixing,
-                           &geyserSeed,
-                           &errorMessage)) {
+    if (!ResolveGeyserSeedContext(request.worldType,
+                                  request.seed,
+                                  request.mixing,
+                                  &geyserContext,
+                                  &errorMessage)) {
         EmitLine(Batch::SerializeFailedEvent(request.jobId,
                                              errorMessage.empty() ? "resolve geyser seed failed"
                                                                   : errorMessage));
@@ -722,9 +754,15 @@ void RunGetWorldReportCommand(const Batch::SidecarWorldReportRequest &request)
     }
 
     const auto report =
-        GeyserCalc::BuildWorldReportData(*primaryPreview, geyserSeed, request.mixing, code);
+        GeyserCalc::BuildWorldReportData(*primaryPreview,
+                                         geyserContext.geyserSeed,
+                                         request.mixing,
+                                         code,
+                                         geyserContext.worldOffsetX,
+                                         geyserContext.worldOffsetY);
     EmitLine(Batch::SerializeWorldReportEvent(request.jobId, request, report));
 }
+
 void RunGetSearchCatalogCommand(const Batch::SidecarGetSearchCatalogRequest &request)
 {
     EmitDiagnostic("RunGetSearchCatalogCommand jobId=" + request.jobId);

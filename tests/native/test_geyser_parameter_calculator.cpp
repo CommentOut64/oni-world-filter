@@ -143,6 +143,27 @@ int RunAllTests()
         }
     }
 
+    {
+        const int miniClusterSeed = 644400493 + 11 - 1;
+        const auto details = GeyserCalc::BuildGeyserDetails(miniClusterSeed,
+                                                            153,
+                                                            {{1, 37, 106}},
+                                                            212,
+                                                            0);
+        Expect(details.size() == 1, "M-FLIP-C sample should produce one hot steam detail", failures);
+        if (details.size() == 1) {
+            const auto &hotSteam = details[0];
+            ExpectNear(hotSteam.derived.temperatureCelsius, 500.0f, 0.05f,
+                       "M-FLIP-C hot steam temperature mismatch", failures);
+            ExpectNear(hotSteam.native.eruptionPeriodSeconds, 576.0f, 1.0f,
+                       "M-FLIP-C hot steam eruption period mismatch", failures);
+            ExpectNear(hotSteam.derived.eruptionSeconds, 260.0f, 1.0f,
+                       "M-FLIP-C hot steam eruption seconds mismatch", failures);
+            ExpectNear(hotSteam.derived.eruptionRateKgPerSecond, 2.8386f, 0.02f,
+                       "M-FLIP-C hot steam eruption rate mismatch", failures);
+        }
+    }
+
     if (failures == 0) {
         std::cout << "[PASS] test_geyser_parameter_calculator" << std::endl;
         return 0;

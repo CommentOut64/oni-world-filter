@@ -4,7 +4,7 @@
 
 - 喷口参数不是地图里“额外再随机一层”的黑盒值。
 - 对于同一个世界坐标，喷口类型与原生参数都是确定性的。
-- 真正的随机源只有进入喷口生成链路的 `globalWorldSeed` 和喷口实例坐标；地图生成后，喷口参数可以直接复算。
+- 真正的随机源只有进入喷口生成链路的 `globalWorldSeed` 和喷口实例的绝对坐标；地图生成后，喷口参数可以直接复算。
 
 ## 1. 生成入口
 
@@ -33,6 +33,20 @@ int geyserSeed = baseSeed + static_cast<int>(cluster->worldPlacements.size()) - 
 
 因此 `BuildGeyserDetails(...)` 必须使用这个 `geyserSeed`，不能直接把 `preview.summary.seed`
 当成喷口参数的随机源。
+
+另外，喷口参数复算不能只看世界内的本地显示坐标。游戏实际使用的是：
+
+```cpp
+seed = globalWorldSeed + absoluteX + absoluteY;
+```
+
+其中：
+
+- `absoluteX = worldOffset.x + localX`
+- `absoluteY = worldOffset.y + internalY`
+- `worldOffset` 不是模板坐标的一部分，而是 cluster 初始化阶段通过 `BestFitWorlds` 给 asteroid 分配的全局偏移
+
+这也是 Space Out / moonlet cluster 上最容易漏掉的一层。
 
 ## 2. 喷口类型确定
 
@@ -191,6 +205,16 @@ total cycles = active period / 600
 - `95.9 cycles / 63.7 cycles`
 - `355.6 g/s`
 
+### 热蒸汽喷孔
+
+`M-FLIP-C-644400493-0-0-0`
+
+- `2.8386 kg/s`
+- `500°C`
+- `576.2 s / 259.8 s`
+- `129.6 cycles / 80.4 cycles`
+- `794.0 g/s`
+
 ## 7. 已验证类型区间
 
 以下是本仓库已按该算法复核过的两类喷口区间：
@@ -216,6 +240,7 @@ total cycles = active period / 600
 当前已经可以确认：
 
 - 喷口参数绑定 `globalWorldSeed` 与喷口实例坐标，不是地图生成后的额外黑盒随机
+- 对于 Space Out cluster，喷口实例坐标必须先叠加 `worldOffset`，再参与随机种子
 - 统一的参数抽样算法形式已经明确
 - `GeyserGenericConfig.GenerateConfigs()` 的 26 类权威区间表已经可以从官方资料与游戏反编译中恢复
 
@@ -226,7 +251,8 @@ total cycles = active period / 600
 1. `src/Geyser/GeyserParameterCalculator.cpp` 已实现 `GeyserGenericConfig.GenerateConfigs()` 的等价区间表。
 2. `BuildGeyserDetails(...)` 已按游戏的 5 次随机抽样顺序复算原生参数。
 3. `BuildGeyserDetails(...)` 与 `BuildWorldReportData(...)` 都以真实 `geyserSeed` 为输入，不再混用展示 world seed。
-4. `oil_reservoir`、`warp_portal` 等非适用对象会显式返回 `hasParameters = false`，不伪造喷口参数。
+4. 对主世界预览链路，当前实现已经补齐了 cluster `worldOffset` 对喷口随机种子的影响，不再把本地预览坐标误当成游戏绝对坐标。
+5. `oil_reservoir`、`warp_portal` 等非适用对象会显式返回 `hasParameters = false`，不伪造喷口参数。
 
 当前仓库内与该算法配套的协议 / 宿主接入也已经具备以下能力：
 
