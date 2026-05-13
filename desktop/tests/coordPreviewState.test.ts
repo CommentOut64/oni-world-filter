@@ -191,6 +191,7 @@ test("primeResolvedPreviewState stores preview in cache and makes it active", ()
   const preview = createPreview();
   const initialState: PreviewStoreSnapshot = {
     activeKey: null,
+    activeTarget: "primary",
     activePreview: null,
     activeGeyserDetailsStatus: "idle",
     activeGeyserDetails: [],
@@ -204,10 +205,11 @@ test("primeResolvedPreviewState stores preview in cache and makes it active", ()
   };
 
   const state = primeResolvedPreviewState(initialState, match, preview);
-  assert.equal(state.activeKey, "13:123456:625");
+  assert.equal(state.activeKey, "13:123456:625:primary");
+  assert.equal(state.activeTarget, "primary");
   assert.deepEqual(state.activePreview, preview);
   assert.deepEqual(state.cache, {
-    "13:123456:625": {
+    "13:123456:625:primary": {
       preview,
       geyserDetailsStatus: "idle",
       geyserDetails: [],

@@ -2,6 +2,7 @@ import type {
   GeyserDetail,
   GeyserDetailsStatus,
   PreviewPayload,
+  PreviewTarget,
   SearchMatchSummary,
 } from "../lib/contracts.ts";
 
@@ -14,6 +15,7 @@ export interface PreviewCacheEntry {
 
 export interface PreviewStoreSnapshot {
   activeKey: string | null;
+  activeTarget: PreviewTarget;
   activePreview: PreviewPayload | null;
   activeGeyserDetailsStatus: GeyserDetailsStatus;
   activeGeyserDetails: GeyserDetail[];
@@ -103,7 +105,46 @@ function upsertCacheEntry(
 }
 
 export function previewKey(match: SearchMatchSummary): string {
-  return `${match.worldType}:${match.seed}:${match.mixing}`;
+  return previewKeyForTarget(match.worldType, match.seed, match.mixing, "primary");
+}
+
+export function previewKeyForTarget(
+  worldType: number,
+  seed: number,
+  mixing: number,
+  target: PreviewTarget
+): string {
+  return `${worldType}:${seed}:${mixing}:${target}`;
+}
+
+export function previewKeyForMatch(
+  match: SearchMatchSummary,
+  target: PreviewTarget
+): string {
+  return previewKeyForTarget(match.worldType, match.seed, match.mixing, target);
+}
+
+function activeTargetFromKey(key: string, fallback: PreviewTarget): PreviewTarget {
+  const segments = key.split(":");
+  const rawTarget = segments[3];
+  if (rawTarget === "secondary") {
+    return "secondary";
+  }
+  if (rawTarget === "primary") {
+    return "primary";
+  }
+  return fallback;
+}
+
+export function previewBaseKey(key: string | null): string | null {
+  if (!key) {
+    return null;
+  }
+  const segments = key.split(":");
+  if (segments.length < 3) {
+    return null;
+  }
+  return segments.slice(0, 3).join(":");
 }
 
 export function beginPreviewLoad(
@@ -114,11 +155,14 @@ export function beginPreviewLoad(
   const cached = state.cache[key];
   const forceLoading = state.inflightDetailKeys[key] !== undefined && cached?.geyserDetailsStatus !== "ready";
   const activeDetails = activeDetailsFromCache(cached, forceLoading);
+  const activeTarget = activeTargetFromKey(key, state.activeTarget);
+  const shouldRetainActivePreview = previewBaseKey(state.activeKey) === previewBaseKey(key);
 
   if (cached) {
     return {
       ...state,
       activeKey: key,
+      activeTarget,
       activePreview: cached.preview,
       activeGeyserDetailsStatus: activeDetails.status,
       activeGeyserDetails: activeDetails.details,
@@ -132,7 +176,8 @@ export function beginPreviewLoad(
   return {
     ...state,
     activeKey: key,
-    activePreview: null,
+    activeTarget,
+    activePreview: shouldRetainActivePreview ? state.activePreview : null,
     activeGeyserDetailsStatus: "idle",
     activeGeyserDetails: [],
     activeGeyserDetailsError: null,
@@ -257,6 +302,26 @@ export function failPreviewLoad(
   if (state.activeKey !== key || state.requestSerial !== requestSerial) {
     return nextState;
   }
+  const failedTarget = activeTargetFromKey(key, state.activeTarget);
+  const baseKey = previewBaseKey(key);
+  const primaryKey = baseKey ? `${baseKey}:primary` : null;
+  const primaryCached = primaryKey ? state.cache[primaryKey] : undefined;
+  if (failedTarget === "secondary" && state.cache[key] === undefined && primaryCached && primaryKey) {
+    const forceLoading =
+      state.inflightDetailKeys[primaryKey] !== undefined && primaryCached.geyserDetailsStatus !== "ready";
+    const activeDetails = activeDetailsFromCache(primaryCached, forceLoading);
+    return {
+      ...nextState,
+      activeKey: primaryKey,
+      activeTarget: "primary",
+      activePreview: primaryCached.preview,
+      activeGeyserDetailsStatus: activeDetails.status,
+      activeGeyserDetails: activeDetails.details,
+      activeGeyserDetailsError: activeDetails.error,
+      isLoading: false,
+      lastError: error,
+    };
+  }
   return {
     ...nextState,
     isLoading: false,
@@ -301,15 +366,17 @@ export function failGeyserDetailsLoad(
 export function primeResolvedPreviewState(
   state: PreviewStoreSnapshot,
   match: SearchMatchSummary,
-  preview: PreviewPayload
+  preview: PreviewPayload,
+  target: PreviewTarget = "primary"
 ): PreviewStoreSnapshot {
-  const key = previewKey(match);
+  const key = previewKeyForMatch(match, target);
   const cacheEntry = createCacheEntry(preview, state.cache[key]);
   const activeDetails = activeDetailsFromCache(cacheEntry, cacheEntry.geyserDetailsStatus === "loading");
 
   return {
     ...state,
     activeKey: key,
+    activeTarget: target,
     activePreview: preview,
     activeGeyserDetailsStatus: activeDetails.status,
     activeGeyserDetails: activeDetails.details,
@@ -318,6 +385,40 @@ export function primeResolvedPreviewState(
       ...state.cache,
       [key]: cacheEntry,
     },
+    isLoading: false,
+    lastError: null,
+  };
+}
+
+export function setActiveTargetState(
+  state: PreviewStoreSnapshot,
+  target: PreviewTarget
+): PreviewStoreSnapshot {
+  const baseKey = previewBaseKey(state.activeKey);
+  if (!baseKey) {
+    return {
+      ...state,
+      activeTarget: target,
+    };
+  }
+
+  const key = `${baseKey}:${target}`;
+  const cached = state.cache[key];
+  if (!cached) {
+    return state;
+  }
+
+  const forceLoading = state.inflightDetailKeys[key] !== undefined && cached.geyserDetailsStatus !== "ready";
+  const activeDetails = activeDetailsFromCache(cached, forceLoading);
+
+  return {
+    ...state,
+    activeKey: key,
+    activeTarget: target,
+    activePreview: cached.preview,
+    activeGeyserDetailsStatus: activeDetails.status,
+    activeGeyserDetails: activeDetails.details,
+    activeGeyserDetailsError: activeDetails.error,
     isLoading: false,
     lastError: null,
   };

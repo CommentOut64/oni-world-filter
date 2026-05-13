@@ -11,6 +11,11 @@
 
 namespace Batch {
 
+enum class PreviewTarget {
+    Primary,
+    Secondary,
+};
+
 enum class SidecarCommandType {
     Unknown,
     Search,
@@ -66,6 +71,7 @@ struct SidecarPreviewRequest {
     int worldType = 0;
     int seed = 0;
     int mixing = 0;
+    PreviewTarget target = PreviewTarget::Primary;
 };
 
 struct SidecarPreviewGeyserDetailsRequest {
@@ -75,6 +81,7 @@ struct SidecarPreviewGeyserDetailsRequest {
     int mixing = 0;
     int worldHeight = 0;
     std::vector<GeyserSummary> geysers;
+    PreviewTarget target = PreviewTarget::Primary;
 };
 
 struct SidecarPreviewCoordRequest {

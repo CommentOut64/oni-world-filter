@@ -57,9 +57,9 @@ int RunAllTests()
     {
         Batch::SidecarWorldReportRequest request;
         request.jobId = "job-world-report-001";
-        request.worldType = 13;
+        request.worldType = 0;
         request.seed = 100123;
-        request.mixing = 625;
+        request.mixing = 0;
 
         std::string expectedCoord;
         Expect(BuildWorldCode(request.worldType, request.seed, request.mixing, &expectedCoord),
@@ -127,6 +127,9 @@ int RunAllTests()
         const Json::Value root =
             ParseJsonObject(firstLine, &failures, "M-FLIP-C world_report json should be valid");
 
+        Expect(root["event"].asString() == "world_report",
+               "M-FLIP-C primary world_report should recover to legacy-equivalent success",
+               &failures);
         const Json::Value &geyserDetails = root["report"]["geyserDetails"];
         int hotSteamIndex = -1;
         for (Json::ArrayIndex i = 0; i < geyserDetails.size(); ++i) {

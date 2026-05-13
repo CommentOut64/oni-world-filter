@@ -251,18 +251,27 @@ total cycles = active period / 600
 1. `src/Geyser/GeyserParameterCalculator.cpp` 已实现 `GeyserGenericConfig.GenerateConfigs()` 的等价区间表。
 2. `BuildGeyserDetails(...)` 已按游戏的 5 次随机抽样顺序复算原生参数。
 3. `BuildGeyserDetails(...)` 与 `BuildWorldReportData(...)` 都以真实 `geyserSeed` 为输入，不再混用展示 world seed。
-4. 对主世界预览链路，当前实现已经补齐了 cluster `worldOffset` 对喷口随机种子的影响，不再把本地预览坐标误当成游戏绝对坐标。
-5. `oil_reservoir`、`warp_portal` 等非适用对象会显式返回 `hasParameters = false`，不伪造喷口参数。
+4. `oil_reservoir`、`warp_portal` 等非适用对象会显式返回 `hasParameters = false`，不伪造喷口参数。
+
+当前预览链路对 `worldOffset` 的实现边界还需特别注意：
+
+1. 游戏里的权威坐标来源是运行时 asteroid `WorldOffset.X/Y`，不是 `coordinatePrefix`、`worldPlacementIndex` 或 teleporter 列号。
+2. 当前仓库仍然只能生成本地 asteroid 预览数据，尚未产出或导出真实 `worldOffset.X/Y`。
+3. 为了兼容已经验证过的旧主星链路，当前 sidecar 已把主星 offset 恢复为一个独立 policy 模块里的 legacy-equivalent 规则：`M-CERS-C / M-BAD-C -> 82`，`M-FLIP-C / M-FRZ-C / M-SWMP-C / M-RAD-C -> 212`，其余主星保持 `0`。
+4. 这条恢复只覆盖主星；副星仍然缺少权威 `worldOffset.X/Y` 来源，因此继续 fail-closed，避免把猜测 offset 伪装成正确结果。
+5. 非 Space Out 的单世界坐标仍沿用 `worldOffset = 0` 的旧语义，因为这条链路不依赖 cluster asteroid 全局排布。
 
 当前仓库内与该算法配套的协议 / 宿主接入也已经具备以下能力：
 
-1. `preview_geyser_details` sidecar 协议已落地，可直接返回 `geyserDetails[]`。
+1. `preview_geyser_details` sidecar 协议已落地，并以 `target = primary|secondary` 指定目标世界，可直接返回 `geyserDetails[]`。
 2. Rust host / Tauri 已暴露 `load_preview_geyser_details`，并完成请求校验、命令构造与事件反序列化。
 3. control sidecar 已支持 `preview_geyser_details` 的 one-shot 收集与终态事件判定。
 
 当前仓库内与该算法配套的前端预览链路也已经完成闭环：
 
-1. `previewStore` 已按 `previewKey(worldType:seed:mixing)` 聚合 preview 主体与 `geyserDetails[]`，并区分 `activePreview`、`activeGeyserDetailsStatus`、`activeGeyserDetailsError`。
+1. `previewStore` 已按 `previewKey(worldType:seed:mixing:target)` 聚合 preview 主体与 `geyserDetails[]`，并区分 `activeTarget`、`activePreview`、`activeGeyserDetailsStatus`、`activeGeyserDetailsError`。
 2. 地图预览采用“两阶段”体验：地图主体先显示，喷口详情随后异步补齐；旧请求只允许写 cache，不能回写当前激活项。
-3. `PreviewCanvas` / `PreviewPane` 已通过容器内锚点 + Ant Design `Popover` 的受控浮层，在喷口点位附近展示温度、喷发率、平均总产出、喷发期和活跃期。
-4. 当前仍然只预留 `WorldReportData` / `get_world_report` 的结构化合同；仓库内没有新增 PDF / HTML 导出逻辑，也没有新增报告导出按钮。
+3. `PreviewPane` 已支持主星 / 副星切换；首次切到副星时按 target 发请求，失败时继续保留主星画面并显示明确错误。
+4. `PreviewCanvas` / `PreviewPane` 已通过容器内锚点 + Ant Design `Popover` 的受控浮层，在喷口点位附近展示温度、喷发率、平均总产出、喷发期和活跃期。
+5. 当前 Space Out 主星的喷口参数与主星 world report 已恢复到旧实现等价结果；副星参数弹窗仍会显示 fail-closed 错误。
+6. 副星只做展示，不参与批量筛选，也不允许从副星态触发报告导出。

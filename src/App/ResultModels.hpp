@@ -51,7 +51,9 @@ struct GeneratedWorldSummary {
     int seed{};
     int worldType{}; // 兼容旧链路：0=主星，1=非主星
     int worldPlacementIndex{-1};
+    std::string worldAssetId;
     bool isPrimary{};
+    bool hasSecondaryPreview{};
     Vector2i worldSize{};
     Vector2i start{};
     std::vector<TraitSummary> traits;
@@ -70,13 +72,23 @@ struct WorldReportData {
     std::string coord;
 };
 
+inline const GeneratedWorldPreview *FindGeneratedWorldPreviewByPrimaryFlag(
+    const std::vector<GeneratedWorldPreview> &previews,
+    bool isPrimary)
+{
+    for (const auto &preview : previews) {
+        if (preview.summary.isPrimary == isPrimary) {
+            return &preview;
+        }
+    }
+    return nullptr;
+}
+
 inline const GeneratedWorldPreview *FindPrimaryGeneratedWorldPreview(
     const std::vector<GeneratedWorldPreview> &previews)
 {
-    for (const auto &preview : previews) {
-        if (preview.summary.isPrimary) {
-            return &preview;
-        }
+    if (const auto *preview = FindGeneratedWorldPreviewByPrimaryFlag(previews, true)) {
+        return preview;
     }
     return previews.empty() ? nullptr : &previews.front();
 }

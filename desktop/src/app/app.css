@@ -395,6 +395,18 @@ textarea,
   gap: 12px;
 }
 
+.preview-pane-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.preview-world-switch {
+  flex: 0 0 auto;
+}
+
 .preview-pane-alert {
   margin-top: 10px;
 }
@@ -1086,6 +1098,12 @@ textarea,
 }
 
 .geyser-overlay-item {
+  appearance: none;
+  width: 100%;
+  display: block;
+  text-align: left;
+  background: transparent;
+  border: 0;
   padding: 8px 12px;
   border-bottom: 1px solid var(--line-overlay);
   transition:
@@ -1175,39 +1193,36 @@ textarea,
   line-height: 1.5;
 }
 
-.geyser-parameter-anchor {
+.geyser-parameter-popover-floating {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  pointer-events: none;
   z-index: 11;
+  width: 100%;
+  max-width: 100%;
 }
 
-.geyser-parameter-popover-overlay {
-  z-index: 11;
-}
-
-.geyser-parameter-popover-overlay .ant-popover-arrow {
-  display: none;
+.geyser-parameter-popover-overlay .ant-popover-content {
+  width: 100%;
+  max-width: 100%;
 }
 
 .geyser-parameter-popover-overlay .ant-popover-inner {
-  width: 100%;
-  max-width: 100%;
-  padding: 0;
   box-sizing: border-box;
-  border: 1px solid var(--line-active);
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg-overlay);
+  border: 0;
   box-shadow: none;
+  padding: 0;
 }
 
 .geyser-parameter-popover-overlay .ant-popover-title {
-  min-height: 42px;
   margin: 0;
-  padding: 0 12px;
-  border-bottom-color: var(--line-overlay);
+  padding: 8px 12px 4px;
+  border-bottom: 0;
+}
+
+.geyser-parameter-popover-overlay .ant-popover-inner-content {
+  padding: 0;
 }
 
 .geyser-parameter-popover-title {

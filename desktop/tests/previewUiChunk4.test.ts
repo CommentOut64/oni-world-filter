@@ -102,7 +102,7 @@ test("PreviewToolbar replaces export png button with generate report action", ()
 test("PreviewPane wires selected geyser popover inside preview canvas container", () => {
   assert.match(
     PREVIEW_PANE_SOURCE,
-    /<PreviewCanvas[\s\S]*selectedGeyserIndex=\{selectedGeyserIndex\}[\s\S]*onSelectedGeyserAnchorChange=\{setSelectedGeyserAnchor\}/
+    /<PreviewCanvas[\s\S]*geyserPopoverEnabled=\{activeTarget === "primary"\}[\s\S]*selectedGeyserIndex=\{selectedGeyserIndex\}[\s\S]*onSelectedGeyserAnchorChange=\{setSelectedGeyserAnchor\}/
   );
   assert.match(
     PREVIEW_PANE_SOURCE,
@@ -113,7 +113,7 @@ test("PreviewPane wires selected geyser popover inside preview canvas container"
 test("PreviewPane forwards active geyser detail state into GeyserListOverlay", () => {
   assert.match(
     PREVIEW_PANE_SOURCE,
-    /<GeyserListOverlay[\s\S]*geyserDetails=\{activeGeyserDetails\}[\s\S]*geyserDetailsStatus=\{activeGeyserDetailsStatus\}[\s\S]*popupContainer=\{previewCanvasContainer\}/
+    /<GeyserListOverlay[\s\S]*activeTarget=\{activeTarget\}[\s\S]*geyserDetails=\{activeGeyserDetails\}[\s\S]*geyserDetailsStatus=\{activeGeyserDetailsStatus\}[\s\S]*popupContainer=\{previewCanvasContainer\}/
   );
 });
 
@@ -128,27 +128,29 @@ test("PreviewLegend uses floating vertical layout styling", () => {
   );
 });
 
-test("Geyser parameter popover uses controlled Popover anchor styling above other preview overlays", () => {
-  assert.match(GEYSER_POPOVER_SOURCE, /import\s*\{\s*Button,\s*Descriptions,\s*Popover,\s*Space,\s*Typography\s*\}\s*from "antd"/);
+test("Geyser parameter popover uses floating panel styling above other preview overlays", () => {
+  assert.match(GEYSER_POPOVER_SOURCE, /import\s*\{\s*Button,\s*Descriptions,\s*Space,\s*Typography\s*\}\s*from "antd"/);
   assert.match(GEYSER_POPOVER_SOURCE, /export function resolveGeyserPopoverWidth/);
   assert.match(
     GEYSER_POPOVER_SOURCE,
     /popupContainer\.clientWidth\s*-\s*GEYSER_POPOVER_CONTAINER_MARGIN/
   );
-  assert.match(GEYSER_POPOVER_SOURCE, /<Popover[\s\S]*open=\{Boolean\(anchor && geyser\)\}/);
-  assert.match(GEYSER_POPOVER_SOURCE, /overlayClassName="geyser-parameter-popover-overlay"/);
+  assert.match(GEYSER_POPOVER_SOURCE, /className="geyser-parameter-popover-overlay geyser-parameter-popover-floating ant-popover ant-popover-placement-rightTop"/);
   assert.match(
     GEYSER_POPOVER_SOURCE,
-    /overlayStyle=\{\{\s*width:\s*overlayWidth,\s*maxWidth:\s*overlayWidth\s*\}\}/
-  );
-  assert.match(GEYSER_POPOVER_SOURCE, /<span className="geyser-parameter-anchor" style=\{\{ left: anchor\.left, top: anchor\.top \}\} \/>/);
-  assert.match(
-    APP_CSS,
-    /\.geyser-parameter-anchor\s*\{\s*position:\s*absolute;[\s\S]*pointer-events:\s*none;[\s\S]*z-index:\s*11;[\s\S]*\}/
+    /style=\{\{[\s\S]*width:\s*overlayWidth,[\s\S]*maxWidth:\s*overlayWidth,[\s\S]*\}\}/
   );
   assert.match(
     APP_CSS,
-    /\.geyser-parameter-popover-overlay \.ant-popover-inner\s*\{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*box-sizing:\s*border-box;[\s\S]*\}/
+    /\.geyser-parameter-popover-floating\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*11;[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*\}/
+  );
+  assert.match(
+    APP_CSS,
+    /\.geyser-parameter-popover-overlay \.ant-popover-inner\s*\{[\s\S]*background:\s*var\(--bg-overlay\);[\s\S]*border:\s*0;[\s\S]*box-shadow:\s*none;[\s\S]*\}/
+  );
+  assert.match(
+    APP_CSS,
+    /\.geyser-parameter-popover-overlay \.ant-popover-title\s*\{[\s\S]*padding:\s*8px 12px 4px;[\s\S]*border-bottom:\s*0;[\s\S]*\}/
   );
 });
 
@@ -296,7 +298,11 @@ test("GeyserListOverlay renders antd overlay shell", () => {
 
   const markup = renderToStaticMarkup(
     createElement(GeyserListOverlay, {
+      activeTarget: "primary",
       geysersData: PREVIEW.summary.geysers,
+      geyserDetails: [],
+      geyserDetailsStatus: "idle",
+      popupContainer: null,
       onClose: () => undefined,
     })
   );

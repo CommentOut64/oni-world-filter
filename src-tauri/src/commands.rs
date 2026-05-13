@@ -83,13 +83,12 @@ pub async fn load_preview_geyser_details(
         Some(&app),
         "command.load_preview_geyser_details",
         format!(
-            "jobId={}, worldType={}, seed={}, mixing={}, worldHeight={}, geysers={}",
+            "jobId={}, worldType={}, seed={}, mixing={}, target={:?}",
             request.job_id,
             request.world_type,
             request.seed,
             request.mixing,
-            request.world_height,
-            request.geysers.len()
+            request.target
         ),
     );
     let app_handle = app.clone();

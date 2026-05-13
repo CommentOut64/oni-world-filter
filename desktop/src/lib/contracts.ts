@@ -127,6 +127,7 @@ export interface PreviewRequest {
   worldType: number;
   seed: number;
   mixing: number;
+  target?: PreviewTarget;
 }
 
 export interface CoordPreviewRequest {
@@ -227,6 +228,8 @@ export interface GeyserDetail {
 
 export type GeyserDetailsStatus = "idle" | "loading" | "ready" | "failed";
 
+export type PreviewTarget = "primary" | "secondary";
+
 export interface SearchMatchPayload {
   start: Point;
   worldSize: WorldSize;
@@ -312,6 +315,10 @@ export interface PreviewPolygon {
 export interface PreviewSummary {
   seed: number;
   worldType: number;
+  worldPlacementIndex: number;
+  worldAssetId?: string;
+  isPrimary: boolean;
+  hasSecondaryPreview: boolean;
   start: Point;
   worldSize: WorldSize;
   traits: number[];
@@ -335,8 +342,7 @@ export interface PreviewGeyserDetailsRequest {
   worldType: number;
   seed: number;
   mixing: number;
-  worldHeight: number;
-  geysers: GeyserSummary[];
+  target?: PreviewTarget;
 }
 
 export interface WorldReportRequest {

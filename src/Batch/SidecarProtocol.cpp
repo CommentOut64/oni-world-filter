@@ -128,6 +128,35 @@ bool ParseGeyserSummaries(const Json::Value &array,
     return true;
 }
 
+bool ParsePreviewTarget(const Json::Value &root,
+                        PreviewTarget *target,
+                        std::string *error)
+{
+    if (target == nullptr || error == nullptr) {
+        return false;
+    }
+    const Json::Value targetNode = root["target"];
+    if (targetNode.isNull()) {
+        *target = PreviewTarget::Primary;
+        return true;
+    }
+    if (!targetNode.isString()) {
+        *error = "field must be string: target";
+        return false;
+    }
+    const std::string value = targetNode.asString();
+    if (value == "primary") {
+        *target = PreviewTarget::Primary;
+        return true;
+    }
+    if (value == "secondary") {
+        *target = PreviewTarget::Secondary;
+        return true;
+    }
+    *error = "invalid target";
+    return false;
+}
+
 bool ParseCpuConfig(const Json::Value &root,
                     SidecarCpuConfig *cpu,
                     SidecarParseResult *result)
@@ -310,6 +339,10 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
     Json::Value root(Json::objectValue);
     root["summary"]["seed"] = preview.summary.seed;
     root["summary"]["worldType"] = preview.summary.worldType;
+    root["summary"]["worldPlacementIndex"] = preview.summary.worldPlacementIndex;
+    root["summary"]["worldAssetId"] = preview.summary.worldAssetId;
+    root["summary"]["isPrimary"] = preview.summary.isPrimary;
+    root["summary"]["hasSecondaryPreview"] = preview.summary.hasSecondaryPreview;
     root["summary"]["start"]["x"] = preview.summary.start.x;
     root["summary"]["start"]["y"] = preview.summary.start.y;
     root["summary"]["worldSize"]["w"] = preview.summary.worldSize.x;
@@ -715,6 +748,9 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
         request.mixing = root.get("mixing", request.mixing).asInt();
+        if (!ParsePreviewTarget(root, &request.target, &result.error)) {
+            return result;
+        }
         return result;
     }
 
@@ -731,13 +767,7 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
         request.mixing = root.get("mixing", request.mixing).asInt();
-        if (!RequireInt(root, "worldHeight", &request.worldHeight, &result.error)) {
-            return result;
-        }
-        if (!ParseGeyserSummaries(root["geysers"],
-                                  "geysers",
-                                  &request.geysers,
-                                  &result.error)) {
+        if (!ParsePreviewTarget(root, &request.target, &result.error)) {
             return result;
         }
         return result;

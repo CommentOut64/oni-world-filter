@@ -52,6 +52,13 @@ function normalizeError(error: unknown): string {
   return "未知错误";
 }
 
+function localizeSidecarError(message: string): string {
+  if (message.includes("authoritative worldOffset is unavailable")) {
+    return "当前版本缺少可验证的 worldOffset 数据，已停止返回喷口参数以避免错误结果。";
+  }
+  return message;
+}
+
 export async function startSearch(request: SearchRequest): Promise<void> {
   if (!inTauriRuntime()) {
     throw new Error("当前不在 Tauri 运行时，无法启动搜索。");
@@ -165,5 +172,5 @@ export async function subscribeSidecar(
 }
 
 export function formatTauriError(error: unknown): string {
-  return normalizeError(error);
+  return localizeSidecarError(normalizeError(error));
 }

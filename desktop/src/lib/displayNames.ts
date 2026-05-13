@@ -54,6 +54,65 @@ export const WORLD_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
   "M-CERS-C-": { zh: "卫星星群 - 谷神星地幔", en: "Moonlet Cluster - Ceres Mantle" },
 };
 
+export const ASTEROID_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
+  "dlc2::worlds/MiniShatteredWarpAsteroid": {
+    zh: "迷你碎裂副星",
+    en: "Mini Shattered Warp Asteroid",
+  },
+  "expansion1::worlds/MediumForestyRadioactiveVanillaWarpPlanet": {
+    zh: "中型林地放射副星",
+    en: "Medium Foresty Radioactive Warp Asteroid",
+  },
+  "expansion1::worlds/MediumForestyWasteland": {
+    zh: "中型林地荒芜副星",
+    en: "Medium Foresty Wasteland Warp Asteroid",
+  },
+  "expansion1::worlds/MediumRadioactiveVanillaWarpPlanet": {
+    zh: "中型放射副星",
+    en: "Medium Radioactive Warp Asteroid",
+  },
+  "expansion1::worlds/MediumSandyRadioactiveVanillaWarpPlanet": {
+    zh: "中型砂质放射副星",
+    en: "Medium Sandy Radioactive Warp Asteroid",
+  },
+  "expansion1::worlds/MediumSandySwamp": {
+    zh: "中型砂质沼泽副星",
+    en: "Medium Sandy Swamp Warp Asteroid",
+  },
+  "expansion1::worlds/MediumSwampy": {
+    zh: "中型沼泽副星",
+    en: "Medium Swampy Warp Asteroid",
+  },
+  "expansion1::worlds/MiniBadlandsWarp": {
+    zh: "迷你荒芜副星",
+    en: "Mini Badlands Warp Asteroid",
+  },
+  "expansion1::worlds/MiniFlippedWarp": {
+    zh: "迷你翻转副星",
+    en: "Mini Flipped Warp Asteroid",
+  },
+  "expansion1::worlds/MiniForestFrozenWarp": {
+    zh: "迷你森林冰霜副星",
+    en: "Mini Forest Frozen Warp Asteroid",
+  },
+  "expansion1::worlds/MiniRadioactiveOceanWarp": {
+    zh: "迷你放射海洋副星",
+    en: "Mini Radioactive Ocean Warp Asteroid",
+  },
+  "expansion1::worlds/OilRichWarpTarget": {
+    zh: "富油副星",
+    en: "Oil-Rich Warp Asteroid",
+  },
+  "expansion1::worlds/WarpOilySandySwamp": {
+    zh: "含油砂质沼泽副星",
+    en: "Oily Sandy Swamp Warp Asteroid",
+  },
+  "expansion1::worlds/WarpOilySwamp": {
+    zh: "含油沼泽副星",
+    en: "Oily Swamp Warp Asteroid",
+  },
+};
+
 export const GEYSER_DISPLAY_NAMES: Record<string, GeyserDisplayName> = {
   steam: { zh: "低温蒸汽喷孔", en: "Cool Steam Vent" },
   hot_steam: { zh: "蒸汽喷孔", en: "Steam Vent" },

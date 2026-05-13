@@ -1,6 +1,5 @@
 import React from "react";
-import { Button, Descriptions, Popover, Space, Typography } from "antd";
-import type { TooltipRef } from "antd/es/tooltip";
+import { Button, Descriptions, Space, Typography } from "antd";
 
 import type {
   GeyserDetail,
@@ -63,22 +62,7 @@ export default function GeyserParameterPopover({
 }: GeyserParameterPopoverProps) {
   void React;
   const geysers = useSearchStore((state) => state.geysers);
-  const popoverRef = React.useRef<TooltipRef | null>(null);
-  const hasPopover = Boolean(anchor && geyser);
-  const anchorLeft = anchor?.left ?? 0;
-  const anchorTop = anchor?.top ?? 0;
-  const geyserX = geyser?.x ?? 0;
-  const geyserY = geyser?.y ?? 0;
   const overlayWidth = resolveGeyserPopoverWidth(popupContainer);
-
-  React.useLayoutEffect(() => {
-    if (!hasPopover) {
-      return;
-    }
-
-    // rc-trigger 不会因为锚点 left/top 变化自动重排，这里显式请求重新对齐。
-    popoverRef.current?.forceAlign?.();
-  }, [anchorLeft, anchorTop, geyserX, geyserY, hasPopover, overlayWidth]);
 
   if (!anchor || !geyser) {
     return null;
@@ -86,9 +70,7 @@ export default function GeyserParameterPopover({
 
   const title = formatGeyserDetailTitle(geyser, geysers);
   const detail = geyserDetail ?? null;
-  const popupContainerResolver = popupContainer ? () => popupContainer : undefined;
-
-  const popoverTitle = (
+  const panelTitle = (
     <div className="geyser-parameter-popover-title">
       <span>{title}</span>
       <Space size={8}>
@@ -169,20 +151,22 @@ export default function GeyserParameterPopover({
       ) : null}
     </div>
   );
-
   return (
-    <Popover
-      ref={popoverRef}
-      open={Boolean(anchor && geyser)}
-      trigger={[]}
-      placement="rightTop"
-      overlayClassName="geyser-parameter-popover-overlay"
-      overlayStyle={{ width: overlayWidth, maxWidth: overlayWidth }}
-      title={popoverTitle}
-      content={popoverContent}
-      getPopupContainer={popupContainerResolver}
+    <div
+      className="geyser-parameter-popover-overlay geyser-parameter-popover-floating ant-popover ant-popover-placement-rightTop"
+      style={{
+        left: anchor.left,
+        top: anchor.top,
+        width: overlayWidth,
+        maxWidth: overlayWidth,
+      }}
     >
-      <span className="geyser-parameter-anchor" style={{ left: anchor.left, top: anchor.top }} />
-    </Popover>
+      <div className="ant-popover-content">
+        <div className="ant-popover-inner" role="tooltip">
+          <div className="ant-popover-title">{panelTitle}</div>
+          <div className="ant-popover-inner-content">{popoverContent}</div>
+        </div>
+      </div>
+    </div>
   );
 }

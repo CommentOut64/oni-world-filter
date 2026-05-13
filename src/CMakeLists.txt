@@ -106,6 +106,8 @@ set(ONI_BASE_SOURCES
     "BatchCpu/CpuOptimization.cpp"
     "Geyser/GeyserParameterCalculator.hpp"
     "Geyser/GeyserParameterCalculator.cpp"
+    "Geyser/PreviewWorldOffsetPolicy.hpp"
+    "Geyser/PreviewWorldOffsetPolicy.cpp"
 )
 
 if(ONI_BUILD_SIDECAR)
@@ -303,6 +305,24 @@ target_include_directories(test_geyser_parameter_calculator
 )
 target_link_libraries(test_geyser_parameter_calculator PRIVATE jsoncpp)
 add_test(NAME test_geyser_parameter_calculator COMMAND test_geyser_parameter_calculator)
+
+add_executable(test_preview_world_session
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_preview_world_session.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_preview_world_session
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_preview_world_session PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_preview_world_session PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_preview_world_session COMMAND test_preview_world_session)
 
 add_executable(test_sidecar_shutdown
     "../tests/native/test_main.cpp"

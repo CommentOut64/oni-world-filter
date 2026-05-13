@@ -21,6 +21,7 @@ interface PreviewCanvasProps {
   sessionKey: string | null;
   preview: PreviewPayload | null;
   geysers: readonly GeyserOption[];
+  geyserPopoverEnabled: boolean;
   showBoundaries: boolean;
   showLabels: boolean;
   showGeysers: boolean;
@@ -68,6 +69,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
     sessionKey,
     preview,
     geysers,
+    geyserPopoverEnabled,
     showBoundaries,
     showLabels,
     showGeysers,
@@ -203,7 +205,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
   ]);
 
   useEffect(() => {
-    if (!model || !showGeysers || selectedGeyserIndex === null) {
+    if (!geyserPopoverEnabled || !model || !showGeysers || selectedGeyserIndex === null) {
       onSelectedGeyserAnchorChange(null);
       return;
     }
@@ -215,6 +217,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
     onSelectedGeyserAnchorChange(resolveSelectedGeyserAnchor(marker, viewport, stageSize));
   }, [
     model,
+    geyserPopoverEnabled,
     onSelectedGeyserAnchorChange,
     selectedGeyserIndex,
     showGeysers,
