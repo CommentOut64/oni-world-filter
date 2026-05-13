@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
-import type { PreviewPayload, SearchMatchSummary } from "../lib/contracts.ts";
+import type {
+  PreviewPayload,
+  PreviewTarget,
+  SearchMatchSummary,
+} from "../lib/contracts.ts";
 import { formatTauriError, loadPreview, loadPreviewGeyserDetails } from "../lib/tauri.ts";
 import {
   beginGeyserDetailsLoad,
@@ -9,20 +13,23 @@ import {
   completePreviewLoad,
   failGeyserDetailsLoad,
   failPreviewLoad,
-  previewKey,
+  previewKeyForMatch,
   primeResolvedPreviewState,
+  setActiveTargetState,
   type PreviewStoreSnapshot,
 } from "./previewStoreState.ts";
 
 interface PreviewState extends PreviewStoreSnapshot {
-  loadByMatch: (match: SearchMatchSummary) => Promise<void>;
+  loadByMatch: (match: SearchMatchSummary, target?: PreviewTarget) => Promise<void>;
   primeResolvedPreview: (match: SearchMatchSummary, preview: PreviewPayload) => void;
+  setActiveTarget: (target: PreviewTarget) => void;
   clear: () => void;
   clearError: () => void;
 }
 
 export const usePreviewStore = create<PreviewState>((set, get) => ({
   activeKey: null,
+  activeTarget: "primary",
   activePreview: null,
   activeGeyserDetailsStatus: "idle",
   activeGeyserDetails: [],
@@ -33,10 +40,11 @@ export const usePreviewStore = create<PreviewState>((set, get) => ({
   requestSerial: 0,
   isLoading: false,
   lastError: null,
-  loadByMatch: async (match) => {
+  loadByMatch: async (match, target = "primary") => {
     const requestGeyserDetails = async (
       key: string,
-      requestSerial: number
+      requestSerial: number,
+      detailTarget: PreviewTarget
     ): Promise<void> => {
       const current = get();
       const cachedPreview = current.cache[key]?.preview;
@@ -54,8 +62,7 @@ export const usePreviewStore = create<PreviewState>((set, get) => ({
           worldType: match.worldType,
           seed: match.seed,
           mixing: match.mixing,
-          worldHeight: cachedPreview.summary.worldSize.h,
-          geysers: cachedPreview.summary.geysers,
+          target: detailTarget,
         });
         set((state) => completeGeyserDetailsLoad(state, key, event.geyserDetails, requestSerial));
       } catch (error) {
@@ -63,21 +70,21 @@ export const usePreviewStore = create<PreviewState>((set, get) => ({
       }
     };
 
-    const key = previewKey(match);
+    const key = previewKeyForMatch(match, target);
     const current = get();
     const inflightPreviewSerial = current.inflightPreviewKeys[key];
     const inflightDetailSerial = current.inflightDetailKeys[key];
     const cached = current.cache[key];
     const requestSerial = inflightPreviewSerial ?? inflightDetailSerial ?? current.requestSerial + 1;
-
     set((state) => beginPreviewLoad(state, key, requestSerial));
+
     if (inflightPreviewSerial !== undefined) {
       return;
     }
 
     if (cached) {
       if (cached.geyserDetailsStatus !== "ready" && inflightDetailSerial === undefined) {
-        void requestGeyserDetails(key, requestSerial);
+        void requestGeyserDetails(key, requestSerial, target);
       }
       return;
     }
@@ -96,19 +103,39 @@ export const usePreviewStore = create<PreviewState>((set, get) => ({
         worldType: match.worldType,
         seed: match.seed,
         mixing: match.mixing,
+        target,
       });
       set((state) => completePreviewLoad(state, key, event.preview, requestSerial));
-      void requestGeyserDetails(key, requestSerial);
+      void requestGeyserDetails(key, requestSerial, target);
     } catch (error) {
-      set((state) => failPreviewLoad(state, key, formatTauriError(error), requestSerial));
+      const message = formatTauriError(error);
+      set((state) =>
+        failPreviewLoad(
+          state,
+          key,
+          target === "secondary" ? `副星预览加载失败: ${message}` : message,
+          requestSerial
+        )
+      );
+      if (target === "secondary") {
+        set((state) => ({
+          ...state,
+          isLoading: false,
+          lastError: `副星预览加载失败: ${message}`,
+        }));
+      }
     }
   },
   primeResolvedPreview: (match, preview) => {
     set((state) => primeResolvedPreviewState(state, match, preview));
   },
+  setActiveTarget: (target) => {
+    set((state) => setActiveTargetState(state, target));
+  },
   clear: () => {
     set({
       activeKey: null,
+      activeTarget: "primary",
       activePreview: null,
       activeGeyserDetailsStatus: "idle",
       activeGeyserDetails: [],

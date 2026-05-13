@@ -395,6 +395,18 @@ textarea,
   gap: 12px;
 }
 
+.preview-pane-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.preview-world-switch {
+  flex: 0 0 auto;
+}
+
 .preview-pane-alert {
   margin-top: 10px;
 }

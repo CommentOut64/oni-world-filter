@@ -153,6 +153,9 @@ function appendMatch(state: SearchState, event: SearchMatchEvent): SearchState {
       summary: {
         seed: event.seed,
         worldType: state.activeWorldType,
+        worldPlacementIndex: 0,
+        isPrimary: true,
+        hasSecondaryPreview: false,
         start: event.summary.start,
         worldSize: event.summary.worldSize,
         traits: event.summary.traits,

@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, message, Typography } from "antd";
+import { Alert, Segmented, message, Typography } from "antd";
 
 import type { DesktopThemeMode } from "../../app/antdTheme";
+import type { PreviewTarget } from "../../lib/contracts.ts";
 import ThemeModeToggle from "../../components/layout/ThemeModeToggle";
 import { formatTauriError } from "../../lib/tauri.ts";
 import { usePreviewStore } from "../../state/previewStore";
+import { previewBaseKey } from "../../state/previewStoreState.ts";
 import { useSearchStore } from "../../state/searchStore";
+import { findCategoryForWorld } from "../search/worldParameterUi.ts";
 import { exportWorldReport } from "../report/exportWorldReport.ts";
 import PreviewCanvas, { type PreviewCanvasHandle } from "./PreviewCanvas";
 import PreviewDetails from "./PreviewDetails";
@@ -25,9 +28,12 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
   const results = useSearchStore((state) => state.results);
   const geysers = useSearchStore((state) => state.geysers);
   const catalog = useSearchStore((state) => state.catalog);
+  const worlds = useSearchStore((state) => state.worlds);
 
   const previewSessionKey = usePreviewStore((state) => state.activeKey);
+  const activeTarget = usePreviewStore((state) => state.activeTarget);
   const loadByMatch = usePreviewStore((state) => state.loadByMatch);
+  const setActiveTarget = usePreviewStore((state) => state.setActiveTarget);
   const preview = usePreviewStore((state) => state.activePreview);
   const activeGeyserDetailsStatus = usePreviewStore((state) => state.activeGeyserDetailsStatus);
   const activeGeyserDetails = usePreviewStore((state) => state.activeGeyserDetails);
@@ -59,13 +65,36 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
     selectedSeed === null
       ? null
       : results.find((item) => item.seed === selectedSeed) ?? null;
+  const selectedWorldCategory = selectedMatch
+    ? findCategoryForWorld(worlds, selectedMatch.worldType)
+    : null;
+  const isMoonletResult = selectedWorldCategory === "moonletCluster";
+  const selectedMatchBaseKey = selectedMatch
+    ? `${selectedMatch.worldType}:${selectedMatch.seed}:${selectedMatch.mixing}`
+    : null;
+  const hasSecondaryPreview = Boolean(
+    selectedMatchBaseKey &&
+      previewBaseKey(previewSessionKey) === selectedMatchBaseKey &&
+      preview?.summary.hasSecondaryPreview
+  );
+  const showWorldSwitch = Boolean(isMoonletResult || hasSecondaryPreview);
+  const secondarySwitchDisabled = !hasSecondaryPreview;
 
   useEffect(() => {
     if (!selectedMatch) {
       return;
     }
-    void loadByMatch(selectedMatch);
+    void loadByMatch(selectedMatch, "primary");
   }, [selectedMatch, loadByMatch]);
+
+  useEffect(() => {
+    setHoveredRegion(null);
+    setSelectedRegion(null);
+    setHoverGeyserIndex(null);
+    setSelectedGeyserIndex(null);
+    setSelectedGeyserAnchor(null);
+    setShowGeyserList(false);
+  }, [activeTarget]);
 
   useEffect(() => {
     if (preview && selectedGeyserIndex !== null) {
@@ -76,6 +105,12 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
 
   const handleGenerateReport = () => {
     if (!selectedMatch) {
+      return;
+    }
+    if (activeTarget !== "primary") {
+      usePreviewStore.setState({
+        lastError: "副星预览不支持生成报告，请先切回主星。",
+      });
       return;
     }
     usePreviewStore.setState({ lastError: null });
@@ -112,15 +147,42 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
     if (!selectedMatch) {
       return;
     }
-    void loadByMatch(selectedMatch);
+    void loadByMatch(selectedMatch, activeTarget);
   };
+  const worldSwitchOptions: Array<{
+    label: string;
+    value: PreviewTarget;
+    disabled?: boolean;
+  }> = [
+    { label: "主星", value: "primary" },
+    { label: "副星", value: "secondary", disabled: secondarySwitchDisabled },
+  ];
 
   const previewCanvasContainer = previewCanvasContainerRef.current;
 
   return (
     <section className="preview-pane">
       <header className="preview-pane-header">
-        <Typography.Title level={3}>地图预览</Typography.Title>
+        <div className="preview-pane-title-row">
+          <Typography.Title level={3}>地图预览</Typography.Title>
+          {showWorldSwitch ? (
+            <Segmented<PreviewTarget>
+              className="theme-toggle preview-world-switch"
+              value={activeTarget}
+              options={worldSwitchOptions}
+              onChange={(value) => {
+                if (value === "primary") {
+                  setActiveTarget("primary");
+                  return;
+                }
+                if (!selectedMatch) {
+                  return;
+                }
+                void loadByMatch(selectedMatch, "secondary");
+              }}
+            />
+          ) : null}
+        </div>
         <ThemeModeToggle mode={themeMode} onModeChange={onThemeModeChange} />
       </header>
       {isLoading ? (
