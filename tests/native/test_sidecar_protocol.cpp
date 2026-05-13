@@ -119,12 +119,19 @@ int RunAllTests()
     }
 
     {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"preview","jobId":"job-preview-invalid-target","worldType":13,"seed":100123,"mixing":625,"target":"tertiary"})");
+        Expect(!result.Ok(), "preview request with invalid target should fail", failures);
+        Expect(!result.error.empty(), "preview invalid target should report error", failures);
+    }
+
+    {
         const auto path = FixturePath("preview-geyser-details-request.json");
         const auto jsonText = ReadText(path);
         Expect(!jsonText.empty(), "preview_geyser_details fixture should be readable", failures);
 
         const auto result = Batch::ParseSidecarRequest(jsonText);
-        Expect(result.Ok(), "preview_geyser_details request should parse", failures);
+        Expect(result.Ok(), "preview_geyser_details request should parse without legacy payload fields", failures);
         Expect(result.request.command == Batch::SidecarCommandType::PreviewGeyserDetails,
                "preview_geyser_details request command mismatch",
                failures);
@@ -140,17 +147,12 @@ int RunAllTests()
         Expect(result.request.previewGeyserDetails.mixing == 625,
                "preview_geyser_details request mixing mismatch",
                failures);
-        Expect(result.request.previewGeyserDetails.worldHeight == 384,
-               "preview_geyser_details request worldHeight mismatch",
+        Expect(result.request.previewGeyserDetails.worldHeight == 0,
+               "preview_geyser_details request should not require worldHeight",
                failures);
-        Expect(result.request.previewGeyserDetails.geysers.size() == 2,
-               "preview_geyser_details request geyser size mismatch",
+        Expect(result.request.previewGeyserDetails.geysers.empty(),
+               "preview_geyser_details request should not require geyser list",
                failures);
-        if (result.request.previewGeyserDetails.geysers.size() == 2) {
-            Expect(result.request.previewGeyserDetails.geysers[1].x == 75,
-                   "preview_geyser_details request geyser x mismatch",
-                   failures);
-        }
     }
 
     {
@@ -378,6 +380,9 @@ int RunAllTests()
         GeneratedWorldPreview preview;
         preview.summary.seed = 100123;
         preview.summary.worldType = 13;
+        preview.summary.worldPlacementIndex = 4;
+        preview.summary.isPrimary = false;
+        preview.summary.hasSecondaryPreview = true;
         preview.summary.start = {128, 200};
         preview.summary.worldSize = {256, 384};
         preview.summary.traits.push_back({2});
@@ -588,6 +593,15 @@ int RunAllTests()
         Expect(previewJson["coord"].asString() == previewCoord, "preview coord mismatch", failures);
         Expect(previewJson["preview"]["summary"]["seed"].asInt() == 100123,
                "preview summary seed mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["worldPlacementIndex"].asInt() == 4,
+               "preview summary worldPlacementIndex mismatch",
+               failures);
+        Expect(!previewJson["preview"]["summary"]["isPrimary"].asBool(),
+               "preview summary isPrimary mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["hasSecondaryPreview"].asBool(),
+               "preview summary hasSecondaryPreview mismatch",
                failures);
         Expect(previewGeyserDetailsJson["geyserDetails"].size() == 2,
                "preview_geyser_details size mismatch",
