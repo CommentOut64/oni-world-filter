@@ -3,9 +3,13 @@
 #undef main
 
 #include <fstream>
+#include <functional>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
+
+#include <json/json.h>
 
 namespace {
 
@@ -102,6 +106,95 @@ struct PreviewSample {
     const char *expectedPrefix{};
 };
 
+bool LoadSettingsForWorldType(int worldType,
+                              int seed,
+                              int mixing,
+                              SettingsCache *settings,
+                              std::string *code,
+                              std::string *errorMessage)
+{
+    if (settings == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "settings output is null";
+        }
+        return false;
+    }
+
+    if (!BuildWorldCode(worldType, seed, mixing, code)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "invalid worldType";
+        }
+        return false;
+    }
+
+    std::string sharedError;
+    const auto shared = SharedSettingsCache::GetOrCreate(ReadSettingsBlob, &sharedError);
+    if (shared == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = sharedError.empty() ? "failed to load shared settings cache"
+                                                : sharedError;
+        }
+        return false;
+    }
+
+    *settings = *shared;
+    if (!settings->CoordinateChanged(*code, *settings)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "parse world code failed";
+        }
+        return false;
+    }
+    return true;
+}
+
+int CountWarpWorldPlacements(const SettingsCache &settings)
+{
+    if (settings.cluster == nullptr) {
+        return 0;
+    }
+
+    int warpPlacementCount = 0;
+    for (const auto &placement : settings.cluster->worldPlacements) {
+        const auto itr = settings.worlds.find(placement.world);
+        if (itr == settings.worlds.end()) {
+            continue;
+        }
+        if (itr->second.startingBaseTemplate.contains("::bases/warpworld")) {
+            ++warpPlacementCount;
+        }
+    }
+    return warpPlacementCount;
+}
+
+std::string CaptureStdout(const std::function<void()> &action)
+{
+    std::ostringstream stream;
+    auto *previous = std::cout.rdbuf(stream.rdbuf());
+    action();
+    std::cout.rdbuf(previous);
+    return stream.str();
+}
+
+bool ParseSingleJsonLine(const std::string &text,
+                         Json::Value *root,
+                         std::vector<std::string> *failures,
+                         const std::string &message)
+{
+    if (root == nullptr) {
+        return false;
+    }
+    Json::CharReaderBuilder builder;
+    std::string errors;
+    std::istringstream stream(text);
+    if (!Json::parseFromStream(builder, stream, root, &errors)) {
+        if (failures != nullptr) {
+            failures->push_back(message + ": " + errors);
+        }
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int RunAllTests()
@@ -114,6 +207,19 @@ int RunAllTests()
         {34, 100123, 0, "M-FRZ-C-"},
         {36, 100123, 0, "M-RAD-C-"},
         {37, 100123, 0, "M-CERS-C-"},
+    };
+    const std::vector<PreviewSample> classicSpacedOutSamples = {
+        {27, 100123, 0, "SNDST-C-"},
+        {28, 100123, 0, "PRE-C-"},
+        {29, 100123, 0, "CER-C-"},
+        {30, 100123, 0, "FRST-C-"},
+        {31, 100123, 0, "SWMP-C-"},
+    };
+    const std::vector<PreviewSample> vanillaStyleSpacedOutSamples = {
+        {13, 100123, 0, "V-SNDST-C-"},
+        {15, 100123, 0, "V-SWMP-C-"},
+        {16, 100123, 0, "V-SFRZ-C-"},
+        {23, 100123, 0, "V-CER-C-"},
     };
 
     for (const auto &sample : moonletSamples) {
@@ -150,6 +256,86 @@ int RunAllTests()
     }
 
     {
+        for (const auto &sample : classicSpacedOutSamples) {
+            SettingsCache settings;
+            std::string code;
+            std::string errorMessage;
+            Expect(LoadSettingsForWorldType(sample.worldType,
+                                            sample.seed,
+                                            sample.mixing,
+                                            &settings,
+                                            &code,
+                                            &errorMessage),
+                   std::string("classic SO settings should load for ") + sample.expectedPrefix,
+                   &failures);
+            if (!errorMessage.empty()) {
+                failures.push_back(std::string("classic SO settings load error for ") +
+                                   sample.expectedPrefix + ": " + errorMessage);
+            }
+            if (!settings.cluster) {
+                continue;
+            }
+
+            Expect(CountWarpWorldPlacements(settings) == 1,
+                   std::string("classic SO cluster should contain exactly one warp placement for ") +
+                       sample.expectedPrefix,
+                   &failures);
+
+            PreviewWorldSession session;
+            errorMessage.clear();
+            Expect(GeneratePreviewSessionForTest(sample.worldType,
+                                                sample.seed,
+                                                sample.mixing,
+                                                &session,
+                                                &errorMessage),
+                   std::string("classic SO preview session should generate for ") + sample.expectedPrefix,
+                   &failures);
+            if (!errorMessage.empty()) {
+                failures.push_back(std::string("classic SO preview session error for ") +
+                                   sample.expectedPrefix + ": " + errorMessage);
+            }
+            Expect(session.secondaryPreview.has_value(),
+                   std::string("classic SO preview session should expose secondary preview for ") +
+                       sample.expectedPrefix,
+                   &failures);
+            if (session.primaryPreview.has_value()) {
+                Expect(session.primaryPreview->summary.hasSecondaryPreview,
+                       std::string("classic SO primary preview should report secondary availability for ") +
+                           sample.expectedPrefix,
+                       &failures);
+            }
+        }
+    }
+
+    {
+        PreviewWorldSession session;
+        std::string errorMessage;
+        Expect(GeneratePreviewSessionForTest(33, 100123, 0, &session, &errorMessage),
+               "M-BAD-C preview session should generate",
+               &failures);
+        if (session.secondaryPreview.has_value()) {
+            Expect(session.secondaryPreview->summary.worldAssetId ==
+                       "expansion1::worlds/MiniRadioactiveOceanWarp",
+                   "M-BAD-C secondary preview should keep its real world asset id",
+                   &failures);
+        }
+    }
+
+    {
+        PreviewWorldSession session;
+        std::string errorMessage;
+        Expect(GeneratePreviewSessionForTest(36, 100123, 0, &session, &errorMessage),
+               "M-RAD-C preview session should generate",
+               &failures);
+        if (session.secondaryPreview.has_value()) {
+            Expect(session.secondaryPreview->summary.worldAssetId ==
+                       "expansion1::worlds/MiniFlippedWarp",
+                   "M-RAD-C secondary preview should not be locked to another world asset",
+                   &failures);
+        }
+    }
+
+    {
         CollectingPreviewSink sink;
         std::string code;
         const bool generated = GeneratePreviewSet(13, 100123, 625, &sink, &code);
@@ -168,6 +354,48 @@ int RunAllTests()
     }
 
     {
+        SettingsCache settings;
+        std::string code;
+        std::string errorMessage;
+        Expect(LoadSettingsForWorldType(27, 100123, 0, &settings, &code, &errorMessage),
+               "SNDST-C settings should load for geyser offset checks",
+               &failures);
+        PreviewPlacementSelection selection;
+        Expect(ResolvePreviewPlacementSelection(settings, &selection, &errorMessage),
+               "SNDST-C placement selection should resolve for geyser offset checks",
+               &failures);
+        Expect(settings.cluster != nullptr &&
+                   settings.cluster->clusterCategory == ClusterCategory::SpacedOutStyle,
+               "SNDST-C should stay SpacedOutStyle after settings load",
+               &failures);
+        Expect(selection.primaryPlacementIndex == 0,
+               "SNDST-C primary placement should stay at index 0",
+               &failures);
+        Expect(selection.secondaryPlacementIndex.has_value(),
+               "SNDST-C should expose a secondary placement candidate",
+               &failures);
+    }
+
+    {
+        GeyserSeedContext primaryContext;
+        std::string errorMessage;
+        Expect(ResolveGeyserSeedContext(0,
+                                        100123,
+                                        0,
+                                        Batch::PreviewTarget::Primary,
+                                        &primaryContext,
+                                        &errorMessage),
+               "SNDST-A primary geyser context should resolve",
+               &failures);
+        Expect(primaryContext.worldOffsetX == 0,
+               "SNDST-A primary worldOffsetX should stay 0",
+               &failures);
+        Expect(primaryContext.worldOffsetY == 0,
+               "SNDST-A primary worldOffsetY should stay 0",
+               &failures);
+    }
+
+    {
         GeyserSeedContext primaryContext;
         GeyserSeedContext secondaryContext;
         std::string errorMessage;
@@ -179,19 +407,23 @@ int RunAllTests()
                                         &errorMessage),
                "M-BAD-C primary geyser context should resolve",
                &failures);
-        Expect(ResolveGeyserSeedContext(33,
-                                        100123,
-                                        0,
-                                        Batch::PreviewTarget::Secondary,
-                                        &secondaryContext,
-                                        &errorMessage),
-               "M-BAD-C secondary geyser context should resolve",
+        errorMessage.clear();
+        Expect(!ResolveGeyserSeedContext(33,
+                                         100123,
+                                         0,
+                                         Batch::PreviewTarget::Secondary,
+                                         &secondaryContext,
+                                         &errorMessage),
+               "M-BAD-C secondary geyser context should still fail-closed before secondary offset is restored",
+               &failures);
+        Expect(errorMessage.find("authoritative worldOffset") != std::string::npos,
+               "M-BAD-C secondary geyser context should report missing authoritative offset",
                &failures);
         Expect(primaryContext.worldOffsetX == 82,
                "M-BAD-C primary worldOffsetX should stay 82",
                &failures);
-        Expect(secondaryContext.worldOffsetX == 212,
-               "M-BAD-C secondary worldOffsetX should resolve to opposite column",
+        Expect(primaryContext.worldOffsetY == 0,
+               "M-BAD-C primary worldOffsetY should stay 0",
                &failures);
     }
 
@@ -207,45 +439,102 @@ int RunAllTests()
                                         &errorMessage),
                "M-FRZ-C primary geyser context should resolve",
                &failures);
-        Expect(ResolveGeyserSeedContext(34,
-                                        100123,
-                                        0,
-                                        Batch::PreviewTarget::Secondary,
-                                        &secondaryContext,
-                                        &errorMessage),
-               "M-FRZ-C secondary geyser context should resolve",
+        errorMessage.clear();
+        Expect(!ResolveGeyserSeedContext(34,
+                                         100123,
+                                         0,
+                                         Batch::PreviewTarget::Secondary,
+                                         &secondaryContext,
+                                         &errorMessage),
+               "M-FRZ-C secondary geyser context should still fail-closed before secondary offset is restored",
+               &failures);
+        Expect(errorMessage.find("authoritative worldOffset") != std::string::npos,
+               "M-FRZ-C secondary geyser context should report missing authoritative offset",
                &failures);
         Expect(primaryContext.worldOffsetX == 212,
                "M-FRZ-C primary worldOffsetX should stay 212",
                &failures);
-        Expect(secondaryContext.worldOffsetX == 82,
-               "M-FRZ-C secondary worldOffsetX should resolve to opposite column",
+        Expect(primaryContext.worldOffsetY == 0,
+               "M-FRZ-C primary worldOffsetY should stay 0",
                &failures);
     }
 
     {
-        GeyserSeedContext primaryContext;
-        GeyserSeedContext secondaryContext;
-        std::string errorMessage;
-        Expect(ResolveGeyserSeedContext(13,
-                                        100123,
-                                        625,
-                                        Batch::PreviewTarget::Primary,
-                                        &primaryContext,
-                                        &errorMessage),
-               "non-moonlet primary geyser context should resolve",
-               &failures);
-        Expect(primaryContext.worldOffsetX == 0,
-               "non-moonlet primary worldOffsetX should stay 0",
-               &failures);
-        Expect(!ResolveGeyserSeedContext(13,
-                                         100123,
-                                         625,
-                                         Batch::PreviewTarget::Secondary,
-                                         &secondaryContext,
-                                         &errorMessage),
-               "non-moonlet secondary geyser context should fail",
-               &failures);
+        for (const auto &sample : classicSpacedOutSamples) {
+            GeyserSeedContext primaryContext;
+            GeyserSeedContext secondaryContext;
+            std::string errorMessage;
+            Expect(ResolveGeyserSeedContext(sample.worldType,
+                                            sample.seed,
+                                            sample.mixing,
+                                            Batch::PreviewTarget::Primary,
+                                            &primaryContext,
+                                            &errorMessage),
+                   std::string(sample.expectedPrefix) +
+                       " primary geyser context should resolve with legacy-equivalent primary offset",
+                   &failures);
+            Expect(primaryContext.worldOffsetX == 0,
+                   std::string(sample.expectedPrefix) +
+                       " primary worldOffsetX should stay 0 under legacy-equivalent primary rules",
+                   &failures);
+            Expect(primaryContext.worldOffsetY == 0,
+                   std::string(sample.expectedPrefix) +
+                       " primary worldOffsetY should stay 0 under legacy-equivalent primary rules",
+                   &failures);
+            errorMessage.clear();
+            Expect(!ResolveGeyserSeedContext(sample.worldType,
+                                             sample.seed,
+                                             sample.mixing,
+                                             Batch::PreviewTarget::Secondary,
+                                             &secondaryContext,
+                                             &errorMessage),
+                   std::string(sample.expectedPrefix) +
+                       " secondary geyser context should stay gated before secondary offset is restored",
+                   &failures);
+            Expect(errorMessage.find("authoritative worldOffset") != std::string::npos,
+                   std::string(sample.expectedPrefix) +
+                       " secondary geyser context should report missing authoritative offset",
+                   &failures);
+        }
+    }
+
+    {
+        for (const auto &sample : vanillaStyleSpacedOutSamples) {
+            GeyserSeedContext primaryContext;
+            GeyserSeedContext secondaryContext;
+            std::string errorMessage;
+            Expect(ResolveGeyserSeedContext(sample.worldType,
+                                            sample.seed,
+                                            sample.mixing,
+                                            Batch::PreviewTarget::Primary,
+                                            &primaryContext,
+                                            &errorMessage),
+                   std::string(sample.expectedPrefix) +
+                       " primary geyser context should resolve with legacy-equivalent primary offset",
+                   &failures);
+            Expect(primaryContext.worldOffsetX == 0,
+                   std::string(sample.expectedPrefix) +
+                       " primary worldOffsetX should stay 0 under legacy-equivalent primary rules",
+                   &failures);
+            Expect(primaryContext.worldOffsetY == 0,
+                   std::string(sample.expectedPrefix) +
+                       " primary worldOffsetY should stay 0 under legacy-equivalent primary rules",
+                   &failures);
+            errorMessage.clear();
+            Expect(!ResolveGeyserSeedContext(sample.worldType,
+                                             sample.seed,
+                                             sample.mixing,
+                                             Batch::PreviewTarget::Secondary,
+                                             &secondaryContext,
+                                             &errorMessage),
+                   std::string(sample.expectedPrefix) +
+                       " secondary geyser context should stay gated before secondary offset is restored",
+                   &failures);
+            Expect(errorMessage.find("authoritative worldOffset") != std::string::npos,
+                   std::string(sample.expectedPrefix) +
+                       " secondary geyser context should report missing authoritative offset",
+                   &failures);
+        }
     }
 
     {
@@ -263,11 +552,21 @@ int RunAllTests()
                                           &errorMessage),
                "M-FRZ-C primary preview context should resolve",
                &failures);
-        Expect(ResolvePreviewWorldContext(session,
-                                          Batch::PreviewTarget::Secondary,
-                                          &secondaryContext,
-                                          &errorMessage),
-               "M-FRZ-C secondary preview context should resolve",
+        errorMessage.clear();
+        Expect(!ResolvePreviewWorldContext(session,
+                                           Batch::PreviewTarget::Secondary,
+                                           &secondaryContext,
+                                           &errorMessage),
+               "M-FRZ-C secondary preview context should still fail-closed before secondary offset is restored",
+               &failures);
+        Expect(errorMessage.find("authoritative worldOffset") != std::string::npos,
+               "M-FRZ-C secondary preview context should report missing authoritative offset",
+               &failures);
+        Expect(primaryContext.worldOffsetX == 212,
+               "M-FRZ-C primary preview context should expose legacy-equivalent worldOffsetX",
+               &failures);
+        Expect(primaryContext.worldOffsetY == 0,
+               "M-FRZ-C primary preview context should expose legacy-equivalent worldOffsetY",
                &failures);
 
         const auto primaryDetails = GeyserCalc::BuildGeyserDetails(primaryContext.geyserSeed,
@@ -275,43 +574,62 @@ int RunAllTests()
                                                                    primaryContext.summary.geysers,
                                                                    primaryContext.worldOffsetX,
                                                                    primaryContext.worldOffsetY);
-        const auto secondaryDetails = GeyserCalc::BuildGeyserDetails(secondaryContext.geyserSeed,
-                                                                     secondaryContext.summary.worldSize.y,
-                                                                     secondaryContext.summary.geysers,
-                                                                     secondaryContext.worldOffsetX,
-                                                                     secondaryContext.worldOffsetY);
-        const auto secondaryDetailsWithoutOffset =
-            GeyserCalc::BuildGeyserDetails(secondaryContext.geyserSeed,
-                                          secondaryContext.summary.worldSize.y,
-                                          secondaryContext.summary.geysers,
-                                          0,
-                                          0);
-
-        Expect(!primaryDetails.empty(), "M-FRZ-C primary geyser details should not be empty", &failures);
-        Expect(!secondaryDetails.empty(), "M-FRZ-C secondary geyser details should not be empty", &failures);
-        Expect(secondaryDetails.size() == secondaryContext.summary.geysers.size(),
-               "M-FRZ-C secondary detail count should match summary geysers",
+        Expect(!primaryDetails.empty(),
+               "M-FRZ-C primary geyser details should not be empty after restoring primary offset",
                &failures);
-        Expect(secondaryDetailsWithoutOffset.size() == secondaryDetails.size(),
-               "M-FRZ-C secondary detail count should stay stable without offset",
+        Expect(primaryDetails.size() == primaryContext.summary.geysers.size(),
+               "M-FRZ-C primary detail count should match summary geysers after restoring primary offset",
                &failures);
+    }
 
-        bool foundOffsetSensitiveDetail = false;
-        for (size_t index = 0; index < secondaryDetails.size(); ++index) {
-            if (!secondaryDetails[index].hasParameters ||
-                !secondaryDetailsWithoutOffset[index].hasParameters) {
-                continue;
-            }
-            if (secondaryDetails[index].native.eruptionPeriodSeconds !=
-                    secondaryDetailsWithoutOffset[index].native.eruptionPeriodSeconds ||
-                secondaryDetails[index].derived.temperatureCelsius !=
-                    secondaryDetailsWithoutOffset[index].derived.temperatureCelsius) {
-                foundOffsetSensitiveDetail = true;
-                break;
-            }
+    {
+        Batch::SidecarPreviewGeyserDetailsRequest request;
+        request.jobId = "preview-geyser-details-rebuild-primary";
+        request.worldType = 0;
+        request.seed = 100123;
+        request.mixing = 0;
+        request.target = Batch::PreviewTarget::Primary;
+
+        {
+            std::lock_guard<std::mutex> lock(g_previewSessionMutex);
+            g_previewSession.reset();
         }
-        Expect(foundOffsetSensitiveDetail,
-               "M-FRZ-C secondary detail should depend on resolved world offset",
+
+        Json::Value root;
+        const auto output = CaptureStdout([&]() { RunPreviewGeyserDetailsCommand(request); });
+        Expect(ParseSingleJsonLine(output, &root, &failures,
+                                   "preview_geyser_details primary output should be valid json"),
+               "preview_geyser_details primary output should parse",
+               &failures);
+        Expect(root["event"].asString() == "preview_geyser_details",
+               "preview_geyser_details primary should rebuild preview session instead of failing on missing cache",
+               &failures);
+    }
+
+    {
+        Batch::SidecarPreviewGeyserDetailsRequest request;
+        request.jobId = "preview-geyser-details-rebuild-secondary";
+        request.worldType = 27;
+        request.seed = 100123;
+        request.mixing = 0;
+        request.target = Batch::PreviewTarget::Secondary;
+
+        {
+            std::lock_guard<std::mutex> lock(g_previewSessionMutex);
+            g_previewSession.reset();
+        }
+
+        Json::Value root;
+        const auto output = CaptureStdout([&]() { RunPreviewGeyserDetailsCommand(request); });
+        Expect(ParseSingleJsonLine(output, &root, &failures,
+                                   "preview_geyser_details secondary output should be valid json"),
+               "preview_geyser_details secondary output should parse",
+               &failures);
+        Expect(root["event"].asString() == "failed",
+               "preview_geyser_details secondary should still fail under authoritative offset gate",
+               &failures);
+        Expect(root["message"].asString().find("authoritative worldOffset") != std::string::npos,
+               "preview_geyser_details secondary should surface authoritative offset error after rebuilding session",
                &failures);
     }
 

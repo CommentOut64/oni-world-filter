@@ -43,13 +43,17 @@ test("GeyserListHoverPopover source keeps right-side click popover with compact 
 
 test("GeyserListOverlay source only enables click popover for ready parameter details and tracks active item", () => {
   assert.match(GEYSER_LIST_OVERLAY_SOURCE, /geyserDetailsStatus === "ready"/);
+  assert.match(GEYSER_LIST_OVERLAY_SOURCE, /activeTarget === "primary"/);
   assert.match(GEYSER_LIST_OVERLAY_SOURCE, /detail && detail\.hasParameters/);
+  assert.match(GEYSER_LIST_OVERLAY_SOURCE, /const canShowPopover = activeTarget === "primary" && interactiveDetail !== null/);
   assert.match(GEYSER_LIST_OVERLAY_SOURCE, /<GeyserListHoverPopover/);
   assert.match(GEYSER_LIST_OVERLAY_SOURCE, /const \[activePopoverKey, setActivePopoverKey\] = useState<string \| null>\(null\)/);
-  assert.match(GEYSER_LIST_OVERLAY_SOURCE, /open=\{isActive\}/);
+  assert.match(GEYSER_LIST_OVERLAY_SOURCE, /open=\{canShowPopover \? isActive : false\}/);
   assert.match(GEYSER_LIST_OVERLAY_SOURCE, /onOpenChange=\{\(open\) =>/);
   assert.match(GEYSER_LIST_OVERLAY_SOURCE, /geyser-overlay-item-clickable/);
   assert.match(GEYSER_LIST_OVERLAY_SOURCE, /geyser-overlay-item-active/);
+  assert.match(GEYSER_LIST_OVERLAY_SOURCE, /<button/);
+  assert.match(GEYSER_LIST_OVERLAY_SOURCE, /disabled=\{!isInteractive\}/);
 });
 
 test("GeyserListHoverPopover styles keep compact width and height limits", () => {

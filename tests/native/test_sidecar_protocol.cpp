@@ -381,6 +381,7 @@ int RunAllTests()
         preview.summary.seed = 100123;
         preview.summary.worldType = 13;
         preview.summary.worldPlacementIndex = 4;
+        preview.summary.worldAssetId = "expansion1::worlds/MiniFlippedWarp";
         preview.summary.isPrimary = false;
         preview.summary.hasSecondaryPreview = true;
         preview.summary.start = {128, 200};
@@ -596,6 +597,10 @@ int RunAllTests()
                failures);
         Expect(previewJson["preview"]["summary"]["worldPlacementIndex"].asInt() == 4,
                "preview summary worldPlacementIndex mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["worldAssetId"].asString() ==
+                   "expansion1::worlds/MiniFlippedWarp",
+               "preview summary worldAssetId mismatch",
                failures);
         Expect(!previewJson["preview"]["summary"]["isPrimary"].asBool(),
                "preview summary isPrimary mismatch",

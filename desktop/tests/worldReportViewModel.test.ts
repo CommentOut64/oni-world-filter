@@ -61,6 +61,30 @@ test("buildWorldReportViewModel maps world category, world name and coord summar
   assert.equal(viewModel.startLabel, "(12, 34)");
 });
 
+test("buildWorldReportViewModel uses preview worldAssetId for secondary world name", () => {
+  const viewModel = buildWorldReportViewModel(
+    {
+      ...REPORT,
+      preview: {
+        ...REPORT.preview,
+        summary: {
+          ...REPORT.preview.summary,
+          worldType: 1,
+          isPrimary: false,
+          worldPlacementIndex: 2,
+          hasSecondaryPreview: true,
+          worldAssetId: "expansion1::worlds/MiniFlippedWarp",
+        },
+      },
+      coord: "M-RAD-C-100123-0-D3-0",
+    },
+    FALLBACK_SEARCH_CATALOG
+  );
+
+  assert.equal(viewModel.worldCategoryLabel, "眼冒金星");
+  assert.equal(viewModel.worldName, "迷你翻转副星");
+});
+
 test("buildWorldReportViewModel decodes mixing summary with formal slot names", () => {
   const viewModel = buildWorldReportViewModel(REPORT, FALLBACK_SEARCH_CATALOG);
 

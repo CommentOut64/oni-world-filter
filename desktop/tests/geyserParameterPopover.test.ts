@@ -51,7 +51,7 @@ afterEach(() => {
   });
 });
 
-test("GeyserParameterPopover renders positioned Popover anchor for selected geyser", () => {
+test("GeyserParameterPopover renders positioned floating panel for selected geyser", () => {
   const markup = renderToStaticMarkup(
     createElement(GeyserParameterPopover, {
       anchor: { left: 120, top: 160 },
@@ -65,8 +65,8 @@ test("GeyserParameterPopover renders positioned Popover anchor for selected geys
     })
   );
 
-  assert.match(markup, /geyser-parameter-anchor/);
-  assert.match(markup, /left:120px;top:160px/);
+  assert.match(markup, /geyser-parameter-popover-overlay geyser-parameter-popover-floating ant-popover ant-popover-placement-rightTop/);
+  assert.match(markup, /left:120px;top:160px;width:320px;max-width:320px/);
 });
 
 test("GeyserParameterPopover constrains overlay width to popup container width", () => {
@@ -98,11 +98,13 @@ test("GeyserParameterPopover source keeps failed state and retry controls", () =
   assert.match(GEYSER_POPOVER_SOURCE, />\s*关闭\s*</);
 });
 
-test("GeyserParameterPopover source forces rc-trigger to realign when anchor moves", () => {
-  assert.match(GEYSER_POPOVER_SOURCE, /forceAlign/);
-  assert.match(GEYSER_POPOVER_SOURCE, /ref=\{popoverRef\}/);
-  assert.match(
-    GEYSER_POPOVER_SOURCE,
-    /React\.useLayoutEffect\([\s\S]*?\);\s*\n\s*if \(!anchor \|\| !geyser\) \{\s*\n\s*return null;\s*\n\s*\}/
-  );
+test("GeyserParameterPopover source keeps floating panel positioning without rc-trigger realign", () => {
+  assert.match(GEYSER_POPOVER_SOURCE, /className="geyser-parameter-popover-overlay geyser-parameter-popover-floating ant-popover ant-popover-placement-rightTop"/);
+  assert.match(GEYSER_POPOVER_SOURCE, /left:\s*anchor\.left/);
+  assert.match(GEYSER_POPOVER_SOURCE, /top:\s*anchor\.top/);
+  assert.match(GEYSER_POPOVER_SOURCE, /<div className="ant-popover-content">/);
+  assert.match(GEYSER_POPOVER_SOURCE, /<div className="ant-popover-inner" role="tooltip">/);
+  assert.match(GEYSER_POPOVER_SOURCE, /<div className="ant-popover-title">\{panelTitle\}<\/div>/);
+  assert.doesNotMatch(GEYSER_POPOVER_SOURCE, /forceAlign/);
+  assert.doesNotMatch(GEYSER_POPOVER_SOURCE, /<Popover/);
 });
