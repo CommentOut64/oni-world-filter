@@ -166,12 +166,14 @@ afterEach(async () => {
 test("loadByMatch loads preview first and then hydrates geyser details for the active key", async () => {
   const previewDeferred = createDeferred<{ preview: PreviewPayload }>();
   const detailDeferred = createDeferred<ReturnType<typeof createDetailsEvent>>();
+  const detailRequests: Array<Record<string, unknown>> = [];
 
-  mockIPC(async (cmd) => {
+  mockIPC(async (cmd, payload) => {
     if (cmd === "load_preview") {
       return previewDeferred.promise;
     }
     if (cmd === "load_preview_geyser_details") {
+      detailRequests.push(payload.request as Record<string, unknown>);
       return detailDeferred.promise;
     }
     throw new Error(`unexpected command: ${cmd}`);
@@ -190,7 +192,15 @@ test("loadByMatch loads preview first and then hydrates geyser details for the a
   assert.equal(state.activePreview?.summary.seed, match.seed);
   assert.equal(state.activeGeyserDetailsStatus, "loading");
   assert.deepEqual(state.activeGeyserDetails, []);
-  assert.equal(state.cache["13:123456:625"]?.preview.summary.seed, match.seed);
+  assert.equal(state.cache["13:123456:625:primary"]?.preview.summary.seed, match.seed);
+  assert.deepEqual(
+    Object.keys(detailRequests[0] ?? {}).sort(),
+    ["jobId", "mixing", "seed", "target", "worldType"],
+    "geyser detail request should only carry canonical key fields plus target"
+  );
+  assert.equal(detailRequests[0]?.target, "primary");
+  assert.equal(detailRequests[0]?.worldHeight, undefined);
+  assert.equal(detailRequests[0]?.geysers, undefined);
 
   detailDeferred.resolve(createDetailsEvent(match.seed));
   await flushMicrotasks();
@@ -200,7 +210,7 @@ test("loadByMatch loads preview first and then hydrates geyser details for the a
   assert.equal(state.activeGeyserDetails.length, 1);
   assert.equal(state.activeGeyserDetails[0]?.summary.id, "steam");
   assert.equal(
-    state.cache["13:123456:625"]?.geyserDetailsStatus,
+    state.cache["13:123456:625:primary"]?.geyserDetailsStatus,
     "ready",
     "detail cache should become ready after hydration"
   );
@@ -283,17 +293,17 @@ test("stale preview and detail results can warm cache but must not overwrite the
   await flushMicrotasks();
 
   let state = module.usePreviewStore.getState();
-  assert.equal(state.activeKey, "13:333333:625");
+  assert.equal(state.activeKey, "13:333333:625:primary");
   assert.equal(state.activePreview?.summary.seed, 333333);
   assert.equal(state.activeGeyserDetailsStatus, "loading");
-  assert.equal(state.cache["13:111111:625"]?.preview.summary.seed, 111111);
-  assert.equal(state.cache["13:222222:625"]?.geyserDetailsStatus, "ready");
+  assert.equal(state.cache["13:111111:625:primary"]?.preview.summary.seed, 111111);
+  assert.equal(state.cache["13:222222:625:primary"]?.geyserDetailsStatus, "ready");
 
   detailDeferredBySeed.get(333333)?.resolve(createDetailsEvent(333333));
   await flushMicrotasks();
 
   state = module.usePreviewStore.getState();
-  assert.equal(state.activeKey, "13:333333:625");
+  assert.equal(state.activeKey, "13:333333:625:primary");
   assert.equal(state.activePreview?.summary.seed, 333333);
   assert.equal(state.activeGeyserDetailsStatus, "ready");
   assert.equal(state.activeGeyserDetails[0]?.summary.id, "steam");
