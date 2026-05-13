@@ -187,6 +187,14 @@ pub struct CountRule {
     pub max_count: i32,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PreviewTargetPayload {
+    #[default]
+    Primary,
+    Secondary,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewRequestPayload {
@@ -195,6 +203,8 @@ pub struct PreviewRequestPayload {
     pub seed: i32,
     #[serde(default)]
     pub mixing: i32,
+    #[serde(default)]
+    pub target: PreviewTargetPayload,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -216,8 +226,8 @@ pub struct PreviewGeyserDetailsRequestPayload {
     pub seed: i32,
     #[serde(default)]
     pub mixing: i32,
-    pub world_height: i32,
-    pub geysers: Vec<GeyserSummaryPayload>,
+    #[serde(default)]
+    pub target: PreviewTargetPayload,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1352,11 +1362,6 @@ pub(crate) fn validate_preview_geyser_details_request(
             "worldType 超出有效范围".to_string(),
         ));
     }
-    if request.world_height <= 0 {
-        return Err(HostError::InvalidRequest(
-            "worldHeight 必须 > 0".to_string(),
-        ));
-    }
     Ok(())
 }
 
@@ -1389,7 +1394,8 @@ pub(crate) fn build_preview_command(request: &PreviewRequestPayload) -> Value {
         "jobId": request.job_id,
         "worldType": request.world_type,
         "seed": request.seed,
-        "mixing": request.mixing
+        "mixing": request.mixing,
+        "target": request.target
     })
 }
 
@@ -1404,25 +1410,13 @@ pub(crate) fn build_preview_coord_command(request: &CoordPreviewRequestPayload) 
 pub(crate) fn build_preview_geyser_details_command(
     request: &PreviewGeyserDetailsRequestPayload,
 ) -> Value {
-    let geysers = request
-        .geysers
-        .iter()
-        .map(|geyser| {
-            json!({
-                "type": geyser.r#type,
-                "x": geyser.x,
-                "y": geyser.y,
-            })
-        })
-        .collect::<Vec<_>>();
     json!({
         "command": "preview_geyser_details",
         "jobId": request.job_id,
         "worldType": request.world_type,
         "seed": request.seed,
         "mixing": request.mixing,
-        "worldHeight": request.world_height,
-        "geysers": geysers
+        "target": request.target
     })
 }
 
@@ -1857,7 +1851,7 @@ mod tests {
     use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
     use super::{
-        abort_all_running_jobs_for_shutdown, begin_host_cancellation,
+        abort_all_running_jobs_for_shutdown, begin_host_cancellation, build_preview_command,
         build_preview_coord_command, build_preview_geyser_details_command,
         build_world_report_command,
         collect_sidecar_candidates, deserialize_preview_geyser_details_event,
@@ -1868,8 +1862,9 @@ mod tests {
         sanitize_sidecar_stderr, should_emit_failed_for_exit, should_forward_sidecar_event,
         sidecar_spawn_creation_flags, validate_preview_coord_request,
         validate_preview_geyser_details_request, CoordPreviewRequestPayload,
-        PreviewCpuSetInfo, PreviewGeyserDetailsRequestPayload, SearchCatalogPayload,
-        SidecarProcessPriority, WorldReportRequestPayload, validate_world_report_request,
+        PreviewCpuSetInfo, PreviewGeyserDetailsRequestPayload, PreviewRequestPayload,
+        PreviewTargetPayload, SearchCatalogPayload, SidecarProcessPriority,
+        WorldReportRequestPayload, validate_world_report_request,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -2617,27 +2612,41 @@ mod tests {
     }
 
     #[test]
-    fn build_preview_geyser_details_command_should_emit_full_payload() {
+    fn preview_request_should_default_target_to_primary() {
+        let payload: PreviewRequestPayload = serde_json::from_value(json!({
+            "jobId": "preview-001",
+            "worldType": 13,
+            "seed": 100123,
+            "mixing": 625
+        }))
+        .expect("preview request should deserialize with default target");
+
+        assert_eq!(payload.target, PreviewTargetPayload::Primary);
+    }
+
+    #[test]
+    fn build_preview_command_should_emit_target_payload() {
+        let command = build_preview_command(&PreviewRequestPayload {
+            job_id: "preview-002".to_string(),
+            world_type: 13,
+            seed: 100123,
+            mixing: 625,
+            target: PreviewTargetPayload::Secondary,
+        });
+
+        assert_eq!(command["command"].as_str(), Some("preview"));
+        assert_eq!(command["jobId"].as_str(), Some("preview-002"));
+        assert_eq!(command["target"].as_str(), Some("secondary"));
+    }
+
+    #[test]
+    fn build_preview_geyser_details_command_should_emit_target_only_payload() {
         let command = build_preview_geyser_details_command(&PreviewGeyserDetailsRequestPayload {
             job_id: "preview-geyser-details-001".to_string(),
             world_type: 13,
             seed: 100123,
             mixing: 625,
-            world_height: 384,
-            geysers: vec![
-                super::GeyserSummaryPayload {
-                    r#type: 0,
-                    x: 70,
-                    y: 90,
-                    id: Some("steam".to_string()),
-                },
-                super::GeyserSummaryPayload {
-                    r#type: 27,
-                    x: 75,
-                    y: 120,
-                    id: Some("oil_reservoir".to_string()),
-                },
-            ],
+            target: PreviewTargetPayload::Secondary,
         });
 
         assert_eq!(command["command"].as_str(), Some("preview_geyser_details"));
@@ -2645,25 +2654,21 @@ mod tests {
         assert_eq!(command["worldType"].as_i64(), Some(13));
         assert_eq!(command["seed"].as_i64(), Some(100123));
         assert_eq!(command["mixing"].as_i64(), Some(625));
-        assert_eq!(command["worldHeight"].as_i64(), Some(384));
-        assert_eq!(command["geysers"].as_array().map(Vec::len), Some(2));
-        assert_eq!(command["geysers"][0]["type"].as_i64(), Some(0));
-        assert_eq!(command["geysers"][1]["x"].as_i64(), Some(75));
+        assert_eq!(command["target"].as_str(), Some("secondary"));
+        assert!(command.get("worldHeight").is_none());
+        assert!(command.get("geysers").is_none());
     }
 
     #[test]
-    fn validate_preview_geyser_details_request_should_reject_invalid_world_height() {
-        let error = validate_preview_geyser_details_request(&PreviewGeyserDetailsRequestPayload {
+    fn validate_preview_geyser_details_request_should_accept_target_only_payload() {
+        validate_preview_geyser_details_request(&PreviewGeyserDetailsRequestPayload {
             job_id: "preview-geyser-details-002".to_string(),
             world_type: 13,
             seed: 100123,
             mixing: 625,
-            world_height: 0,
-            geysers: vec![],
+            target: PreviewTargetPayload::Primary,
         })
-        .expect_err("world height zero should be rejected");
-
-        assert!(error.to_string().contains("worldHeight"));
+        .expect("target-only payload should be accepted");
     }
 
     #[test]

@@ -251,18 +251,19 @@ total cycles = active period / 600
 1. `src/Geyser/GeyserParameterCalculator.cpp` 已实现 `GeyserGenericConfig.GenerateConfigs()` 的等价区间表。
 2. `BuildGeyserDetails(...)` 已按游戏的 5 次随机抽样顺序复算原生参数。
 3. `BuildGeyserDetails(...)` 与 `BuildWorldReportData(...)` 都以真实 `geyserSeed` 为输入，不再混用展示 world seed。
-4. 对主世界预览链路，当前实现已经补齐了 cluster `worldOffset` 对喷口随机种子的影响，不再把本地预览坐标误当成游戏绝对坐标。
+4. 对预览链路里的主星与稳定 warp 副星，当前实现都已经补齐了 cluster `worldOffset` 对喷口随机种子的影响，不再把本地预览坐标误当成游戏绝对坐标。
 5. `oil_reservoir`、`warp_portal` 等非适用对象会显式返回 `hasParameters = false`，不伪造喷口参数。
 
 当前仓库内与该算法配套的协议 / 宿主接入也已经具备以下能力：
 
-1. `preview_geyser_details` sidecar 协议已落地，可直接返回 `geyserDetails[]`。
+1. `preview_geyser_details` sidecar 协议已落地，并以 `target = primary|secondary` 指定目标世界，可直接返回 `geyserDetails[]`。
 2. Rust host / Tauri 已暴露 `load_preview_geyser_details`，并完成请求校验、命令构造与事件反序列化。
 3. control sidecar 已支持 `preview_geyser_details` 的 one-shot 收集与终态事件判定。
 
 当前仓库内与该算法配套的前端预览链路也已经完成闭环：
 
-1. `previewStore` 已按 `previewKey(worldType:seed:mixing)` 聚合 preview 主体与 `geyserDetails[]`，并区分 `activePreview`、`activeGeyserDetailsStatus`、`activeGeyserDetailsError`。
+1. `previewStore` 已按 `previewKey(worldType:seed:mixing:target)` 聚合 preview 主体与 `geyserDetails[]`，并区分 `activeTarget`、`activePreview`、`activeGeyserDetailsStatus`、`activeGeyserDetailsError`。
 2. 地图预览采用“两阶段”体验：地图主体先显示，喷口详情随后异步补齐；旧请求只允许写 cache，不能回写当前激活项。
-3. `PreviewCanvas` / `PreviewPane` 已通过容器内锚点 + Ant Design `Popover` 的受控浮层，在喷口点位附近展示温度、喷发率、平均总产出、喷发期和活跃期。
-4. 当前仍然只预留 `WorldReportData` / `get_world_report` 的结构化合同；仓库内没有新增 PDF / HTML 导出逻辑，也没有新增报告导出按钮。
+3. `PreviewPane` 已支持主星 / 副星切换；首次切到副星时按 target 发请求，失败时继续保留主星画面并显示明确错误。
+4. `PreviewCanvas` / `PreviewPane` 已通过容器内锚点 + Ant Design `Popover` 的受控浮层，在喷口点位附近展示温度、喷发率、平均总产出、喷发期和活跃期。
+5. 副星只做展示，不参与批量筛选，也不允许从副星态触发报告导出。

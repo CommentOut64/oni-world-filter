@@ -686,7 +686,11 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 pid = $PID
                 spawnCount = $spawnCount
                 preview = @{
-                    seed = $request.seed
+                    summary = @{
+                        seed = $request.seed
+                        worldPlacementIndex = 4
+                        isPrimary = $false
+                    }
                 }
             }
         }
@@ -965,6 +969,14 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
             .expect("preview request should succeed");
 
         assert_eq!(preview_events[0]["event"].as_str(), Some("preview"));
+        assert_eq!(
+            preview_events[0]["preview"]["summary"]["worldPlacementIndex"].as_i64(),
+            Some(4)
+        );
+        assert_eq!(
+            preview_events[0]["preview"]["summary"]["isPrimary"].as_bool(),
+            Some(false)
+        );
         assert_eq!(registry.get_status("streaming-job"), Some(crate::state::JobStatus::Running));
         assert_eq!(registry.get_status("preview-001"), None);
     }
@@ -982,13 +994,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 world_type: 13,
                 seed: 100123,
                 mixing: 625,
-                world_height: 384,
-                geysers: vec![crate::sidecar::GeyserSummaryPayload {
-                    r#type: 0,
-                    x: 70,
-                    y: 90,
-                    id: Some("steam".to_string()),
-                }],
+                target: crate::sidecar::PreviewTargetPayload::Secondary,
             },
         )
         .expect("preview_geyser_details request should succeed");
@@ -1012,8 +1018,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 world_type: 13,
                 seed: 100123,
                 mixing: 625,
-                world_height: 384,
-                geysers: vec![],
+                target: crate::sidecar::PreviewTargetPayload::Primary,
             },
         )
         .expect_err("failed event should surface as host error");
@@ -1034,8 +1039,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 world_type: 13,
                 seed: 100123,
                 mixing: 625,
-                world_height: 384,
-                geysers: vec![],
+                target: crate::sidecar::PreviewTargetPayload::Primary,
             },
         )
         .expect_err("missing geyserDetails field should be rejected");
