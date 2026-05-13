@@ -1,5 +1,6 @@
 import type { GeyserOption, GeyserSummary, MixingSlotMeta, WorldOption } from "./contracts.ts";
 import {
+  ASTEROID_DISPLAY_NAMES,
   GEYSER_DISPLAY_NAMES,
   MIXING_SLOT_DISPLAY_NAMES,
   PLAYER_ZONE_TYPE_DISPLAY_NAMES,
@@ -19,6 +20,15 @@ export function formatWorldNameByCode(code: string): string {
 
 export function formatWorldName(world: WorldOption): string {
   return formatWorldNameByCode(world.code);
+}
+
+export function formatWorldNameByAssetId(worldAssetId: string): string {
+  const displayName = ASTEROID_DISPLAY_NAMES[worldAssetId];
+  if (displayName) {
+    return formatDisplayName(displayName);
+  }
+  const parts = worldAssetId.split("/");
+  return parts[parts.length - 1] || worldAssetId;
 }
 
 export function formatGeyserNameByKey(key: string): string {

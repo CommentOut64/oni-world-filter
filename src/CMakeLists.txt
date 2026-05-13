@@ -106,6 +106,8 @@ set(ONI_BASE_SOURCES
     "BatchCpu/CpuOptimization.cpp"
     "Geyser/GeyserParameterCalculator.hpp"
     "Geyser/GeyserParameterCalculator.cpp"
+    "Geyser/PreviewWorldOffsetPolicy.hpp"
+    "Geyser/PreviewWorldOffsetPolicy.cpp"
 )
 
 if(ONI_BUILD_SIDECAR)

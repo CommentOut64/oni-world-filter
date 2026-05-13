@@ -4,6 +4,7 @@ import {
   formatGeyserNameFromSummary,
   formatMixingSlotName,
   formatWorldName,
+  formatWorldNameByAssetId,
   geyserKeyFromType,
 } from "../../lib/displayResolvers.ts";
 import { sortResolvedGeyserItems } from "../../lib/geyserOrdering.ts";
@@ -30,6 +31,19 @@ function formatPointLabel(point: { x: number; y: number }): string {
 
 function resolveWorldOption(worlds: readonly WorldOption[], worldType: number): WorldOption {
   return worlds.find((item) => item.id === worldType) ?? { id: worldType, code: String(worldType) };
+}
+
+function resolveWorldOptionByCoord(worlds: readonly WorldOption[], coord: string): WorldOption | null {
+  let resolved: WorldOption | null = null;
+  for (const world of worlds) {
+    if (!coord.startsWith(world.code)) {
+      continue;
+    }
+    if (resolved === null || world.code.length > resolved.code.length) {
+      resolved = world;
+    }
+  }
+  return resolved;
 }
 
 function formatMixingMode(level: number): string {
@@ -99,14 +113,19 @@ export function buildWorldReportViewModel(
 ): WorldReportViewModel {
   const catalog = normalizeSearchCatalog(rawCatalog);
   const summary = report.preview.summary;
-  const world = resolveWorldOption(catalog.worlds, summary.worldType);
-  const worldCategory = classifyWorld(world.code);
+  const coordWorld = resolveWorldOptionByCoord(catalog.worlds, report.coord);
+  const fallbackWorld = resolveWorldOption(catalog.worlds, summary.worldType);
+  const worldCategory = classifyWorld((coordWorld ?? fallbackWorld).code);
   const worldCategoryLabel =
     WORLD_CATEGORY_OPTIONS.find((item) => item.id === worldCategory)?.label ?? "未知";
+  const worldName =
+    !summary.isPrimary && summary.worldAssetId
+      ? formatWorldNameByAssetId(summary.worldAssetId)
+      : formatWorldName(coordWorld ?? fallbackWorld);
 
   return {
     worldCategoryLabel,
-    worldName: formatWorldName(world),
+    worldName,
     coord: report.coord,
     seedLabel: String(summary.seed),
     worldSizeLabel: `${summary.worldSize.w} × ${summary.worldSize.h}`,

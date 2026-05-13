@@ -42,6 +42,10 @@ public:
     bool ResetSearchSeed(const std::string &code);
     bool GeneratePrepared(int traitsFlag);
     bool Generate(const std::string &code, int traitsFlag);
+    bool GenerateSelectedPlacements(const std::string &code,
+                                    int traitsFlag,
+                                    const std::vector<int> &placementIndexes,
+                                    int primaryPlacementIndex);
 #if 0
     // 临时 timing 检测，先停用。
     const SearchPhaseTiming &LastSearchPhaseTiming() const;
@@ -52,6 +56,13 @@ private:
 
     bool BuildWorldList(std::vector<World *> &worlds);
     bool GenerateCurrentState(int traitsFlag, bool genWarpWorld);
+    static int FindPrimaryPlacementIndex(const std::vector<World *> &worlds);
+    static std::vector<int> CollectPreviewPlacementIndexes(const std::vector<World *> &worlds,
+                                                           bool genWarpWorld);
+    bool GenerateWorldsForPlacementIndexes(std::vector<World *> &worlds,
+                                           int traitsFlag,
+                                           const std::vector<int> &placementIndexes,
+                                           int primaryPlacementIndex);
     void SetSeedWithTraits(const std::vector<World *> &worlds, int traitsFlag);
     GeneratedWorldSummary BuildSummary(int seed,
                                        int worldPlacementIndex,

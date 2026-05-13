@@ -316,6 +316,7 @@ export interface PreviewSummary {
   seed: number;
   worldType: number;
   worldPlacementIndex: number;
+  worldAssetId?: string;
   isPrimary: boolean;
   hasSecondaryPreview: boolean;
   start: Point;

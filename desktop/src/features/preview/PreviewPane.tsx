@@ -218,6 +218,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
           sessionKey={previewSessionKey}
           preview={preview}
           geysers={geysers}
+          geyserPopoverEnabled={activeTarget === "primary"}
           showBoundaries={showBoundaries}
           showLabels={showLabels}
           showGeysers={showGeysers}
@@ -244,6 +245,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
         />
         {showGeyserList && preview ? (
           <GeyserListOverlay
+            activeTarget={activeTarget}
             geysersData={preview.summary.geysers}
             geyserDetails={activeGeyserDetails}
             geyserDetailsStatus={activeGeyserDetailsStatus}

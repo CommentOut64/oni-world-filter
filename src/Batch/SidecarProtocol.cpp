@@ -340,6 +340,7 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
     root["summary"]["seed"] = preview.summary.seed;
     root["summary"]["worldType"] = preview.summary.worldType;
     root["summary"]["worldPlacementIndex"] = preview.summary.worldPlacementIndex;
+    root["summary"]["worldAssetId"] = preview.summary.worldAssetId;
     root["summary"]["isPrimary"] = preview.summary.isPrimary;
     root["summary"]["hasSecondaryPreview"] = preview.summary.hasSecondaryPreview;
     root["summary"]["start"]["x"] = preview.summary.start.x;
