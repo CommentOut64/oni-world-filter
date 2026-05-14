@@ -30,13 +30,13 @@ const PREVIEW: PreviewPayload = {
 };
 
 test("buildReportStageLayout uses fixed 4000px width with export scale not limited by interactive viewport clamp", () => {
-  const layout = buildReportStageLayout(PREVIEW);
+  const layout = buildReportStageLayout(PREVIEW, [{ id: 0, key: "steam" }]);
 
   assert.equal(layout.stageWidth, 4000);
-  assert.equal(layout.stageHeight, 5928);
-  assert.equal(layout.viewport.x, 24);
-  assert.equal(layout.viewport.y, 0);
-  assert.equal(layout.viewport.scale, 15.4375);
+  assert.equal(layout.stageHeight, 4895);
+  assert.equal(layout.viewport.x, 493);
+  assert.equal(layout.viewport.y, 187);
+  assert.equal(layout.viewport.scale, 11.7734375);
 });
 
 test("renderPreviewReportImage always requests boundaries labels and geysers for report export", async () => {
@@ -59,11 +59,11 @@ test("renderPreviewReportImage always requests boundaries labels and geysers for
   assert.equal(dataUrl, "data:image/png;base64,AAA=");
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].showBoundaries, true);
-  assert.equal(snapshots[0].showLabels, true);
+  assert.equal(snapshots[0].showBiomes, true);
   assert.equal(snapshots[0].showGeysers, true);
   assert.equal(snapshots[0].selectedGeyserIndex, null);
   assert.equal(snapshots[0].stageWidth, 4000);
-  assert.equal(snapshots[0].stageHeight, 5928);
+  assert.equal(snapshots[0].stageHeight, 4895);
 });
 
 test("visible preview keeps screen-sized primitives while offscreen report scales preview primitives proportionally", () => {
