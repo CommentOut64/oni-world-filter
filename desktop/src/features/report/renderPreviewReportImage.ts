@@ -71,7 +71,7 @@ export async function renderPreviewReportImage(
     stageHeight: layout.stageHeight,
     viewport: layout.viewport,
     showBoundaries: true,
-    showLabels: true,
+    showBiomes: true,
     showGeysers: true,
     selectedGeyserIndex: null,
   });

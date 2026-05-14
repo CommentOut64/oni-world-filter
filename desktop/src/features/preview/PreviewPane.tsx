@@ -45,7 +45,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
   const previewCanvasContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [showBoundaries, setShowBoundaries] = useState(true);
-  const [showLabels, setShowLabels] = useState(true);
+  const [showBiomes, setShowBiomes] = useState(true);
   const [showGeysers, setShowGeysers] = useState(true);
   const [hoveredRegion, setHoveredRegion] = useState<{
     id: string;
@@ -200,12 +200,12 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
       ) : null}
       <PreviewToolbar
         showBoundaries={showBoundaries}
-        showLabels={showLabels}
+        showBiomes={showBiomes}
         showGeysers={showGeysers}
         geyserCount={preview?.summary.geysers.length ?? 0}
         isGeneratingReport={isGeneratingReport}
         onToggleBoundaries={() => setShowBoundaries((current) => !current)}
-        onToggleLabels={() => setShowLabels((current) => !current)}
+        onToggleBiomes={() => setShowBiomes((current) => !current)}
         onToggleGeysers={() => setShowGeysers((current) => !current)}
         onResetView={() => canvasRef.current?.resetView()}
         onGenerateReport={handleGenerateReport}
@@ -220,7 +220,7 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
           geysers={geysers}
           geyserPopoverEnabled={activeTarget === "primary"}
           showBoundaries={showBoundaries}
-          showLabels={showLabels}
+          showBiomes={showBiomes}
           showGeysers={showGeysers}
           selectedGeyserIndex={selectedGeyserIndex}
           onHoverRegionChange={setHoveredRegion}
