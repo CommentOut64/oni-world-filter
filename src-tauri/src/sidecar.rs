@@ -144,6 +144,10 @@ pub struct SearchConstraints {
     pub distance: Vec<DistanceRule>,
     #[serde(default)]
     pub count: Vec<CountRule>,
+    #[serde(default)]
+    pub required_traits: Vec<String>,
+    #[serde(default)]
+    pub forbidden_traits: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -380,6 +384,10 @@ pub struct NormalizedSearchRequestPayload {
     pub seed_start: i32,
     pub seed_end: i32,
     pub mixing: i32,
+    #[serde(default)]
+    pub required_traits: Vec<String>,
+    #[serde(default)]
+    pub forbidden_traits: Vec<String>,
     pub groups: Vec<NormalizedConstraintGroup>,
 }
 
@@ -424,6 +432,12 @@ pub struct WorldEnvelopeProfilePayload {
     pub diagonal: f64,
     pub active_mixing_slots: Vec<i32>,
     pub disabled_mixing_slots: Vec<i32>,
+    #[serde(default)]
+    pub possible_trait_count_upper: i32,
+    #[serde(default)]
+    pub possible_trait_ids: Vec<String>,
+    #[serde(default)]
+    pub impossible_trait_ids: Vec<String>,
     pub possible_geyser_types: Vec<String>,
     pub impossible_geyser_types: Vec<String>,
     pub possible_max_count_by_type: BTreeMap<String, i32>,
@@ -1322,6 +1336,8 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
             "forbidden": request.constraints.forbidden,
             "distance": request.constraints.distance,
             "count": request.constraints.count,
+            "requiredTraits": request.constraints.required_traits,
+            "forbiddenTraits": request.constraints.forbidden_traits,
         },
         "cpu": cpu,
     })
@@ -1450,6 +1466,8 @@ pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Va
             "forbidden": request.constraints.forbidden,
             "distance": request.constraints.distance,
             "count": request.constraints.count,
+            "requiredTraits": request.constraints.required_traits,
+            "forbiddenTraits": request.constraints.forbidden_traits,
         },
         "cpu": request.cpu,
     })
@@ -1493,9 +1511,19 @@ pub(crate) fn sanitize_sidecar_stderr(stderr_text: &str) -> String {
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
-        .filter(|line| !line.starts_with(SIDECAR_DIAGNOSTIC_PREFIX))
+        .filter(|line| !should_ignore_sidecar_stderr_line(line))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn should_ignore_sidecar_stderr_line(line: &str) -> bool {
+    line.starts_with(SIDECAR_DIAGNOSTIC_PREFIX)
+        || line.contains("compute child node pd failed, fallback to compute node.")
+        || line.contains("compute node pd failed, fallback to compute node.")
+        || line.contains("compute node pd failed after convert unknown cells")
+        || line.contains("can not place all templates")
+        || (line.contains("Intersect:") && line.contains("intersection result is empty."))
+        || (line.contains("Intersect:") && line.contains("subj:") && line.contains("clip:"))
 }
 
 fn drain_stderr(stderr: ChildStderr) -> String {
@@ -1547,7 +1575,9 @@ fn spawn_stderr_logger(app: AppHandle, job_id: String, stderr: ChildStderr) {
             if line.trim().is_empty() {
                 continue;
             }
-            eprintln!("[sidecar:{}] {}", job_id, line);
+            if !should_ignore_sidecar_stderr_line(&line) {
+                eprintln!("[sidecar:{}] {}", job_id, line);
+            }
             let _ = app.emit(
                 SIDECAR_STDERR_CHANNEL,
                 json!({
@@ -1851,20 +1881,22 @@ mod tests {
     use crate::state::{JobProgressSnapshot, JobRegistry, JobStatus, RunningJobHandles};
 
     use super::{
-        abort_all_running_jobs_for_shutdown, begin_host_cancellation, build_preview_command,
-        build_preview_coord_command, build_preview_geyser_details_command,
-        build_world_report_command,
+        abort_all_running_jobs_for_shutdown, begin_host_cancellation,
+        build_analyze_search_command, build_preview_command, build_preview_coord_command,
+        build_preview_geyser_details_command, build_search_command, build_world_report_command,
         collect_sidecar_candidates, deserialize_preview_geyser_details_event,
         finalize_cancelled_from_snapshot, finalize_cancelled_from_stdout_eof,
         first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
         list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
         request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
         sanitize_sidecar_stderr, should_emit_failed_for_exit, should_forward_sidecar_event,
+        should_ignore_sidecar_stderr_line,
         sidecar_spawn_creation_flags, validate_preview_coord_request,
-        validate_preview_geyser_details_request, CoordPreviewRequestPayload,
-        PreviewCpuSetInfo, PreviewGeyserDetailsRequestPayload, PreviewRequestPayload,
-        PreviewTargetPayload, SearchCatalogPayload, SidecarProcessPriority,
-        WorldReportRequestPayload, validate_world_report_request,
+        validate_preview_geyser_details_request, validate_world_report_request, CountRule,
+        CoordPreviewRequestPayload, DistanceRule, PreviewCpuSetInfo,
+        PreviewGeyserDetailsRequestPayload, PreviewRequestPayload, PreviewTargetPayload,
+        SearchCatalogPayload, SearchConstraints, SearchCpuConfig, SearchRequestPayload,
+        SidecarProcessPriority, WorldReportRequestPayload,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -1962,11 +1994,28 @@ mod tests {
     }
 
     #[test]
+    fn sanitize_sidecar_stderr_should_drop_recoverable_template_diagnostics() {
+        let stderr = "error ApplyTemplateRules:430 can not place all templates\nreal failure";
+
+        assert_eq!(sanitize_sidecar_stderr(stderr), "real failure");
+    }
+
+    #[test]
     fn sanitize_sidecar_stderr_should_keep_real_errors() {
         assert_eq!(
             sanitize_sidecar_stderr("sidecar 进程异常退出(code=Some(-1073741819))"),
             "sidecar 进程异常退出(code=Some(-1073741819))"
         );
+    }
+
+    #[test]
+    fn ignore_sidecar_stderr_line_should_match_recoverable_template_diagnostics() {
+        assert!(should_ignore_sidecar_stderr_line(
+            "error ApplyTemplateRules:430 can not place all templates"
+        ));
+        assert!(!should_ignore_sidecar_stderr_line(
+            "sidecar 进程异常退出(code=Some(-1073741819))"
+        ));
     }
 
     #[test]
@@ -2750,6 +2799,77 @@ mod tests {
         assert_eq!(command["worldType"].as_i64(), Some(13));
         assert_eq!(command["seed"].as_i64(), Some(100123));
         assert_eq!(command["mixing"].as_i64(), Some(625));
+    }
+
+    #[test]
+    fn build_search_command_includes_trait_constraints() {
+        let command = build_search_command(&SearchRequestPayload {
+            job_id: "search-001".to_string(),
+            world_type: 13,
+            seed_start: 100000,
+            seed_end: 120000,
+            mixing: 625,
+            constraints: SearchConstraints {
+                required: vec!["steam".to_string()],
+                forbidden: vec!["methane".to_string()],
+                distance: vec![DistanceRule {
+                    geyser: "hot_water".to_string(),
+                    min_dist: 0.0,
+                    max_dist: 80.0,
+                }],
+                count: vec![CountRule {
+                    geyser: "salt_water".to_string(),
+                    min_count: 1,
+                    max_count: 2,
+                }],
+                required_traits: vec!["traits/MagmaVents".to_string()],
+                forbidden_traits: vec!["traits/GeoDormant".to_string()],
+            },
+            cpu: Some(SearchCpuConfig {
+                mode: "balanced".to_string(),
+                allow_smt: true,
+                allow_low_perf: false,
+                placement: "strict".to_string(),
+            }),
+        });
+
+        assert_eq!(
+            command["constraints"]["requiredTraits"][0].as_str(),
+            Some("traits/MagmaVents")
+        );
+        assert_eq!(
+            command["constraints"]["forbiddenTraits"][0].as_str(),
+            Some("traits/GeoDormant")
+        );
+    }
+
+    #[test]
+    fn build_analyze_search_command_includes_trait_constraints() {
+        let command = build_analyze_search_command(&SearchRequestPayload {
+            job_id: "analyze-001".to_string(),
+            world_type: 13,
+            seed_start: 100000,
+            seed_end: 120000,
+            mixing: 625,
+            constraints: SearchConstraints {
+                required: vec![],
+                forbidden: vec![],
+                distance: vec![],
+                count: vec![],
+                required_traits: vec!["traits/MagmaVents".to_string()],
+                forbidden_traits: vec!["traits/GeoDormant".to_string()],
+            },
+            cpu: None,
+        });
+
+        assert_eq!(
+            command["constraints"]["requiredTraits"][0].as_str(),
+            Some("traits/MagmaVents")
+        );
+        assert_eq!(
+            command["constraints"]["forbiddenTraits"][0].as_str(),
+            Some("traits/GeoDormant")
+        );
     }
 
     #[test]

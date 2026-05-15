@@ -6,6 +6,8 @@
 
 #include <json/json.h>
 
+#include "SearchAnalysis/TraitCatalog.hpp"
+
 namespace Batch {
 
 namespace {
@@ -202,6 +204,18 @@ bool ParseConstraints(const Json::Value &root,
     if (!ParseStringArray(constraintsNode["forbidden"],
                           "constraints.forbidden",
                           &constraints->forbidden,
+                          &result->error)) {
+        return false;
+    }
+    if (!ParseStringArray(constraintsNode["requiredTraits"],
+                          "constraints.requiredTraits",
+                          &constraints->requiredTraits,
+                          &result->error)) {
+        return false;
+    }
+    if (!ParseStringArray(constraintsNode["forbiddenTraits"],
+                          "constraints.forbiddenTraits",
+                          &constraints->forbiddenTraits,
                           &result->error)) {
         return false;
     }
@@ -556,6 +570,18 @@ Json::Value BuildNormalizedSearchRequestJson(const SearchAnalysis::NormalizedSea
     root["seedEnd"] = request.seedEnd;
     root["mixing"] = request.mixing;
 
+    Json::Value requiredTraits(Json::arrayValue);
+    for (const auto &traitId : request.requiredTraits) {
+        requiredTraits.append(traitId);
+    }
+    root["requiredTraits"] = requiredTraits;
+
+    Json::Value forbiddenTraits(Json::arrayValue);
+    for (const auto &traitId : request.forbiddenTraits) {
+        forbiddenTraits.append(traitId);
+    }
+    root["forbiddenTraits"] = forbiddenTraits;
+
     Json::Value groups(Json::arrayValue);
     for (const auto &group : request.groups) {
         Json::Value item(Json::objectValue);
@@ -592,6 +618,7 @@ Json::Value BuildSearchAnalysisJson(const SearchAnalysis::SearchAnalysisResult &
     worldProfile["width"] = analysis.worldProfile.width;
     worldProfile["height"] = analysis.worldProfile.height;
     worldProfile["diagonal"] = analysis.worldProfile.diagonal;
+    worldProfile["possibleTraitCountUpper"] = analysis.worldProfile.possibleTraitCountUpper;
 
     Json::Value activeMixingSlots(Json::arrayValue);
     for (int slot : analysis.worldProfile.activeMixingSlots) {
@@ -604,6 +631,18 @@ Json::Value BuildSearchAnalysisJson(const SearchAnalysis::SearchAnalysisResult &
         disabledMixingSlots.append(slot);
     }
     worldProfile["disabledMixingSlots"] = disabledMixingSlots;
+
+    Json::Value possibleTraitIds(Json::arrayValue);
+    for (const auto &id : analysis.worldProfile.possibleTraitIds) {
+        possibleTraitIds.append(id);
+    }
+    worldProfile["possibleTraitIds"] = possibleTraitIds;
+
+    Json::Value impossibleTraitIds(Json::arrayValue);
+    for (const auto &id : analysis.worldProfile.impossibleTraitIds) {
+        impossibleTraitIds.append(id);
+    }
+    worldProfile["impossibleTraitIds"] = impossibleTraitIds;
 
     Json::Value possibleGeyserTypes(Json::arrayValue);
     for (const auto &id : analysis.worldProfile.possibleGeyserTypes) {
@@ -873,7 +912,8 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
 }
 
 FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &request,
-                                                std::vector<FilterError> *errors)
+                                                std::vector<FilterError> *errors,
+                                                const SettingsCache *settings)
 {
     FilterConfig cfg;
     cfg.worldType = request.worldType;
@@ -915,6 +955,30 @@ FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &requ
             continue;
         }
         cfg.forbidden.push_back(index);
+    }
+
+    for (const auto &id : request.constraints.requiredTraits) {
+        const int index = settings == nullptr
+                              ? -1
+                              : SearchAnalysis::ResolveTraitSummaryIndexById(*settings, id);
+        if (index < 0) {
+            appendError(FilterErrorCode::UnknownRequiredTraitId, "constraints.requiredTraits", id);
+            continue;
+        }
+        cfg.requiredTraits.push_back(index);
+    }
+
+    for (const auto &id : request.constraints.forbiddenTraits) {
+        const int index = settings == nullptr
+                              ? -1
+                              : SearchAnalysis::ResolveTraitSummaryIndexById(*settings, id);
+        if (index < 0) {
+            appendError(FilterErrorCode::UnknownForbiddenTraitId,
+                        "constraints.forbiddenTraits",
+                        id);
+            continue;
+        }
+        cfg.forbiddenTraits.push_back(index);
     }
 
     for (const auto &rule : request.constraints.distance) {

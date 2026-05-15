@@ -715,6 +715,10 @@ textarea,
   grid-template-columns: minmax(0, 1fr) minmax(54px, 68px) minmax(54px, 68px) 40px 56px;
 }
 
+.trait-rule-row {
+  grid-template-columns: minmax(0, 1fr) minmax(92px, 112px) 56px;
+}
+
 .count-rule-column-label {
   font-size: 12px;
   color: var(--text-muted);

@@ -1,6 +1,29 @@
 import type { SearchAnalysisPayload } from "../../lib/contracts";
 import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import type { SearchDraft } from "../../state/searchStore.ts";
 import { formatProbabilityUpper } from "./searchProbabilityFormat";
+import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay.ts";
+
+const EMPTY_DRAFT: SearchDraft = {
+  worldType: 0,
+  seedStart: 0,
+  seedEnd: 0,
+  mixing: 0,
+  cpu: {
+    mode: "balanced",
+    allowSmt: true,
+    allowLowPerf: false,
+    placement: "strict",
+  },
+  constraints: {
+    required: [],
+    forbidden: [],
+    distance: [],
+    count: [],
+    requiredTraits: [],
+    forbiddenTraits: [],
+  },
+};
 
 interface SearchAnalysisHintsProps {
   analysis: SearchAnalysisPayload | null;
@@ -40,7 +63,9 @@ export default function SearchAnalysisHints({ analysis }: SearchAnalysisHintsPro
       {analysis.errors.length > 0 ? (
         <ul className="analysis-list analysis-list-error">
           {analysis.errors.map((item, index) => (
-            <li key={`${item.code}-${index}`}>{item.message}</li>
+            <li key={`${item.code}-${index}`}>
+              {formatAnalysisErrorMessage(item, analysis, EMPTY_DRAFT, [], [])}
+            </li>
           ))}
         </ul>
       ) : null}
@@ -48,7 +73,9 @@ export default function SearchAnalysisHints({ analysis }: SearchAnalysisHintsPro
       {analysis.warnings.length > 0 ? (
         <ul className="analysis-list analysis-list-warning">
           {analysis.warnings.map((item, index) => (
-            <li key={`${item.code}-${index}`}>{item.message}</li>
+            <li key={`${item.code}-${index}`}>
+              {formatAnalysisErrorMessage(item, analysis, EMPTY_DRAFT, [], [])}
+            </li>
           ))}
         </ul>
       ) : null}

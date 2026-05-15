@@ -15,6 +15,8 @@ export interface SearchConstraints {
   forbidden: string[];
   distance: DistanceRule[];
   count: CountRule[];
+  requiredTraits: string[];
+  forbiddenTraits: string[];
 }
 
 export type CpuMode = "balanced" | "turbo";
@@ -63,6 +65,8 @@ export interface NormalizedSearchRequestPayload {
   seedStart: number;
   seedEnd: number;
   mixing: number;
+  requiredTraits: string[];
+  forbiddenTraits: string[];
   groups: NormalizedConstraintGroup[];
 }
 
@@ -99,6 +103,9 @@ export interface WorldEnvelopeProfile {
   diagonal: number;
   activeMixingSlots: number[];
   disabledMixingSlots: number[];
+  possibleTraitCountUpper: number;
+  possibleTraitIds: string[];
+  impossibleTraitIds: string[];
   possibleGeyserTypes: string[];
   impossibleGeyserTypes: string[];
   possibleMaxCountByType: Record<string, number>;
