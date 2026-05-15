@@ -23,7 +23,7 @@ interface PreviewCanvasProps {
   geysers: readonly GeyserOption[];
   geyserPopoverEnabled: boolean;
   showBoundaries: boolean;
-  showLabels: boolean;
+  showBiomes: boolean;
   showGeysers: boolean;
   selectedGeyserIndex: number | null;
   onHoverRegionChange: (region: { id: string; zoneType: number } | null) => void;
@@ -71,7 +71,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
     geysers,
     geyserPopoverEnabled,
     showBoundaries,
-    showLabels,
+    showBiomes,
     showGeysers,
     selectedGeyserIndex,
     onHoverRegionChange,
@@ -391,9 +391,15 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
           </Layer>
         ) : null}
 
-        {showLabels ? (
+        {showBiomes || showGeysers ? (
           <Layer listening={false}>
             {model.labelCandidates.map((label) => {
+              if (label.kind === "region" && !showBiomes) {
+                return null;
+              }
+              if (label.kind !== "region" && !showGeysers) {
+                return null;
+              }
               const resolved = resolvedLabels.get(label.id);
               if (!resolved) {
                 return null;

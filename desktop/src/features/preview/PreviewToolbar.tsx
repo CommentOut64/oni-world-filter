@@ -3,12 +3,12 @@ import { Button, Switch, Tooltip, Typography } from "antd";
 
 interface PreviewToolbarProps {
   showBoundaries: boolean;
-  showLabels: boolean;
+  showBiomes: boolean;
   showGeysers: boolean;
   geyserCount: number;
   isGeneratingReport: boolean;
   onToggleBoundaries: () => void;
-  onToggleLabels: () => void;
+  onToggleBiomes: () => void;
   onToggleGeysers: () => void;
   onResetView: () => void;
   onGenerateReport: () => void;
@@ -17,12 +17,12 @@ interface PreviewToolbarProps {
 
 export default function PreviewToolbar({
   showBoundaries,
-  showLabels,
+  showBiomes,
   showGeysers,
   geyserCount,
   isGeneratingReport,
   onToggleBoundaries,
-  onToggleLabels,
+  onToggleBiomes,
   onToggleGeysers,
   onResetView,
   onGenerateReport,
@@ -41,8 +41,8 @@ export default function PreviewToolbar({
         <Switch checked={showBoundaries} onChange={onToggleBoundaries} />
       </div>
       <div className="preview-toolbar-toggle">
-        <Typography.Text>标签</Typography.Text>
-        <Switch checked={showLabels} onChange={onToggleLabels} />
+        <Typography.Text>生态</Typography.Text>
+        <Switch checked={showBiomes} onChange={onToggleBiomes} />
       </div>
       <div className="preview-toolbar-toggle">
         <Typography.Text>喷口</Typography.Text>

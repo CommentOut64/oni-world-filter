@@ -18,7 +18,7 @@ export interface SnapshotPreviewSceneRequest {
   stageHeight: number;
   viewport: ViewportState;
   showBoundaries: boolean;
-  showLabels: boolean;
+  showBiomes: boolean;
   showGeysers: boolean;
   selectedGeyserIndex: number | null;
 }
@@ -36,7 +36,7 @@ function OffscreenPreviewStage(props: OffscreenPreviewStageProps) {
     stageHeight,
     viewport,
     showBoundaries,
-    showLabels,
+    showBiomes,
     showGeysers,
     selectedGeyserIndex,
     onReady,
@@ -138,9 +138,15 @@ function OffscreenPreviewStage(props: OffscreenPreviewStageProps) {
         </Layer>
       ) : null}
 
-      {showLabels ? (
+      {showBiomes || showGeysers ? (
         <Layer listening={false}>
           {model.labelCandidates.map((label) => {
+            if (label.kind === "region" && !showBiomes) {
+              return null;
+            }
+            if (label.kind !== "region" && !showGeysers) {
+              return null;
+            }
             const resolved = resolvedLabels.get(label.id);
             if (!resolved) {
               return null;
