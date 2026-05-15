@@ -25,6 +25,7 @@ function buildValidFormValues() {
     forbidden: [] as { geyser: string }[],
     distance: [] as { geyser: string; minDist: number; maxDist: number }[],
     count: [] as { geyser: string; minCount: number; maxCount: number }[],
+    traitRules: [] as { traitId: string; mode: "required" | "forbidden" }[],
   };
 }
 
@@ -286,6 +287,62 @@ test("search schema rejects legacy custom cpu mode", () => {
   assert.equal(result.error.issues[0]?.path.join("."), "cpuMode");
 });
 
+test("search schema rejects duplicate required trait rules", () => {
+  const result = schema.safeParse({
+    ...buildValidFormValues(),
+    traitRules: [
+      { traitId: "traits/MagmaVents", mode: "required" },
+      { traitId: "traits/MagmaVents", mode: "required" },
+    ],
+  });
+
+  assert.equal(result.success, false);
+  if (result.success) {
+    return;
+  }
+
+  assert.deepEqual(
+    result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+    })),
+    [
+      {
+        path: "traitRules.1.traitId",
+        message: "“主星特质”里有重复特质",
+      },
+    ]
+  );
+});
+
+test("search schema rejects conflicting required and forbidden trait rules", () => {
+  const result = schema.safeParse({
+    ...buildValidFormValues(),
+    traitRules: [
+      { traitId: "traits/MagmaVents", mode: "required" },
+      { traitId: "traits/MagmaVents", mode: "forbidden" },
+    ],
+  });
+
+  assert.equal(result.success, false);
+  if (result.success) {
+    return;
+  }
+
+  assert.deepEqual(
+    result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+    })),
+    [
+      {
+        path: "traitRules.1.traitId",
+        message: "同一个主星特质不能同时设置“必须包含”和“必须排除”",
+      },
+    ]
+  );
+});
+
 test("search schema treats blank world selection as required instead of NaN type error", () => {
   const result = schema.safeParse({
     ...buildValidFormValues(),
@@ -337,6 +394,8 @@ test("toSearchFormValues migrates legacy required geysers into count rows with [
       forbidden: ["methane"],
       distance: [{ geyser: "steam", minDist: 0, maxDist: 80 }],
       count: [{ geyser: "hot_water", minCount: 2, maxCount: 3 }],
+      requiredTraits: ["traits/MagmaVents"],
+      forbiddenTraits: ["traits/GeoDormant"],
     },
   });
 
@@ -345,6 +404,23 @@ test("toSearchFormValues migrates legacy required geysers into count rows with [
     { geyser: "hot_water", minCount: 2, maxCount: 3 },
     { geyser: "steam", minCount: 1, maxCount: COUNT_MAX_SENTINEL },
   ]);
+  assert.deepEqual(values.traitRules, [
+    { traitId: "traits/MagmaVents", mode: "required" },
+    { traitId: "traits/GeoDormant", mode: "forbidden" },
+  ]);
+});
+
+test("toSearchDraft splits trait rules into requiredTraits and forbiddenTraits", () => {
+  const draft = toSearchDraft({
+    ...buildValidFormValues(),
+    traitRules: [
+      { traitId: "traits/MagmaVents", mode: "required" },
+      { traitId: "traits/GeoDormant", mode: "forbidden" },
+    ],
+  });
+
+  assert.deepEqual(draft.constraints.requiredTraits, ["traits/MagmaVents"]);
+  assert.deepEqual(draft.constraints.forbiddenTraits, ["traits/GeoDormant"]);
 });
 
 test("resolveCountAutoMax expands Max upper bounds using world profile limits", () => {
@@ -368,6 +444,8 @@ test("resolveCountAutoMax expands Max upper bounds using world profile limits", 
           { geyser: "steam", minCount: 1, maxCount: COUNT_MAX_SENTINEL },
           { geyser: "hot_water", minCount: 2, maxCount: 3 },
         ],
+        requiredTraits: [],
+        forbiddenTraits: [],
       },
     },
     {

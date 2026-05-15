@@ -13,6 +13,8 @@ test("buildWorldConstraintAlertItems returns blocking error for unsupported requ
       forbidden: [],
       distance: [{ geyser: "hot_water", minDist: 0, maxDist: 80 }],
       count: [{ geyser: "salt_water", minCount: 1, maxCount: 2 }],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
     disabledGeyserKeys: new Set(["steam", "hot_water", "salt_water"]),
   });
@@ -32,6 +34,8 @@ test("buildWorldConstraintAlertItems returns warning for redundant forbidden gey
       forbidden: [{ geyser: "steam" }],
       distance: [],
       count: [],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
     disabledGeyserKeys: new Set(["steam"]),
   });

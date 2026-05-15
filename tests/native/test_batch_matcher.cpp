@@ -103,6 +103,36 @@ int RunAllTests()
 
     {
         Batch::FilterConfig cfg;
+        cfg.forbiddenTraits = {5};
+        auto capture = MakeBaseCapture();
+        capture.traits = {1, 5};
+        const auto result = Batch::MatchFilter(cfg, capture);
+        Expect(result.Ok(), "forbidden trait test should not produce errors", failures);
+        Expect(!result.matched, "forbidden trait should short-circuit to not matched", failures);
+    }
+
+    {
+        Batch::FilterConfig cfg;
+        cfg.requiredTraits = {1, 5};
+        auto capture = MakeBaseCapture();
+        capture.traits = {1, 5, 9};
+        const auto result = Batch::MatchFilter(cfg, capture);
+        Expect(result.Ok(), "required trait match test should not produce errors", failures);
+        Expect(result.matched, "all required traits should match", failures);
+    }
+
+    {
+        Batch::FilterConfig cfg;
+        cfg.requiredTraits = {1, 5};
+        auto capture = MakeBaseCapture();
+        capture.traits = {1};
+        const auto result = Batch::MatchFilter(cfg, capture);
+        Expect(result.Ok(), "required trait mismatch test should not produce errors", failures);
+        Expect(!result.matched, "missing required trait should reject capture", failures);
+    }
+
+    {
+        Batch::FilterConfig cfg;
         BatchCaptureRecord missingStart;
         missingStart.worldW = 256;
         missingStart.worldH = 256;

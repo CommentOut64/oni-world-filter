@@ -147,6 +147,8 @@ test("openDirectCoordResult clears search runtime state but keeps the existing d
         forbidden: [],
         distance: [],
         count: [],
+        requiredTraits: [],
+        forbiddenTraits: [],
       },
       cpu: { ...preservedDraft.cpu },
     },

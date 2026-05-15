@@ -308,6 +308,29 @@ bool ApplySearchMutablePath(SettingsCache &settings, const std::string &code)
     return true;
 }
 
+std::vector<const WorldTrait *> GetStartWorldTraitsForCode(SettingsCache &settings,
+                                                           const std::string &code)
+{
+    if (!settings.CoordinateChanged(code, settings)) {
+        return {};
+    }
+    auto worlds = BuildActiveWorlds(settings);
+    if (worlds.empty()) {
+        return {};
+    }
+    settings.DoSubworldMixing(worlds);
+    const int baseSeed = settings.seed;
+    for (size_t i = 0; i < worlds.size(); ++i) {
+        auto *world = worlds[i];
+        if (world == nullptr || world->locationType != LocationType::StartWorld) {
+            continue;
+        }
+        settings.seed = baseSeed + static_cast<int>(i);
+        return settings.GetRandomTraits(*world);
+    }
+    return {};
+}
+
 } // namespace
 
 int RunAllTests()
@@ -358,6 +381,34 @@ int RunAllTests()
             const std::string replayFingerprint = FingerprintMutableState(settings);
             Expect(replayFingerprint == mutatedFingerprint,
                    "restored state should reproduce the same mutable search runtime state",
+                   failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for primary trait regression checks",
+               failures);
+
+        if (error.empty()) {
+            const auto vanillaSandstoneTraits =
+                GetStartWorldTraitsForCode(settings, BuildCoordinateCode("V-SNDST-C-", 123456, 0));
+            Expect(vanillaSandstoneTraits.empty(),
+                   "V-SNDST-C primary should not generate runtime traits",
+                   failures);
+
+            const auto terraMoonletTraits =
+                GetStartWorldTraitsForCode(settings, BuildCoordinateCode("SNDST-C-", 123456, 0));
+            Expect(terraMoonletTraits.empty(),
+                   "SNDST-C primary should not generate runtime traits",
+                   failures);
+
+            const auto vanillaArboriaTraits =
+                GetStartWorldTraitsForCode(settings, BuildCoordinateCode("V-LUSH-C-", 123456, 0));
+            Expect(!vanillaArboriaTraits.empty(),
+                   "classic primary trait generation should stay enabled on non-Terra worlds",
                    failures);
         }
     }
