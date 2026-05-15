@@ -1,6 +1,6 @@
 [package]
 name = "oni-world-filter"
-version = "0.0.4"
+version = "1.0.0"
 description = "oni-world-filter desktop host"
 authors = ["wgh"]
 license = "MIT"
@@ -18,6 +18,8 @@ tauri-plugin-fs = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_SystemInformation", "Win32_System_Threading"] }
+webview2-com = "0.38.2"
+windows = "0.61"
 
 [features]
 default = ["custom-protocol"]

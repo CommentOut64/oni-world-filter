@@ -28,7 +28,7 @@ export default function SearchConstraintAlerts({
           type="error"
           showIcon
           closable
-          title={`参数提示: ${lastError}`}
+          title={`提示: ${lastError}`}
           onClose={onCloseLastError}
         />
       ) : null}

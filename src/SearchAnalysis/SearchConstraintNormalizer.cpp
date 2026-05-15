@@ -37,6 +37,8 @@ NormalizedSearchRequest NormalizeSearchRequest(const SearchAnalysisRequest &requ
     normalized.seedEnd = request.seedEnd;
     normalized.mixing = request.mixing;
     normalized.cpu = request.cpu;
+    normalized.requiredTraits = request.constraints.requiredTraits;
+    normalized.forbiddenTraits = request.constraints.forbiddenTraits;
 
     std::unordered_map<std::string, size_t> indexById;
     indexById.reserve(request.constraints.required.size() +

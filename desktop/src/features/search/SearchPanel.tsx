@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, FormProvider, useForm } from "react-hook-form";
 
 import type { SearchAnalysisPayload } from "../../lib/contracts";
-import { getParameterSpecStaticMax } from "../../lib/searchCatalog";
+import { FALLBACK_SEARCH_CATALOG, getParameterSpecStaticMax } from "../../lib/searchCatalog";
 import type { SearchDraft } from "../../state/searchStore";
 import {
   analyzeSearchRequest,
@@ -28,12 +28,24 @@ import GeyserConstraintEditor from "./GeyserConstraintEditor";
 import MixingSelector from "./MixingSelector";
 import CoordQuickSearch from "./CoordQuickSearch";
 import { runCoordPreviewFlow } from "./coordPreviewFlow";
+import { validateNativeCoordInput } from "./nativeCoordValidation";
 import SearchActions from "./SearchActions";
 import SearchConstraintAlerts from "./SearchConstraintAlerts";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
 import { buildWorldConstraintAlertItems } from "./geyserConstraintPresentation.ts";
+import {
+  getPrimaryTraitBlockingError,
+  getPrimaryTraitAvailabilityConflict,
+  getPrimaryTraitCountExceededReason,
+  getPrimaryTraitFilterDisabledReason,
+  isPrimaryTraitValidationMessage,
+  PRIMARY_TRAIT_FILTER_UNSUPPORTED_ERROR,
+  supportsPrimaryTraitFiltering,
+} from "./primaryTraitSupport";
 import { formatAnalysisErrorMessage } from "./searchAnalysisDisplay";
 import { shouldShowSearchWarningConfirmation } from "./searchWarningPolicy";
+import TraitConstraintEditor from "./TraitConstraintEditor";
+import { hasMatchingWorldProfileRequest, type WorldProfileRequestState } from "./worldProfileRequestState";
 import {
   COUNT_MAX_SENTINEL,
   createSearchSchema,
@@ -64,6 +76,8 @@ async function loadWorldProfile(worldType: number, mixing: number): Promise<Sear
       forbidden: [],
       distance: [],
       count: [],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
   });
   return analysis.worldProfile;
@@ -124,6 +138,11 @@ export default function SearchPanel({
   const [disabledGeyserKeys, setDisabledGeyserKeys] = useState<Set<string>>(new Set());
   const [disabledMixingSlots, setDisabledMixingSlots] = useState<Set<number>>(new Set());
   const [possibleMaxCountByType, setPossibleMaxCountByType] = useState<Record<string, number>>({});
+  const [worldProfile, setWorldProfile] = useState<SearchAnalysisPayload["worldProfile"] | null>(
+    null
+  );
+  const [worldProfileRequestState, setWorldProfileRequestState] =
+    useState<WorldProfileRequestState | null>(null);
   const [pendingWarningConfirmation, setPendingWarningConfirmation] = useState<{
     uiDraft: SearchDraft;
     submitDraft: SearchDraft;
@@ -136,7 +155,24 @@ export default function SearchPanel({
   const watchForbidden = methods.watch("forbidden") ?? [];
   const watchDistance = methods.watch("distance") ?? [];
   const watchCount = methods.watch("count") ?? [];
+  const watchTraitRules = methods.watch("traitRules") ?? [];
   const previousCpuModeRef = useRef(watchCpuMode);
+  const primaryTraitFilteringSupported = useMemo(
+    () => supportsPrimaryTraitFiltering(worldProfile),
+    [worldProfile]
+  );
+  const primaryTraitFilterDisabledReason = useMemo(
+    () => getPrimaryTraitFilterDisabledReason(worldProfile),
+    [worldProfile]
+  );
+  const primaryTraitAvailabilityConflict = useMemo(
+    () => getPrimaryTraitAvailabilityConflict(worldProfile, watchTraitRules),
+    [watchTraitRules, worldProfile]
+  );
+  const primaryTraitCountExceededReason = useMemo(
+    () => getPrimaryTraitCountExceededReason(worldProfile, watchTraitRules),
+    [watchTraitRules, worldProfile]
+  );
   const worldConstraintAlerts = useMemo(
     () =>
       buildWorldConstraintAlertItems({
@@ -150,6 +186,30 @@ export default function SearchPanel({
       }),
     [disabledGeyserKeys, watchCount, watchDistance, watchForbidden, watchRequired]
   );
+  const traitConstraintAlerts = useMemo(
+    () => [
+      ...(primaryTraitCountExceededReason
+        ? [{ severity: "error" as const, message: primaryTraitCountExceededReason }]
+        : []),
+      ...(primaryTraitAvailabilityConflict ? [primaryTraitAvailabilityConflict] : []),
+    ],
+    [primaryTraitAvailabilityConflict, primaryTraitCountExceededReason]
+  );
+  const primaryTraitBlockingError = useMemo(
+    () => getPrimaryTraitBlockingError(worldProfile, watchTraitRules),
+    [watchTraitRules, worldProfile]
+  );
+
+  const applyWorldProfile = (
+    nextWorldProfile: SearchAnalysisPayload["worldProfile"],
+    requestState: WorldProfileRequestState
+  ) => {
+    setWorldProfile(nextWorldProfile);
+    setWorldProfileRequestState(requestState);
+    setDisabledGeyserKeys(new Set(nextWorldProfile.impossibleGeyserTypes));
+    setDisabledMixingSlots(new Set(nextWorldProfile.disabledMixingSlots));
+    setPossibleMaxCountByType(nextWorldProfile.possibleMaxCountByType);
+  };
 
   useEffect(() => {
     const previousCpuMode = previousCpuModeRef.current;
@@ -163,20 +223,33 @@ export default function SearchPanel({
   }, [methods, watchCpuMode]);
 
   useEffect(() => {
+    if (!lastError || !isPrimaryTraitValidationMessage(lastError)) {
+      return;
+    }
+    if (lastError === primaryTraitBlockingError) {
+      return;
+    }
+    useSearchStore.setState({ lastError: primaryTraitBlockingError });
+  }, [lastError, primaryTraitBlockingError]);
+
+  useEffect(() => {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const worldProfile = await loadWorldProfile(
+        const nextWorldProfile = await loadWorldProfile(
           Number.isFinite(watchWorldType) ? watchWorldType : draft.worldType,
           Number.isFinite(watchMixing) ? watchMixing : draft.mixing
         );
         if (!cancelled) {
-          setDisabledGeyserKeys(new Set(worldProfile.impossibleGeyserTypes));
-          setDisabledMixingSlots(new Set(worldProfile.disabledMixingSlots));
-          setPossibleMaxCountByType(worldProfile.possibleMaxCountByType);
+          applyWorldProfile(nextWorldProfile, {
+            worldType: Number.isFinite(watchWorldType) ? watchWorldType : draft.worldType,
+            mixing: Number.isFinite(watchMixing) ? watchMixing : draft.mixing,
+          });
         }
       } catch {
         if (!cancelled) {
+          setWorldProfile(null);
+          setWorldProfileRequestState(null);
           setDisabledGeyserKeys(new Set());
           setDisabledMixingSlots(new Set());
           setPossibleMaxCountByType({});
@@ -209,13 +282,58 @@ export default function SearchPanel({
       if (hasCountAutoMax(uiDraft)) {
         let resolvedPossibleMaxCountByType = possibleMaxCountByType;
         if (!hasCompletePossibleMaxMap(uiDraft, resolvedPossibleMaxCountByType)) {
-          const worldProfile = await loadWorldProfile(uiDraft.worldType, uiDraft.mixing);
-          resolvedPossibleMaxCountByType = worldProfile.possibleMaxCountByType;
-          setDisabledGeyserKeys(new Set(worldProfile.impossibleGeyserTypes));
-          setDisabledMixingSlots(new Set(worldProfile.disabledMixingSlots));
-          setPossibleMaxCountByType(worldProfile.possibleMaxCountByType);
+          const nextWorldProfile = await loadWorldProfile(uiDraft.worldType, uiDraft.mixing);
+          resolvedPossibleMaxCountByType = nextWorldProfile.possibleMaxCountByType;
+          applyWorldProfile(nextWorldProfile, {
+            worldType: uiDraft.worldType,
+            mixing: uiDraft.mixing,
+          });
         }
         nextDraft = resolveCountAutoMax(uiDraft, resolvedPossibleMaxCountByType);
+      }
+      let resolvedWorldProfile = worldProfile;
+      if (
+        resolvedWorldProfile === null ||
+        !hasMatchingWorldProfileRequest(
+          worldProfileRequestState,
+          nextDraft.worldType,
+          nextDraft.mixing
+        )
+      ) {
+        resolvedWorldProfile = await loadWorldProfile(nextDraft.worldType, nextDraft.mixing);
+        applyWorldProfile(resolvedWorldProfile, {
+          worldType: nextDraft.worldType,
+          mixing: nextDraft.mixing,
+        });
+      }
+      const hasTraitConstraints =
+        nextDraft.constraints.requiredTraits.length > 0 ||
+        nextDraft.constraints.forbiddenTraits.length > 0;
+      if (!supportsPrimaryTraitFiltering(resolvedWorldProfile) && hasTraitConstraints) {
+        useSearchStore.setState({
+          lastError: PRIMARY_TRAIT_FILTER_UNSUPPORTED_ERROR,
+        });
+        return;
+      }
+      const submitTraitRules = [
+        ...nextDraft.constraints.requiredTraits.map((traitId) => ({
+          traitId,
+          mode: "required" as const,
+        })),
+        ...nextDraft.constraints.forbiddenTraits.map((traitId) => ({
+          traitId,
+          mode: "forbidden" as const,
+        })),
+      ];
+      const submitPrimaryTraitBlockingError = getPrimaryTraitBlockingError(
+        resolvedWorldProfile,
+        submitTraitRules
+      );
+      if (submitPrimaryTraitBlockingError) {
+        useSearchStore.setState({
+          lastError: submitPrimaryTraitBlockingError,
+        });
+        return;
       }
       const analysis = await analyzeSearchRequest({
         jobId: `analyze-${Date.now()}`,
@@ -272,6 +390,14 @@ export default function SearchPanel({
     }
 
     const coord = coordInput.trim();
+    const coordError = validateNativeCoordInput(
+      coord,
+      (worlds.length > 0 ? worlds : FALLBACK_SEARCH_CATALOG.worlds).map((item) => item.code)
+    );
+    if (coordError) {
+      useSearchStore.setState({ lastError: coordError });
+      return;
+    }
     setIsCoordSubmitting(true);
     clearError();
     try {
@@ -299,196 +425,293 @@ export default function SearchPanel({
   };
 
   return (
-    <FormProvider {...methods}>
-      <section className="search-panel">
-        <header className="search-panel-header">
-          <div className="search-panel-header-row">
-            <Flex vertical gap={4} className="search-panel-title">
-              <Typography.Title level={3}>搜索参数</Typography.Title>
-            </Flex>
-            <div className="search-panel-header-center">
-              <CoordQuickSearch
-                value={coordInput}
-                loading={isCoordSubmitting}
-                disabled={isSearching || isCoordSubmitting}
-                onChange={(value) => {
-                  setCoordInput(value);
-                }}
-                onSubmit={() => {
-                  void handleCoordSubmit();
-                }}
-              />
-            </div>
-            <ThemeModeToggle mode={themeMode} onModeChange={onThemeModeChange} />
-          </div>
-          <SearchConstraintAlerts
-            lastError={lastError}
-            items={worldConstraintAlerts}
-            onCloseLastError={clearError}
+      <FormProvider {...methods}>
+          <section className="search-panel">
+              <header className="search-panel-header">
+                  <div className="search-panel-header-row">
+                      <Flex vertical gap={4} className="search-panel-title">
+                          <Typography.Title level={3}>
+                              搜索参数
+                          </Typography.Title>
+                      </Flex>
+                      <div className="search-panel-header-center">
+                          <CoordQuickSearch
+                              value={coordInput}
+                              loading={isCoordSubmitting}
+                              disabled={isSearching || isCoordSubmitting}
+                              onChange={(value) => {
+                                  setCoordInput(value);
+                              }}
+                              onSubmit={() => {
+                                  void handleCoordSubmit();
+                              }}
+                          />
+                      </div>
+                      <ThemeModeToggle
+                          mode={themeMode}
+                          onModeChange={onThemeModeChange}
+                      />
+                  </div>
+                  <SearchConstraintAlerts
+                      lastError={lastError}
+                      items={[
+                          ...worldConstraintAlerts,
+                          ...traitConstraintAlerts,
+                      ]}
+                      onCloseLastError={clearError}
+                  />
+              </header>
+
+              <form className="search-panel-form" onSubmit={submit}>
+                  <section className="search-panel-grid">
+                      <section className="search-column search-column-main">
+                          <Card className="search-section">
+                              <header className="search-section-header">
+                                  <Typography.Title level={4}>
+                                      世界参数
+                                  </Typography.Title>
+                                  <Typography.Paragraph>
+                                      先按世界家族筛选具体世界，再按 DLC
+                                      包配置当前世界允许的混搭内容。
+                                  </Typography.Paragraph>
+                              </header>
+                              <div className="world-parameter-layout">
+                                  <WorldSelector worlds={worlds} />
+                                  <MixingSelector
+                                      mixingSlots={catalog?.mixingSlots ?? []}
+                                      disabledMixingSlots={disabledMixingSlots}
+                                  />
+                              </div>
+                          </Card>
+
+                          <Card className="search-section">
+                              <header className="search-section-header">
+                                  <Typography.Title level={4}>
+                                      性能参数
+                                  </Typography.Title>
+                                  <Typography.Paragraph>
+                                      CPU 模式与调度策略。
+                                  </Typography.Paragraph>
+                              </header>
+                              <div className="field-grid">
+                                  <div className="field">
+                                      <Typography.Text className="field-label">
+                                          CPU 模式
+                                      </Typography.Text>
+                                      <Controller
+                                          control={methods.control}
+                                          name="cpuMode"
+                                          render={({ field }) => (
+                                              <Select
+                                                  className="field-control"
+                                                  value={field.value}
+                                                  options={[
+                                                      {
+                                                          label: "平衡",
+                                                          value: "balanced",
+                                                      },
+                                                      {
+                                                          label: "极速",
+                                                          value: "turbo",
+                                                      },
+                                                  ]}
+                                                  onChange={field.onChange}
+                                              />
+                                          )}
+                                      />
+                                      {methods.formState.errors.cpuMode ? (
+                                          <small className="error">
+                                              {
+                                                  methods.formState.errors
+                                                      .cpuMode.message
+                                              }
+                                          </small>
+                                      ) : null}
+                                  </div>
+                              </div>
+                              <div className="field">
+                                  <Typography.Text className="field-label">
+                                      调度选项
+                                  </Typography.Text>
+                                  <div className="field-inline">
+                                      <Controller
+                                          control={methods.control}
+                                          name="cpuAllowSmt"
+                                          render={({ field }) => (
+                                              <Checkbox
+                                                  checked={field.value}
+                                                  onChange={(event) =>
+                                                      field.onChange(
+                                                          event.target.checked,
+                                                      )
+                                                  }
+                                              >
+                                                  允许 SMT
+                                              </Checkbox>
+                                          )}
+                                      />
+                                      <Controller
+                                          control={methods.control}
+                                          name="cpuAllowLowPerf"
+                                          render={({ field }) => (
+                                              <Checkbox
+                                                  checked={
+                                                      watchCpuMode === "turbo"
+                                                          ? getDefaultAllowLowPerfForCpuMode(
+                                                                watchCpuMode,
+                                                            )
+                                                          : field.value
+                                                  }
+                                                  disabled={
+                                                      watchCpuMode === "turbo"
+                                                  }
+                                                  onChange={(event) =>
+                                                      field.onChange(
+                                                          event.target.checked,
+                                                      )
+                                                  }
+                                              >
+                                                  允许低性能核心
+                                              </Checkbox>
+                                          )}
+                                      />
+                                  </div>
+                              </div>
+                          </Card>
+
+                          <Card className="search-section">
+                              <header className="search-section-header">
+                                  <Typography.Title level={4}>
+                                      Seed 范围
+                                  </Typography.Title>
+                              </header>
+                              <div className="field-grid">
+                                  <div className="field">
+                                      <Typography.Text className="field-label">
+                                          Seed Start
+                                      </Typography.Text>
+                                      <Controller
+                                          control={methods.control}
+                                          name="seedStart"
+                                          render={({ field }) => (
+                                              <InputNumber
+                                                  className="field-control"
+                                                  value={field.value}
+                                                  style={{ width: "100%" }}
+                                                  onChange={(value) =>
+                                                      field.onChange(
+                                                          value ?? undefined,
+                                                      )
+                                                  }
+                                              />
+                                          )}
+                                      />
+                                      {methods.formState.errors.seedStart ? (
+                                          <small className="error">
+                                              {
+                                                  methods.formState.errors
+                                                      .seedStart.message
+                                              }
+                                          </small>
+                                      ) : null}
+                                  </div>
+                                  <div className="field">
+                                      <Typography.Text className="field-label">
+                                          Seed End
+                                      </Typography.Text>
+                                      <Controller
+                                          control={methods.control}
+                                          name="seedEnd"
+                                          render={({ field }) => (
+                                              <InputNumber
+                                                  className="field-control"
+                                                  value={field.value}
+                                                  style={{ width: "100%" }}
+                                                  onChange={(value) =>
+                                                      field.onChange(
+                                                          value ?? undefined,
+                                                      )
+                                                  }
+                                              />
+                                          )}
+                                      />
+                                      {methods.formState.errors.seedEnd ? (
+                                          <small className="error">
+                                              {
+                                                  methods.formState.errors
+                                                      .seedEnd.message
+                                              }
+                                          </small>
+                                      ) : null}
+                                  </div>
+                              </div>
+                          </Card>
+                      </section>
+
+                      <section className="search-column search-column-rules">
+                          <Card className="search-section search-section-rules">
+                              <header className="search-section-header">
+                                  <Typography.Title level={4}>
+                                      喷口/特质约束
+                                  </Typography.Title>
+                                  <Typography.Paragraph>
+                                      “必须包含”表示该喷口在整张地图里的总出现次数范围，“距离规则”表示至少有一个目标喷口落在指定范围内。
+                                  </Typography.Paragraph>
+                                  <Typography.Paragraph>
+                                      主星特质约束注意世界类型限制和数量限制。
+                                  </Typography.Paragraph>
+                              </header>
+                              <div className="search-rule-grid">
+                                  <CountRuleEditor
+                                      geysers={geysers}
+                                      disabledGeyserKeys={disabledGeyserKeys}
+                                  />
+                                  <GeyserConstraintEditor
+                                      title="必须排除"
+                                      type="forbidden"
+                                      geysers={geysers}
+                                      disabledGeyserKeys={disabledGeyserKeys}
+                                  />
+                                  <DistanceRuleEditor
+                                      geysers={geysers}
+                                      disabledGeyserKeys={disabledGeyserKeys}
+                                  />
+                                  <TraitConstraintEditor
+                                      traits={catalog?.traits ?? []}
+                                      disabled={!primaryTraitFilteringSupported}
+                                      disabledReason={
+                                          primaryTraitFilterDisabledReason
+                                      }
+                                      availableTraitIds={
+                                          worldProfile
+                                              ? new Set(
+                                                    worldProfile.possibleTraitIds,
+                                                )
+                                              : null
+                                      }
+                                  />
+                              </div>
+                          </Card>
+                          <SearchActions
+                              isSearching={isSearching}
+                              isBusy={isCoordSubmitting || isSearchSubmitting}
+                              hasResults={hasResults}
+                              resultsCount={resultsCount}
+                              onViewResults={() => {
+                                  onViewResults?.();
+                              }}
+                          />
+                      </section>
+                  </section>
+              </form>
+          </section>
+          <SearchWarningConfirmModal
+              open={pendingWarningConfirmation !== null}
+              analysis={pendingWarningConfirmation?.analysis ?? null}
+              geysers={geysers}
+              onContinue={handleWarningContinue}
+              onAbandon={handleWarningAbandon}
           />
-        </header>
-
-        <form className="search-panel-form" onSubmit={submit}>
-          <section className="search-panel-grid">
-          <section className="search-column search-column-main">
-            <Card className="search-section">
-              <header className="search-section-header">
-                <Typography.Title level={4}>世界参数</Typography.Title>
-                <Typography.Paragraph>
-                  先按世界家族筛选具体世界，再按 DLC 包配置当前世界允许的混搭内容。
-                </Typography.Paragraph>
-              </header>
-              <div className="world-parameter-layout">
-                <WorldSelector worlds={worlds} />
-                <MixingSelector
-                  mixingSlots={catalog?.mixingSlots ?? []}
-                  disabledMixingSlots={disabledMixingSlots}
-                />
-              </div>
-            </Card>
-
-            <Card className="search-section">
-              <header className="search-section-header">
-                <Typography.Title level={4}>性能参数</Typography.Title>
-                <Typography.Paragraph>CPU 模式与调度策略。</Typography.Paragraph>
-              </header>
-              <div className="field-grid">
-                <div className="field">
-                  <Typography.Text className="field-label">CPU 模式</Typography.Text>
-                  <Controller
-                    control={methods.control}
-                    name="cpuMode"
-                    render={({ field }) => (
-                      <Select
-                        className="field-control"
-                        value={field.value}
-                        options={[
-                          { label: "平衡", value: "balanced" },
-                          { label: "极速", value: "turbo" },
-                        ]}
-                        onChange={field.onChange}
-                      />
-                    )}
-                  />
-                  {methods.formState.errors.cpuMode ? (
-                    <small className="error">{methods.formState.errors.cpuMode.message}</small>
-                  ) : null}
-                </div>
-              </div>
-              <div className="field">
-                <Typography.Text className="field-label">调度选项</Typography.Text>
-                <div className="field-inline">
-                  <Controller
-                    control={methods.control}
-                    name="cpuAllowSmt"
-                    render={({ field }) => (
-                      <Checkbox checked={field.value} onChange={(event) => field.onChange(event.target.checked)}>
-                        允许 SMT
-                      </Checkbox>
-                    )}
-                  />
-                  <Controller
-                    control={methods.control}
-                    name="cpuAllowLowPerf"
-                    render={({ field }) => (
-                      <Checkbox
-                        checked={watchCpuMode === "turbo" ? getDefaultAllowLowPerfForCpuMode(watchCpuMode) : field.value}
-                        disabled={watchCpuMode === "turbo"}
-                        onChange={(event) => field.onChange(event.target.checked)}
-                      >
-                        允许低性能核心
-                      </Checkbox>
-                    )}
-                  />
-                </div>
-              </div>
-            </Card>
-
-            <Card className="search-section">
-              <header className="search-section-header">
-                <Typography.Title level={4}>Seed 范围</Typography.Title>
-              </header>
-              <div className="field-grid">
-                <div className="field">
-                  <Typography.Text className="field-label">Seed Start</Typography.Text>
-                  <Controller
-                    control={methods.control}
-                    name="seedStart"
-                    render={({ field }) => (
-                      <InputNumber
-                        className="field-control"
-                        value={field.value}
-                        style={{ width: "100%" }}
-                        onChange={(value) => field.onChange(value ?? undefined)}
-                      />
-                    )}
-                  />
-                  {methods.formState.errors.seedStart ? (
-                    <small className="error">{methods.formState.errors.seedStart.message}</small>
-                  ) : null}
-                </div>
-                <div className="field">
-                  <Typography.Text className="field-label">Seed End</Typography.Text>
-                  <Controller
-                    control={methods.control}
-                    name="seedEnd"
-                    render={({ field }) => (
-                      <InputNumber
-                        className="field-control"
-                        value={field.value}
-                        style={{ width: "100%" }}
-                        onChange={(value) => field.onChange(value ?? undefined)}
-                      />
-                    )}
-                  />
-                  {methods.formState.errors.seedEnd ? (
-                    <small className="error">{methods.formState.errors.seedEnd.message}</small>
-                  ) : null}
-                </div>
-              </div>
-            </Card>
-
-          </section>
-
-          <section className="search-column search-column-rules">
-            <Card className="search-section search-section-rules">
-              <header className="search-section-header">
-                <Typography.Title level={4}>喷口约束</Typography.Title>
-                <Typography.Paragraph>
-                    “必须包含”表示该喷口在整张地图里的总出现次数范围，“距离规则”表示至少有一个目标喷口落在指定范围内。
-                </Typography.Paragraph>
-              </header>
-              <div className="search-rule-grid">
-                <CountRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
-                <GeyserConstraintEditor
-                  title="必须排除"
-                  type="forbidden"
-                  geysers={geysers}
-                  disabledGeyserKeys={disabledGeyserKeys}
-                />
-                <DistanceRuleEditor geysers={geysers} disabledGeyserKeys={disabledGeyserKeys} />
-              </div>
-            </Card>
-            <SearchActions
-              isSearching={isSearching}
-              isBusy={isCoordSubmitting || isSearchSubmitting}
-              hasResults={hasResults}
-              resultsCount={resultsCount}
-              onViewResults={() => {
-                onViewResults?.();
-              }}
-            />
-          </section>
-          </section>
-        </form>
-      </section>
-      <SearchWarningConfirmModal
-        open={pendingWarningConfirmation !== null}
-        analysis={pendingWarningConfirmation?.analysis ?? null}
-        geysers={geysers}
-        onContinue={handleWarningContinue}
-        onAbandon={handleWarningAbandon}
-      />
-    </FormProvider>
+      </FormProvider>
   );
 }

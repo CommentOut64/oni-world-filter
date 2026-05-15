@@ -174,6 +174,30 @@ bool AppRuntime::Generate(const std::string &code, int traitsFlag)
     return GenerateCurrentState(traitsFlag, code.find("M-") == 0);
 }
 
+bool AppRuntime::GenerateSelectedPlacements(const std::string &code,
+                                            int traitsFlag,
+                                            const std::vector<int> &placementIndexes,
+                                            int primaryPlacementIndex)
+{
+    if (m_sink == nullptr) {
+        LogE("result sink is not set before GenerateSelectedPlacements()");
+        return false;
+    }
+    if (!m_settings.CoordinateChanged(code, m_settings)) {
+        LogE("parse seed code %s failed.", code.c_str());
+        return false;
+    }
+
+    std::vector<World *> worlds;
+    if (!BuildWorldList(worlds)) {
+        return false;
+    }
+    return GenerateWorldsForPlacementIndexes(worlds,
+                                             traitsFlag,
+                                             placementIndexes,
+                                             primaryPlacementIndex);
+}
+
 bool AppRuntime::BuildWorldList(std::vector<World *> &worlds)
 {
     worlds.clear();
@@ -202,25 +226,81 @@ bool AppRuntime::GenerateCurrentState(int traitsFlag, bool genWarpWorld)
     if (!BuildWorldList(worlds)) {
         return false;
     }
+    const auto placementIndexes = CollectPreviewPlacementIndexes(worlds, genWarpWorld);
+    return GenerateWorldsForPlacementIndexes(worlds,
+                                             traitsFlag,
+                                             placementIndexes,
+                                             FindPrimaryPlacementIndex(worlds));
+}
+
+int AppRuntime::FindPrimaryPlacementIndex(const std::vector<World *> &worlds)
+{
+    for (size_t index = 0; index < worlds.size(); ++index) {
+        if (worlds[index] != nullptr &&
+            worlds[index]->locationType == LocationType::StartWorld) {
+            return static_cast<int>(index);
+        }
+    }
+    return -1;
+}
+
+std::vector<int> AppRuntime::CollectPreviewPlacementIndexes(const std::vector<World *> &worlds,
+                                                            bool genWarpWorld)
+{
+    std::vector<int> placementIndexes;
+    placementIndexes.reserve(worlds.size());
+    for (size_t index = 0; index < worlds.size(); ++index) {
+        const auto *world = worlds[index];
+        if (world == nullptr || world->locationType == LocationType::Cluster) {
+            continue;
+        }
+        if (world->locationType == LocationType::StartWorld) {
+            placementIndexes.push_back(static_cast<int>(index));
+            continue;
+        }
+        if (genWarpWorld && world->startingBaseTemplate.contains("::bases/warpworld")) {
+            placementIndexes.push_back(static_cast<int>(index));
+        }
+    }
+    return placementIndexes;
+}
+
+bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<World *> &worlds,
+                                                   int traitsFlag,
+                                                   const std::vector<int> &placementIndexes,
+                                                   int primaryPlacementIndex)
+{
     if (traitsFlag != 0) {
         SetSeedWithTraits(worlds, traitsFlag);
     }
 
     m_settings.DoSubworldMixing(worlds);
     int seed = m_settings.seed;
-    for (size_t i = 0; i < worlds.size(); ++i) {
-        auto world = worlds[i];
-        if (world->locationType == LocationType::Cluster) {
-            continue;
-        } else if (world->locationType == LocationType::StartWorld) {
-            // keep start world path
-        } else if (!world->startingBaseTemplate.contains("::bases/warpworld")) {
-            continue;
-        } else if (!genWarpWorld) {
+    std::vector<int> normalizedPlacementIndexes;
+    normalizedPlacementIndexes.reserve(placementIndexes.size());
+    for (const int placementIndex : placementIndexes) {
+        if (placementIndex < 0 || placementIndex >= static_cast<int>(worlds.size())) {
+            LogE("placement index %d is out of range.", placementIndex);
+            return false;
+        }
+        if (std::ranges::contains(normalizedPlacementIndexes, placementIndex)) {
             continue;
         }
+        normalizedPlacementIndexes.push_back(placementIndex);
+    }
 
-        m_settings.seed = seed + (int)i;
+    for (const int placementIndex : normalizedPlacementIndexes) {
+        auto *world = worlds[static_cast<size_t>(placementIndex)];
+        if (world == nullptr) {
+            LogE("world at placement index %d is null.", placementIndex);
+            return false;
+        }
+        if (world->locationType == LocationType::Cluster) {
+            LogE("placement index %d points to cluster-only world.", placementIndex);
+            return false;
+        }
+
+        m_settings.seed = seed + placementIndex;
         auto traits = m_settings.GetRandomTraits(*world);
         for (auto trait : traits) {
             world->ApplayTraits(*trait, m_settings);
@@ -237,7 +317,11 @@ bool AppRuntime::GenerateCurrentState(int traitsFlag, bool genWarpWorld)
             return false;
         }
 
-        auto summary = BuildSummary(seed, static_cast<int>(i), world, sites, traits, worldGen);
+        auto summary = BuildSummary(seed, placementIndex, world, sites, traits, worldGen);
+        summary.isPrimary = primaryPlacementIndex >= 0
+                                ? placementIndex == primaryPlacementIndex
+                                : world->locationType == LocationType::StartWorld;
+        summary.worldType = summary.isPrimary ? 0 : 1;
         m_sink->OnGeneratedWorldSummary(summary);
         if (!m_skipPolygons) {
             auto preview = BuildPreview(world, sites, summary);
@@ -309,6 +393,12 @@ GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
     summary.isPrimary = world->locationType == LocationType::StartWorld;
     summary.worldType = summary.isPrimary ? 0 : 1;
     summary.worldPlacementIndex = worldPlacementIndex;
+    if (m_settings.cluster != nullptr &&
+        worldPlacementIndex >= 0 &&
+        worldPlacementIndex < static_cast<int>(m_settings.cluster->worldPlacements.size())) {
+        summary.worldAssetId =
+            m_settings.cluster->worldPlacements[static_cast<size_t>(worldPlacementIndex)].world;
+    }
     summary.start = {sites[0].x, sites[0].y};
     summary.worldSize = world->worldsize;
     summary.start.y = summary.worldSize.y - summary.start.y;

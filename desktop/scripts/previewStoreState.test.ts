@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { PreviewPayload } from "../src/lib/contracts";
+import type { PreviewPayload } from "../src/lib/contracts.ts";
 import {
   beginPreviewLoad,
   completePreviewLoad,
@@ -27,7 +27,13 @@ function makeState(): PreviewStoreSnapshot {
   return {
     activeKey: null,
     activePreview: null,
+    activeGeyserDetailsStatus: "idle",
+    activeGeyserDetails: [],
+    activeGeyserDetailsError: null,
     cache: {},
+    inflightPreviewKeys: {},
+    inflightDetailKeys: {},
+    requestSerial: 0,
     isLoading: false,
     lastError: null,
   };
@@ -40,7 +46,7 @@ test("beginPreviewLoad clears stale preview for uncached key", () => {
     activePreview: makePreview(100067),
   };
 
-  const next = beginPreviewLoad(initial, "0:100082:625");
+  const next = beginPreviewLoad(initial, "0:100082:625", 1);
 
   assert.equal(next.activeKey, "0:100082:625");
   assert.equal(next.activePreview, null);
@@ -56,12 +62,12 @@ test("completePreviewLoad ignores stale response for inactive key", () => {
     isLoading: true,
   };
 
-  const next = completePreviewLoad(initial, "0:100067:625", makePreview(100067));
+  const next = completePreviewLoad(initial, "0:100067:625", makePreview(100067), 1);
 
   assert.equal(next.activeKey, "0:100082:625");
   assert.equal(next.activePreview?.summary.seed, 100082);
   assert.equal(next.isLoading, true);
-  assert.equal(next.cache["0:100067:625"]?.summary.seed, 100067);
+  assert.equal(next.cache["0:100067:625"]?.preview.summary.seed, 100067);
 });
 
 test("failPreviewLoad ignores stale error for inactive key", () => {
@@ -72,7 +78,7 @@ test("failPreviewLoad ignores stale error for inactive key", () => {
     isLoading: true,
   };
 
-  const next = failPreviewLoad(initial, "0:100067:625", "stale failure");
+  const next = failPreviewLoad(initial, "0:100067:625", "stale failure", 1);
 
   assert.deepEqual(next, initial);
 });

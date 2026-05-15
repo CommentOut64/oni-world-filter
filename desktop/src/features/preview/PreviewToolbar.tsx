@@ -3,27 +3,29 @@ import { Button, Switch, Tooltip, Typography } from "antd";
 
 interface PreviewToolbarProps {
   showBoundaries: boolean;
-  showLabels: boolean;
+  showBiomes: boolean;
   showGeysers: boolean;
   geyserCount: number;
+  isGeneratingReport: boolean;
   onToggleBoundaries: () => void;
-  onToggleLabels: () => void;
+  onToggleBiomes: () => void;
   onToggleGeysers: () => void;
   onResetView: () => void;
-  onExportPng: () => void;
+  onGenerateReport: () => void;
   onOpenGeyserList: () => void;
 }
 
 export default function PreviewToolbar({
   showBoundaries,
-  showLabels,
+  showBiomes,
   showGeysers,
   geyserCount,
+  isGeneratingReport,
   onToggleBoundaries,
-  onToggleLabels,
+  onToggleBiomes,
   onToggleGeysers,
   onResetView,
-  onExportPng,
+  onGenerateReport,
   onOpenGeyserList,
 }: PreviewToolbarProps) {
   void React;
@@ -39,8 +41,8 @@ export default function PreviewToolbar({
         <Switch checked={showBoundaries} onChange={onToggleBoundaries} />
       </div>
       <div className="preview-toolbar-toggle">
-        <Typography.Text>标签</Typography.Text>
-        <Switch checked={showLabels} onChange={onToggleLabels} />
+        <Typography.Text>生态</Typography.Text>
+        <Switch checked={showBiomes} onChange={onToggleBiomes} />
       </div>
       <div className="preview-toolbar-toggle">
         <Typography.Text>喷口</Typography.Text>
@@ -51,9 +53,14 @@ export default function PreviewToolbar({
           重置视图
         </Button>
       </Tooltip>
-      <Tooltip title="导出当前视图为 PNG 图片">
-        <Button htmlType="button" onClick={onExportPng}>
-          导出 PNG
+      <Tooltip title="生成当前地图的 PDF 报告">
+        <Button
+          htmlType="button"
+          onClick={onGenerateReport}
+          loading={isGeneratingReport}
+          disabled={isGeneratingReport}
+        >
+          生成报告
         </Button>
       </Tooltip>
     </section>

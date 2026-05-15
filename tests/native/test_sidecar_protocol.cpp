@@ -1,4 +1,5 @@
 #include "Batch/SidecarProtocol.hpp"
+#include "Setting/SettingsCache.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -120,6 +121,43 @@ int RunAllTests()
 
     {
         const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"preview","jobId":"job-preview-invalid-target","worldType":13,"seed":100123,"mixing":625,"target":"tertiary"})");
+        Expect(!result.Ok(), "preview request with invalid target should fail", failures);
+        Expect(!result.error.empty(), "preview invalid target should report error", failures);
+    }
+
+    {
+        const auto path = FixturePath("preview-geyser-details-request.json");
+        const auto jsonText = ReadText(path);
+        Expect(!jsonText.empty(), "preview_geyser_details fixture should be readable", failures);
+
+        const auto result = Batch::ParseSidecarRequest(jsonText);
+        Expect(result.Ok(), "preview_geyser_details request should parse without legacy payload fields", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::PreviewGeyserDetails,
+               "preview_geyser_details request command mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.jobId == "job-preview-geyser-details-001",
+               "preview_geyser_details request jobId mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.worldType == 13,
+               "preview_geyser_details request worldType mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.seed == 100123,
+               "preview_geyser_details request seed mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.mixing == 625,
+               "preview_geyser_details request mixing mismatch",
+               failures);
+        Expect(result.request.previewGeyserDetails.worldHeight == 0,
+               "preview_geyser_details request should not require worldHeight",
+               failures);
+        Expect(result.request.previewGeyserDetails.geysers.empty(),
+               "preview_geyser_details request should not require geyser list",
+               failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
             R"({"command":"preview_coord","jobId":"job-preview-coord-001","coord":"V-SNDST-C-123456-0-D3-HD"})");
         Expect(result.Ok(), "preview_coord request should parse", failures);
         Expect(result.request.command == Batch::SidecarCommandType::PreviewCoord,
@@ -130,6 +168,27 @@ int RunAllTests()
                failures);
         Expect(result.request.previewCoord.coord == "V-SNDST-C-123456-0-D3-HD",
                "preview_coord request coord mismatch",
+               failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"world_report","jobId":"job-world-report-001","worldType":13,"seed":100123,"mixing":625})");
+        Expect(result.Ok(), "world_report request should parse", failures);
+        Expect(result.request.command == Batch::SidecarCommandType::WorldReport,
+               "world_report request command mismatch",
+               failures);
+        Expect(result.request.worldReport.jobId == "job-world-report-001",
+               "world_report request jobId mismatch",
+               failures);
+        Expect(result.request.worldReport.worldType == 13,
+               "world_report request worldType mismatch",
+               failures);
+        Expect(result.request.worldReport.seed == 100123,
+               "world_report request seed mismatch",
+               failures);
+        Expect(result.request.worldReport.mixing == 625,
+               "world_report request mixing mismatch",
                failures);
     }
 
@@ -197,6 +256,18 @@ int RunAllTests()
         Expect(result.request.analyze.constraints.count[0].maxCount == 2,
                "analyze_search_request maxCount mismatch",
                failures);
+        Expect(result.request.analyze.constraints.requiredTraits.size() == 1,
+               "analyze_search_request requiredTraits size mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.requiredTraits[0] == "traits/MagmaVents",
+               "analyze_search_request requiredTraits value mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.forbiddenTraits.size() == 1,
+               "analyze_search_request forbiddenTraits size mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.forbiddenTraits[0] == "traits/GeoDormant",
+               "analyze_search_request forbiddenTraits value mismatch",
+               failures);
         Expect(!result.request.analyze.cpu.hasValue,
                "analyze_search_request should not require cpu section",
                failures);
@@ -240,6 +311,57 @@ int RunAllTests()
         if (!cfg.countRules.empty()) {
             Expect(cfg.countRules[0].minCount == 1, "sidecar count min mismatch", failures);
             Expect(cfg.countRules[0].maxCount == 2, "sidecar count max mismatch", failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        settings.traits["traits/GeoDormant"] = WorldTrait{
+            .filePath = "traits/GeoDormant",
+            .name = "Geo Dormant",
+        };
+        settings.traits["traits/MagmaVents"] = WorldTrait{
+            .filePath = "traits/MagmaVents",
+            .name = "Magma Vents",
+        };
+
+        Batch::SidecarSearchRequest request;
+        request.worldType = 13;
+        request.seedStart = 100000;
+        request.seedEnd = 100100;
+        request.constraints.requiredTraits.push_back("traits/MagmaVents");
+        request.constraints.forbiddenTraits.push_back("traits/GeoDormant");
+
+        std::vector<Batch::FilterError> errors;
+        const auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors, &settings);
+        Expect(errors.empty(), "sidecar trait mapping should not produce errors", failures);
+        Expect(cfg.requiredTraits.size() == 1, "sidecar trait required size mismatch", failures);
+        Expect(cfg.forbiddenTraits.size() == 1, "sidecar trait forbidden size mismatch", failures);
+        if (!cfg.requiredTraits.empty()) {
+            Expect(cfg.requiredTraits[0] == 1, "required trait summary index mismatch", failures);
+        }
+        if (!cfg.forbiddenTraits.empty()) {
+            Expect(cfg.forbiddenTraits[0] == 0, "forbidden trait summary index mismatch", failures);
+        }
+    }
+
+    {
+        Batch::SidecarSearchRequest request;
+        request.worldType = 13;
+        request.seedStart = 100000;
+        request.seedEnd = 100100;
+        request.constraints.requiredTraits.push_back("traits/UnknownTrait");
+
+        std::vector<Batch::FilterError> errors;
+        const auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors);
+        Expect(cfg.requiredTraits.empty(),
+               "unknown sidecar trait should not be appended to filter config",
+               failures);
+        Expect(errors.size() == 1, "unknown sidecar trait should produce one error", failures);
+        if (!errors.empty()) {
+            Expect(errors[0].field == "constraints.requiredTraits",
+                   "unknown sidecar trait error field mismatch",
+                   failures);
         }
     }
 
@@ -305,11 +427,27 @@ int RunAllTests()
         previewRequest.worldType = 13;
         previewRequest.seed = 100123;
         previewRequest.mixing = 625;
+        Batch::SidecarPreviewGeyserDetailsRequest previewGeyserDetailsRequest;
+        previewGeyserDetailsRequest.jobId = "job-preview-geyser-details-001";
+        previewGeyserDetailsRequest.worldType = 13;
+        previewGeyserDetailsRequest.seed = 100123;
+        previewGeyserDetailsRequest.mixing = 625;
+        previewGeyserDetailsRequest.worldHeight = 384;
+        previewGeyserDetailsRequest.geysers = {{steam, 70, 90}, {27, 75, 120}};
         const std::string previewCoord = "V-SNDST-C-100123-0-D3-HD";
+        Batch::SidecarWorldReportRequest worldReportRequest;
+        worldReportRequest.jobId = "job-world-report-001";
+        worldReportRequest.worldType = 13;
+        worldReportRequest.seed = 100123;
+        worldReportRequest.mixing = 625;
 
         GeneratedWorldPreview preview;
         preview.summary.seed = 100123;
         preview.summary.worldType = 13;
+        preview.summary.worldPlacementIndex = 4;
+        preview.summary.worldAssetId = "expansion1::worlds/MiniFlippedWarp";
+        preview.summary.isPrimary = false;
+        preview.summary.hasSecondaryPreview = true;
         preview.summary.start = {128, 200};
         preview.summary.worldSize = {256, 384};
         preview.summary.traits.push_back({2});
@@ -320,6 +458,36 @@ int RunAllTests()
         polygon.vertices.push_back({1, 2});
         polygon.vertices.push_back({3, 4});
         preview.polygons.push_back(std::move(polygon));
+
+        GeyserDetail geyserDetail;
+        geyserDetail.index = 0;
+        geyserDetail.summary = {steam, 70, 90};
+        geyserDetail.hasParameters = true;
+        geyserDetail.parameterKind = "geyser";
+        geyserDetail.native.averageActiveYieldKgPerCycle = 1234.5f;
+        geyserDetail.native.eruptionPeriodSeconds = 800.0f;
+        geyserDetail.native.eruptionRatio = 0.4f;
+        geyserDetail.native.activePeriodSeconds = 60000.0f;
+        geyserDetail.native.activeRatio = 0.5f;
+        geyserDetail.derived.eruptionRateKgPerSecond = 10.2f;
+        geyserDetail.derived.averageOverallYieldGPerSecond = 2056.7f;
+        geyserDetail.derived.eruptionSeconds = 320.0f;
+        geyserDetail.derived.activeSeconds = 30000.0f;
+        geyserDetail.derived.activeCycles = 50.0f;
+        geyserDetail.derived.totalCycles = 100.0f;
+        geyserDetail.derived.temperatureCelsius = 110.0f;
+
+        GeyserDetail reservoirDetail;
+        reservoirDetail.index = 1;
+        reservoirDetail.summary = {27, 75, 120};
+        reservoirDetail.hasParameters = false;
+        reservoirDetail.parameterKind = "reservoir";
+        const std::vector<GeyserDetail> geyserDetails = {geyserDetail, reservoirDetail};
+        WorldReportData worldReport;
+        worldReport.preview = preview;
+        worldReport.geyserDetails = geyserDetails;
+        worldReport.mixing = 625;
+        worldReport.coord = previewCoord;
 
         SearchAnalysis::SearchCatalog catalog;
         catalog.worlds.push_back({.id = 13, .code = "V-SNDST-C-"});
@@ -333,7 +501,7 @@ int RunAllTests()
             .exclusiveWithTags = {"unique"},
             .forbiddenDLCIds = {"EXPANSION1_ID"},
             .effectSummary = {"globalFeatureMods=1"},
-            .searchable = false,
+            .searchable = true,
         });
         catalog.mixingSlots.push_back(SearchAnalysis::MixingSlotMeta{
             .slot = 0,
@@ -356,14 +524,19 @@ int RunAllTests()
         analysis.normalizedRequest.mixing = 625;
         analysis.normalizedRequest.seedStart = 100000;
         analysis.normalizedRequest.seedEnd = 101000;
+        analysis.normalizedRequest.requiredTraits = {"traits/MagmaVents"};
+        analysis.normalizedRequest.forbiddenTraits = {"traits/GeoDormant"};
         analysis.worldProfile.valid = true;
         analysis.worldProfile.worldType = 13;
         analysis.worldProfile.worldCode = "V-SNDST-C-";
         analysis.worldProfile.width = 256;
         analysis.worldProfile.height = 384;
         analysis.worldProfile.diagonal = 461.7;
+        analysis.worldProfile.possibleTraitCountUpper = 2;
         analysis.worldProfile.activeMixingSlots = {0, 1};
         analysis.worldProfile.disabledMixingSlots = {6, 7, 8, 9, 10};
+        analysis.worldProfile.possibleTraitIds = {"traits/MagmaVents", "traits/GeoDormant"};
+        analysis.worldProfile.impossibleTraitIds = {"traits/FrozenCore"};
         analysis.worldProfile.possibleGeyserTypes = {"hot_water", "steam"};
         analysis.worldProfile.impossibleGeyserTypes = {"molten_niobium"};
         analysis.worldProfile.possibleMaxCountByType["hot_water"] = 3;
@@ -445,6 +618,16 @@ int RunAllTests()
             Batch::SerializePreviewEvent("job-preview-001", previewRequest, preview, &previewCoord),
             failures,
             "preview event json parse failed");
+        const auto previewGeyserDetailsJson = ParseJsonObject(
+            Batch::SerializePreviewGeyserDetailsEvent("job-preview-geyser-details-001",
+                                                      previewGeyserDetailsRequest,
+                                                      geyserDetails),
+            failures,
+            "preview geyser details event json parse failed");
+        const auto worldReportJson = ParseJsonObject(
+            Batch::SerializeWorldReportEvent("job-world-report-001", worldReportRequest, worldReport),
+            failures,
+            "world_report event json parse failed");
         const auto searchCatalogJson = ParseJsonObject(
             Batch::SerializeSearchCatalogEvent("job-search-catalog-001", catalog),
             failures,
@@ -464,6 +647,12 @@ int RunAllTests()
         Expect(failedJson["event"].asString() == "failed", "failed event type mismatch", failures);
         Expect(cancelledJson["event"].asString() == "cancelled", "cancelled event type mismatch", failures);
         Expect(previewJson["event"].asString() == "preview", "preview event type mismatch", failures);
+        Expect(previewGeyserDetailsJson["event"].asString() == "preview_geyser_details",
+               "preview_geyser_details event type mismatch",
+               failures);
+        Expect(worldReportJson["event"].asString() == "world_report",
+               "world_report event type mismatch",
+               failures);
 
         Expect(matchJson["summary"]["geysers"].size() == 1, "match event geyser size mismatch", failures);
         Expect(matchJson["summary"]["geysers"][0]["id"].asString() == "steam",
@@ -474,6 +663,49 @@ int RunAllTests()
         Expect(previewJson["coord"].asString() == previewCoord, "preview coord mismatch", failures);
         Expect(previewJson["preview"]["summary"]["seed"].asInt() == 100123,
                "preview summary seed mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["worldPlacementIndex"].asInt() == 4,
+               "preview summary worldPlacementIndex mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["worldAssetId"].asString() ==
+                   "expansion1::worlds/MiniFlippedWarp",
+               "preview summary worldAssetId mismatch",
+               failures);
+        Expect(!previewJson["preview"]["summary"]["isPrimary"].asBool(),
+               "preview summary isPrimary mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["hasSecondaryPreview"].asBool(),
+               "preview summary hasSecondaryPreview mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"].size() == 2,
+               "preview_geyser_details size mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][0]["summary"]["id"].asString() == "steam",
+               "preview_geyser_details first id mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][0]["native"]["eruptionPeriodSeconds"].asFloat() == 800.0f,
+               "preview_geyser_details native field mismatch",
+               failures);
+        Expect(!previewGeyserDetailsJson["geyserDetails"][1]["hasParameters"].asBool(),
+               "preview_geyser_details reservoir should stay no-parameter",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][1]["parameterKind"].asString() == "reservoir",
+               "preview_geyser_details reservoir kind mismatch",
+               failures);
+        Expect(worldReportJson["report"]["coord"].asString() == previewCoord,
+               "world_report coord mismatch",
+               failures);
+        Expect(worldReportJson["report"]["mixing"].asInt() == 625,
+               "world_report mixing mismatch",
+               failures);
+        Expect(worldReportJson["report"]["preview"]["summary"]["seed"].asInt() == 100123,
+               "world_report preview seed mismatch",
+               failures);
+        Expect(worldReportJson["report"]["geyserDetails"].size() == 2,
+               "world_report geyserDetails size mismatch",
+               failures);
+        Expect(worldReportJson["report"]["geyserDetails"][0]["summary"]["id"].asString() == "steam",
+               "world_report first geyser id mismatch",
                failures);
         Expect(searchCatalogJson["event"].asString() == "search_catalog",
                "search catalog event type mismatch",
@@ -487,17 +719,47 @@ int RunAllTests()
         Expect(searchCatalogJson["catalog"]["parameterSpecs"][0]["supportsDynamicRange"].asBool(),
                "search catalog parameter spec dynamic flag mismatch",
                failures);
+        Expect(searchCatalogJson["catalog"]["traits"][0]["searchable"].asBool(),
+               "search catalog trait searchable flag mismatch",
+               failures);
         Expect(searchAnalysisJson["event"].asString() == "search_analysis",
                "search analysis event type mismatch",
                failures);
         Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["groups"].size() == 1,
                "search analysis normalized groups size mismatch",
                failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["requiredTraits"].size() == 1,
+               "search analysis normalized requiredTraits size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["requiredTraits"][0].asString() ==
+                   "traits/MagmaVents",
+               "search analysis normalized requiredTraits value mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["forbiddenTraits"].size() == 1,
+               "search analysis normalized forbiddenTraits size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["forbiddenTraits"][0].asString() ==
+                   "traits/GeoDormant",
+               "search analysis normalized forbiddenTraits value mismatch",
+               failures);
         Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["threads"].isNull(),
                "search analysis normalized request should not serialize legacy threads",
                failures);
         Expect(searchAnalysisJson["analysis"]["worldProfile"]["valid"].asBool(),
                "search analysis worldProfile valid mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleTraitCountUpper"].asInt() == 2,
+               "search analysis worldProfile possibleTraitCountUpper mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleTraitIds"].size() == 2,
+               "search analysis worldProfile possibleTraitIds size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleTraitIds"][0].asString() ==
+                   "traits/MagmaVents",
+               "search analysis worldProfile possibleTraitIds value mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["impossibleTraitIds"].size() == 1,
+               "search analysis worldProfile impossibleTraitIds size mismatch",
                failures);
         Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleMaxCountByType"]["hot_water"].asInt() == 3,
                "search analysis worldProfile possibleMaxCountByType mismatch",

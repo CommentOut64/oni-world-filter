@@ -68,6 +68,8 @@ set(ONI_BASE_SOURCES
     "SearchAnalysis/WorldEnvelopeProfile.hpp"
     "SearchAnalysis/WorldEnvelopeProfile.cpp"
     "Setting/ComposableDictionary.hpp"
+    "Setting/NativeCoordinate.hpp"
+    "Setting/NativeCoordinate.cpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
     "Setting/WorldGenClasses.cpp"
@@ -102,6 +104,10 @@ set(ONI_BASE_SOURCES
     "BatchCpu/SearchCpuGovernor.cpp"
     "BatchCpu/CpuOptimization.hpp"
     "BatchCpu/CpuOptimization.cpp"
+    "Geyser/GeyserParameterCalculator.hpp"
+    "Geyser/GeyserParameterCalculator.cpp"
+    "Geyser/PreviewWorldOffsetPolicy.hpp"
+    "Geyser/PreviewWorldOffsetPolicy.cpp"
 )
 
 if(ONI_BUILD_SIDECAR)
@@ -118,8 +124,9 @@ target_include_directories(oni-sidecar
 )
 target_link_libraries(oni-sidecar PUBLIC clipper jsoncpp miniz)
 if(MSVC)
+add_compile_options("/utf-8")
 target_compile_options(oni-sidecar
-    PUBLIC /EHsc "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244 /wd4267
+    PUBLIC /EHsc /MP /W4 /WX /wd4244 /wd4267
     PUBLIC "$<$<CONFIG:Release>:/Zi>")
 target_link_options(oni-sidecar
     PRIVATE "$<$<CONFIG:Release>:/DEBUG:FULL>"
@@ -280,12 +287,44 @@ add_executable(test_sidecar_protocol
     "../tests/native/test_sidecar_protocol.cpp"
     "Batch/SidecarProtocol.cpp"
     "Batch/FilterConfig.cpp"
+    "SearchAnalysis/TraitCatalog.cpp"
 )
 target_include_directories(test_sidecar_protocol
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_link_libraries(test_sidecar_protocol PRIVATE jsoncpp)
 add_test(NAME test_sidecar_protocol COMMAND test_sidecar_protocol)
+
+add_executable(test_geyser_parameter_calculator
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_geyser_parameter_calculator.cpp"
+    "Geyser/GeyserParameterCalculator.cpp"
+    "Batch/FilterConfig.cpp"
+    "Utils/KRandom.cpp"
+)
+target_include_directories(test_geyser_parameter_calculator
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(test_geyser_parameter_calculator PRIVATE jsoncpp)
+add_test(NAME test_geyser_parameter_calculator COMMAND test_geyser_parameter_calculator)
+
+add_executable(test_preview_world_session
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_preview_world_session.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_preview_world_session
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_preview_world_session PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_preview_world_session PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_preview_world_session COMMAND test_preview_world_session)
 
 add_executable(test_sidecar_shutdown
     "../tests/native/test_main.cpp"
@@ -304,6 +343,24 @@ if(TARGET Threads::Threads)
 target_link_libraries(test_sidecar_shutdown PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_sidecar_shutdown COMMAND test_sidecar_shutdown)
+
+add_executable(test_sidecar_world_report
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_sidecar_world_report.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_sidecar_world_report
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_sidecar_world_report PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_sidecar_world_report PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_sidecar_world_report COMMAND test_sidecar_world_report)
 
 add_executable(test_recoverable_diagnostics
     "../tests/native/test_main.cpp"

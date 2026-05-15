@@ -31,6 +31,8 @@ struct SearchCpuConfig {
 struct SearchConstraints {
     std::vector<std::string> required;
     std::vector<std::string> forbidden;
+    std::vector<std::string> requiredTraits;
+    std::vector<std::string> forbiddenTraits;
     std::vector<DistanceConstraint> distance;
     std::vector<CountConstraint> count;
 };
@@ -62,6 +64,8 @@ struct NormalizedSearchRequest {
     int seedEnd = 0;
     int mixing = 0;
     SearchCpuConfig cpu;
+    std::vector<std::string> requiredTraits;
+    std::vector<std::string> forbiddenTraits;
     std::vector<ConstraintGroup> groups;
 };
 

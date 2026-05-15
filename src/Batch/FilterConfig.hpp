@@ -37,6 +37,8 @@ struct FilterConfig {
     CpuConfig cpu;
     std::vector<int> required;
     std::vector<int> forbidden;
+    std::vector<int> requiredTraits;
+    std::vector<int> forbiddenTraits;
     std::vector<DistRule> distanceRules;
     std::vector<CountRule> countRules;
 };
@@ -47,6 +49,8 @@ enum class FilterErrorCode {
     InvalidSeedRange,
     UnknownRequiredGeyserId,
     UnknownForbiddenGeyserId,
+    UnknownRequiredTraitId,
+    UnknownForbiddenTraitId,
     MissingDistanceField,
     UnknownDistanceGeyserId,
     MissingCountField,

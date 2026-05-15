@@ -105,6 +105,25 @@ int RunAllTests()
     }
 
     {
+        const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 13, 0);
+        Expect(profile.valid, "V-SNDST-C profile should be valid", failures);
+        Expect(profile.possibleTraitIds.empty(),
+               "V-SNDST-C primary should not expose selectable traits",
+               failures);
+        Expect(Contains(profile.impossibleTraitIds, "traits/Geodes"),
+               "V-SNDST-C primary should mark regular traits impossible",
+               failures);
+    }
+
+    {
+        const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 17, 0);
+        Expect(profile.valid, "V-LUSH-C profile should be valid", failures);
+        Expect(!profile.possibleTraitIds.empty(),
+               "not every classic primary should be treated as no-trait world",
+               failures);
+    }
+
+    {
         const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 9, 625);
         Expect(profile.valid, "CER profile should be valid", failures);
         Expect(HasAllSlots(profile.disabledMixingSlots, {0, 1, 2, 3, 4}),

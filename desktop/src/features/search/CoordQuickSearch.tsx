@@ -24,7 +24,7 @@ export default function CoordQuickSearch({
         className="coord-quick-search-input"
         value={value}
         disabled={disabled}
-        placeholder="标准坐标码"
+        placeholder="坐标码"
         onChange={(event) => onChange(event.target.value)}
         onPressEnter={() => {
           if (!disabled) {

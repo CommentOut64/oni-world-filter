@@ -15,6 +15,8 @@ export interface SearchConstraints {
   forbidden: string[];
   distance: DistanceRule[];
   count: CountRule[];
+  requiredTraits: string[];
+  forbiddenTraits: string[];
 }
 
 export type CpuMode = "balanced" | "turbo";
@@ -63,6 +65,8 @@ export interface NormalizedSearchRequestPayload {
   seedStart: number;
   seedEnd: number;
   mixing: number;
+  requiredTraits: string[];
+  forbiddenTraits: string[];
   groups: NormalizedConstraintGroup[];
 }
 
@@ -99,6 +103,9 @@ export interface WorldEnvelopeProfile {
   diagonal: number;
   activeMixingSlots: number[];
   disabledMixingSlots: number[];
+  possibleTraitCountUpper: number;
+  possibleTraitIds: string[];
+  impossibleTraitIds: string[];
   possibleGeyserTypes: string[];
   impossibleGeyserTypes: string[];
   possibleMaxCountByType: Record<string, number>;
@@ -127,6 +134,7 @@ export interface PreviewRequest {
   worldType: number;
   seed: number;
   mixing: number;
+  target?: PreviewTarget;
 }
 
 export interface CoordPreviewRequest {
@@ -197,6 +205,37 @@ export interface GeyserSummary {
   y: number;
   id?: string;
 }
+
+export interface GeyserNativeParameters {
+  averageActiveYieldKgPerCycle: number;
+  eruptionPeriodSeconds: number;
+  eruptionRatio: number;
+  activePeriodSeconds: number;
+  activeRatio: number;
+}
+
+export interface GeyserDerivedParameters {
+  eruptionRateKgPerSecond: number;
+  averageOverallYieldGPerSecond: number;
+  eruptionSeconds: number;
+  activeSeconds: number;
+  activeCycles: number;
+  totalCycles: number;
+  temperatureCelsius: number;
+}
+
+export interface GeyserDetail {
+  index: number;
+  summary: GeyserSummary;
+  hasParameters: boolean;
+  parameterKind: string;
+  native: GeyserNativeParameters;
+  derived: GeyserDerivedParameters;
+}
+
+export type GeyserDetailsStatus = "idle" | "loading" | "ready" | "failed";
+
+export type PreviewTarget = "primary" | "secondary";
 
 export interface SearchMatchPayload {
   start: Point;
@@ -283,6 +322,10 @@ export interface PreviewPolygon {
 export interface PreviewSummary {
   seed: number;
   worldType: number;
+  worldPlacementIndex: number;
+  worldAssetId?: string;
+  isPrimary: boolean;
+  hasSecondaryPreview: boolean;
   start: Point;
   worldSize: WorldSize;
   traits: number[];
@@ -292,6 +335,49 @@ export interface PreviewSummary {
 export interface PreviewPayload {
   summary: PreviewSummary;
   polygons: PreviewPolygon[];
+}
+
+export interface WorldReportData {
+  preview: PreviewPayload;
+  geyserDetails: GeyserDetail[];
+  mixing: number;
+  coord: string;
+}
+
+export interface PreviewGeyserDetailsRequest {
+  jobId: string;
+  worldType: number;
+  seed: number;
+  mixing: number;
+  target?: PreviewTarget;
+}
+
+export interface WorldReportRequest {
+  jobId: string;
+  worldType: number;
+  seed: number;
+  mixing: number;
+}
+
+export interface PreviewGeyserDetailsEvent {
+  event: "preview_geyser_details";
+  jobId: string;
+  worldType: number;
+  seed: number;
+  mixing: number;
+  geyserDetails: GeyserDetail[];
+}
+
+export interface WorldReportEvent {
+  event: "world_report";
+  jobId: string;
+  report: WorldReportData;
+}
+
+export interface ExportReportPdfRequest {
+  html: string;
+  outputPath: string;
+  title: string;
 }
 
 export interface PreviewEvent {
@@ -320,7 +406,8 @@ export type SidecarEvent =
   | SearchCancelledEvent
   | SearchFailedEvent
   | PreviewEvent
-  | CoordPreviewEvent;
+  | CoordPreviewEvent
+  | WorldReportEvent;
 
 export interface SearchMatchSummary {
   seed: number;

@@ -27,6 +27,29 @@ MatchResult MatchFilter(const FilterConfig &cfg, const BatchCaptureRecord &captu
     const float startX = static_cast<float>(capture.startX);
     const float startY = static_cast<float>(capture.startY);
 
+    for (int forbiddenTrait : cfg.forbiddenTraits) {
+        for (int trait : capture.traits) {
+            if (trait == forbiddenTrait) {
+                result.matched = false;
+                return result;
+            }
+        }
+    }
+
+    for (int requiredTrait : cfg.requiredTraits) {
+        bool found = false;
+        for (int trait : capture.traits) {
+            if (trait == requiredTrait) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            result.matched = false;
+            return result;
+        }
+    }
+
     for (const auto &geyser : capture.geysers) {
         for (int forbiddenId : cfg.forbidden) {
             if (geyser.type == forbiddenId) {

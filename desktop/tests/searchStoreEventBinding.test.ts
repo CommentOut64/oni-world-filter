@@ -321,6 +321,21 @@ test("sidecar stderr diagnostics do not become visible backend errors", async ()
   assert.equal(useSearchStore.getState().lastError, null);
 });
 
+test("recoverable template placement stderr does not surface in search alerts", async () => {
+  mockIPC(async () => null, { shouldMockEvents: true });
+
+  const module = await loadSearchStoreModule();
+  const { useSearchStore } = module;
+  await useSearchStore.getState().bindSidecarEvents();
+
+  await emit("sidecar://stderr", {
+    jobId: "search-1778835015770-0c73mz",
+    message: "error SpawnStartingTemplate:94 start location should not overlap bounds.",
+  });
+
+  assert.equal(useSearchStore.getState().lastError, null);
+});
+
 test("real sidecar stderr errors still become visible backend errors", async () => {
   mockIPC(async () => null, { shouldMockEvents: true });
 

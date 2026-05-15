@@ -103,6 +103,43 @@ SearchAnalysis::SearchCatalog BuildMockCatalog()
     catalog.geysers.push_back({.id = 0, .key = "steam"});
     catalog.geysers.push_back({.id = 2, .key = "hot_water"});
     catalog.geysers.push_back({.id = 15, .key = "methane"});
+    catalog.traits.push_back({
+        .id = "traits/GeoDormant",
+        .name = "Geo Dormant",
+        .description = "",
+        .traitTags = {"geo"},
+        .searchable = true,
+    });
+    catalog.traits.push_back({
+        .id = "traits/MagmaVents",
+        .name = "Magma Vents",
+        .description = "",
+        .exclusiveWith = {"traits/FrozenCore"},
+        .exclusiveWithTags = {"thermal-core"},
+        .searchable = true,
+    });
+    catalog.traits.push_back({
+        .id = "traits/FrozenCore",
+        .name = "Frozen Core",
+        .description = "",
+        .exclusiveWith = {"traits/MagmaVents"},
+        .exclusiveWithTags = {"thermal-core"},
+        .searchable = true,
+    });
+    catalog.traits.push_back({
+        .id = "traits/BuriedOcean",
+        .name = "Buried Ocean",
+        .description = "",
+        .exclusiveWithTags = {"hydrology"},
+        .searchable = true,
+    });
+    catalog.traits.push_back({
+        .id = "traits/DryCore",
+        .name = "Dry Core",
+        .description = "",
+        .exclusiveWithTags = {"hydrology"},
+        .searchable = true,
+    });
     return catalog;
 }
 
@@ -292,6 +329,8 @@ int RunAllTests()
         request.mixing = 50000000;
         request.constraints.required = {"unknown_geyser"};
         request.constraints.forbidden = {"unknown_geyser"};
+        request.constraints.requiredTraits = {"traits/UnknownTrait"};
+        request.constraints.forbiddenTraits = {"traits/UnknownTrait"};
         request.constraints.distance = {
             {.geyserId = "unknown_geyser", .minDist = 10.0, .maxDist = 1.0},
         };
@@ -317,6 +356,126 @@ int RunAllTests()
         Expect(hasLayer1, "hard validator should include layer1 errors", failures);
         Expect(hasLayer2, "hard validator should include layer2 errors", failures);
         Expect(hasLayer3, "hard validator should include layer3 errors", failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.requiredTraits = {"traits/MagmaVents", "traits/MagmaVents"};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "conflict.required_trait_duplicate"),
+               "duplicate required trait should be rejected in layer3",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.requiredTraits = {"traits/MagmaVents"};
+        request.constraints.forbiddenTraits = {"traits/MagmaVents"};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "conflict.required_forbidden_trait"),
+               "same trait in required and forbidden should be rejected in layer3",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.requiredTraits = {"traits/MagmaVents"};
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.possibleTraitIds = {"traits/GeoDormant"};
+        profile.impossibleTraitIds = {"traits/MagmaVents"};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(HasIssue(result.errors, "world.required_trait_impossible"),
+               "required impossible trait should be rejected in layer2",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.forbiddenTraits = {"traits/MagmaVents"};
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.possibleTraitIds = {"traits/GeoDormant"};
+        profile.impossibleTraitIds = {"traits/MagmaVents"};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(result.errors.empty(),
+               "forbidden impossible trait should not become a hard error",
+               failures);
+        Expect(HasWarning(result.warnings, "world.forbidden_trait_already_impossible"),
+               "forbidden impossible trait should become a warning",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.requiredTraits = {"traits/GeoDormant", "traits/MagmaVents"};
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.possibleTraitIds = {"traits/GeoDormant", "traits/MagmaVents"};
+        profile.impossibleTraitIds = {"traits/FrozenCore"};
+        profile.possibleTraitCountUpper = 1;
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(HasIssue(result.errors, "world.required_trait_count_gt_possible_max"),
+               "required trait count beyond world upper bound should be rejected in layer2",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.requiredTraits = {"traits/MagmaVents", "traits/FrozenCore"};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "conflict.required_traits_mutually_exclusive"),
+               "exclusiveWith required trait pair should be rejected in layer3",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+        request.constraints.requiredTraits = {"traits/BuriedOcean", "traits/DryCore"};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request, BuildMockCatalog());
+        Expect(HasIssue(result.errors, "conflict.required_traits_mutually_exclusive"),
+               "exclusiveWithTags required trait pair should be rejected in layer3",
+               failures);
     }
 
     {

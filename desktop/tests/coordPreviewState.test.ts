@@ -147,6 +147,8 @@ test("openDirectCoordResult clears search runtime state but keeps the existing d
         forbidden: [],
         distance: [],
         count: [],
+        requiredTraits: [],
+        forbiddenTraits: [],
       },
       cpu: { ...preservedDraft.cpu },
     },
@@ -191,17 +193,30 @@ test("primeResolvedPreviewState stores preview in cache and makes it active", ()
   const preview = createPreview();
   const initialState: PreviewStoreSnapshot = {
     activeKey: null,
+    activeTarget: "primary",
     activePreview: null,
+    activeGeyserDetailsStatus: "idle",
+    activeGeyserDetails: [],
+    activeGeyserDetailsError: null,
     cache: {},
+    inflightPreviewKeys: {},
+    inflightDetailKeys: {},
+    requestSerial: 0,
     isLoading: false,
     lastError: "old error",
   };
 
   const state = primeResolvedPreviewState(initialState, match, preview);
-  assert.equal(state.activeKey, "13:123456:625");
+  assert.equal(state.activeKey, "13:123456:625:primary");
+  assert.equal(state.activeTarget, "primary");
   assert.deepEqual(state.activePreview, preview);
   assert.deepEqual(state.cache, {
-    "13:123456:625": preview,
+    "13:123456:625:primary": {
+      preview,
+      geyserDetailsStatus: "idle",
+      geyserDetails: [],
+      geyserDetailsError: null,
+    },
   });
   assert.equal(state.isLoading, false);
   assert.equal(state.lastError, null);

@@ -6,6 +6,8 @@
 
 #include <json/json.h>
 
+#include "SearchAnalysis/TraitCatalog.hpp"
+
 namespace Batch {
 
 namespace {
@@ -90,6 +92,73 @@ bool ParseStringArray(const Json::Value &array,
     return true;
 }
 
+bool ParseGeyserSummaries(const Json::Value &array,
+                         const char *field,
+                         std::vector<GeyserSummary> *out,
+                         std::string *error)
+{
+    if (out == nullptr || error == nullptr) {
+        return false;
+    }
+    if (!array.isArray()) {
+        *error = std::string("field must be geyser array: ") + field;
+        return false;
+    }
+
+    int index = 0;
+    for (const auto &item : array) {
+        if (!item.isObject()) {
+            *error = std::string(field) + "[" + std::to_string(index) + "] must be object";
+            return false;
+        }
+        GeyserSummary summary;
+        if (!RequireInt(item, "type", &summary.type, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        if (!RequireInt(item, "x", &summary.x, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        if (!RequireInt(item, "y", &summary.y, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        out->push_back(summary);
+        ++index;
+    }
+    return true;
+}
+
+bool ParsePreviewTarget(const Json::Value &root,
+                        PreviewTarget *target,
+                        std::string *error)
+{
+    if (target == nullptr || error == nullptr) {
+        return false;
+    }
+    const Json::Value targetNode = root["target"];
+    if (targetNode.isNull()) {
+        *target = PreviewTarget::Primary;
+        return true;
+    }
+    if (!targetNode.isString()) {
+        *error = "field must be string: target";
+        return false;
+    }
+    const std::string value = targetNode.asString();
+    if (value == "primary") {
+        *target = PreviewTarget::Primary;
+        return true;
+    }
+    if (value == "secondary") {
+        *target = PreviewTarget::Secondary;
+        return true;
+    }
+    *error = "invalid target";
+    return false;
+}
+
 bool ParseCpuConfig(const Json::Value &root,
                     SidecarCpuConfig *cpu,
                     SidecarParseResult *result)
@@ -135,6 +204,18 @@ bool ParseConstraints(const Json::Value &root,
     if (!ParseStringArray(constraintsNode["forbidden"],
                           "constraints.forbidden",
                           &constraints->forbidden,
+                          &result->error)) {
+        return false;
+    }
+    if (!ParseStringArray(constraintsNode["requiredTraits"],
+                          "constraints.requiredTraits",
+                          &constraints->requiredTraits,
+                          &result->error)) {
+        return false;
+    }
+    if (!ParseStringArray(constraintsNode["forbiddenTraits"],
+                          "constraints.forbiddenTraits",
+                          &constraints->forbiddenTraits,
                           &result->error)) {
         return false;
     }
@@ -272,6 +353,10 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
     Json::Value root(Json::objectValue);
     root["summary"]["seed"] = preview.summary.seed;
     root["summary"]["worldType"] = preview.summary.worldType;
+    root["summary"]["worldPlacementIndex"] = preview.summary.worldPlacementIndex;
+    root["summary"]["worldAssetId"] = preview.summary.worldAssetId;
+    root["summary"]["isPrimary"] = preview.summary.isPrimary;
+    root["summary"]["hasSecondaryPreview"] = preview.summary.hasSecondaryPreview;
     root["summary"]["start"]["x"] = preview.summary.start.x;
     root["summary"]["start"]["y"] = preview.summary.start.y;
     root["summary"]["worldSize"]["w"] = preview.summary.worldSize.x;
@@ -313,6 +398,62 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
         polygons.append(polygonJson);
     }
     root["polygons"] = polygons;
+    return root;
+}
+
+Json::Value BuildGeyserSummaryJson(const GeyserSummary &summary)
+{
+    Json::Value geyser(Json::objectValue);
+    geyser["type"] = summary.type;
+    geyser["x"] = summary.x;
+    geyser["y"] = summary.y;
+    const auto &ids = GetGeyserIds();
+    if (summary.type >= 0 && summary.type < static_cast<int>(ids.size())) {
+        geyser["id"] = ids[static_cast<size_t>(summary.type)];
+    }
+    return geyser;
+}
+
+Json::Value BuildGeyserDetailJson(const GeyserDetail &detail)
+{
+    Json::Value root(Json::objectValue);
+    root["index"] = detail.index;
+    root["summary"] = BuildGeyserSummaryJson(detail.summary);
+    root["hasParameters"] = detail.hasParameters;
+    root["parameterKind"] = detail.parameterKind;
+
+    Json::Value native(Json::objectValue);
+    native["averageActiveYieldKgPerCycle"] = detail.native.averageActiveYieldKgPerCycle;
+    native["eruptionPeriodSeconds"] = detail.native.eruptionPeriodSeconds;
+    native["eruptionRatio"] = detail.native.eruptionRatio;
+    native["activePeriodSeconds"] = detail.native.activePeriodSeconds;
+    native["activeRatio"] = detail.native.activeRatio;
+    root["native"] = native;
+
+    Json::Value derived(Json::objectValue);
+    derived["eruptionRateKgPerSecond"] = detail.derived.eruptionRateKgPerSecond;
+    derived["averageOverallYieldGPerSecond"] = detail.derived.averageOverallYieldGPerSecond;
+    derived["eruptionSeconds"] = detail.derived.eruptionSeconds;
+    derived["activeSeconds"] = detail.derived.activeSeconds;
+    derived["activeCycles"] = detail.derived.activeCycles;
+    derived["totalCycles"] = detail.derived.totalCycles;
+    derived["temperatureCelsius"] = detail.derived.temperatureCelsius;
+    root["derived"] = derived;
+    return root;
+}
+
+Json::Value BuildWorldReportJson(const WorldReportData &report)
+{
+    Json::Value root(Json::objectValue);
+    root["preview"] = BuildPreviewJson(report.preview);
+
+    Json::Value geyserDetails(Json::arrayValue);
+    for (const auto &detail : report.geyserDetails) {
+        geyserDetails.append(BuildGeyserDetailJson(detail));
+    }
+    root["geyserDetails"] = geyserDetails;
+    root["mixing"] = report.mixing;
+    root["coord"] = report.coord;
     return root;
 }
 
@@ -429,6 +570,18 @@ Json::Value BuildNormalizedSearchRequestJson(const SearchAnalysis::NormalizedSea
     root["seedEnd"] = request.seedEnd;
     root["mixing"] = request.mixing;
 
+    Json::Value requiredTraits(Json::arrayValue);
+    for (const auto &traitId : request.requiredTraits) {
+        requiredTraits.append(traitId);
+    }
+    root["requiredTraits"] = requiredTraits;
+
+    Json::Value forbiddenTraits(Json::arrayValue);
+    for (const auto &traitId : request.forbiddenTraits) {
+        forbiddenTraits.append(traitId);
+    }
+    root["forbiddenTraits"] = forbiddenTraits;
+
     Json::Value groups(Json::arrayValue);
     for (const auto &group : request.groups) {
         Json::Value item(Json::objectValue);
@@ -465,6 +618,7 @@ Json::Value BuildSearchAnalysisJson(const SearchAnalysis::SearchAnalysisResult &
     worldProfile["width"] = analysis.worldProfile.width;
     worldProfile["height"] = analysis.worldProfile.height;
     worldProfile["diagonal"] = analysis.worldProfile.diagonal;
+    worldProfile["possibleTraitCountUpper"] = analysis.worldProfile.possibleTraitCountUpper;
 
     Json::Value activeMixingSlots(Json::arrayValue);
     for (int slot : analysis.worldProfile.activeMixingSlots) {
@@ -477,6 +631,18 @@ Json::Value BuildSearchAnalysisJson(const SearchAnalysis::SearchAnalysisResult &
         disabledMixingSlots.append(slot);
     }
     worldProfile["disabledMixingSlots"] = disabledMixingSlots;
+
+    Json::Value possibleTraitIds(Json::arrayValue);
+    for (const auto &id : analysis.worldProfile.possibleTraitIds) {
+        possibleTraitIds.append(id);
+    }
+    worldProfile["possibleTraitIds"] = possibleTraitIds;
+
+    Json::Value impossibleTraitIds(Json::arrayValue);
+    for (const auto &id : analysis.worldProfile.impossibleTraitIds) {
+        impossibleTraitIds.append(id);
+    }
+    worldProfile["impossibleTraitIds"] = impossibleTraitIds;
 
     Json::Value possibleGeyserTypes(Json::arrayValue);
     for (const auto &id : analysis.worldProfile.possibleGeyserTypes) {
@@ -621,6 +787,28 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
             return result;
         }
         request.mixing = root.get("mixing", request.mixing).asInt();
+        if (!ParsePreviewTarget(root, &request.target, &result.error)) {
+            return result;
+        }
+        return result;
+    }
+
+    if (command == "preview_geyser_details") {
+        result.request.command = SidecarCommandType::PreviewGeyserDetails;
+        auto &request = result.request.previewGeyserDetails;
+        if (!RequireString(root, "jobId", &request.jobId, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "worldType", &request.worldType, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "seed", &request.seed, &result.error)) {
+            return result;
+        }
+        request.mixing = root.get("mixing", request.mixing).asInt();
+        if (!ParsePreviewTarget(root, &request.target, &result.error)) {
+            return result;
+        }
         return result;
     }
 
@@ -633,6 +821,22 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         if (!RequireString(root, "coord", &request.coord, &result.error)) {
             return result;
         }
+        return result;
+    }
+
+    if (command == "world_report") {
+        result.request.command = SidecarCommandType::WorldReport;
+        auto &request = result.request.worldReport;
+        if (!RequireString(root, "jobId", &request.jobId, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "worldType", &request.worldType, &result.error)) {
+            return result;
+        }
+        if (!RequireInt(root, "seed", &request.seed, &result.error)) {
+            return result;
+        }
+        request.mixing = root.get("mixing", request.mixing).asInt();
         return result;
     }
 
@@ -708,7 +912,8 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
 }
 
 FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &request,
-                                                std::vector<FilterError> *errors)
+                                                std::vector<FilterError> *errors,
+                                                const SettingsCache *settings)
 {
     FilterConfig cfg;
     cfg.worldType = request.worldType;
@@ -750,6 +955,30 @@ FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &requ
             continue;
         }
         cfg.forbidden.push_back(index);
+    }
+
+    for (const auto &id : request.constraints.requiredTraits) {
+        const int index = settings == nullptr
+                              ? -1
+                              : SearchAnalysis::ResolveTraitSummaryIndexById(*settings, id);
+        if (index < 0) {
+            appendError(FilterErrorCode::UnknownRequiredTraitId, "constraints.requiredTraits", id);
+            continue;
+        }
+        cfg.requiredTraits.push_back(index);
+    }
+
+    for (const auto &id : request.constraints.forbiddenTraits) {
+        const int index = settings == nullptr
+                              ? -1
+                              : SearchAnalysis::ResolveTraitSummaryIndexById(*settings, id);
+        if (index < 0) {
+            appendError(FilterErrorCode::UnknownForbiddenTraitId,
+                        "constraints.forbiddenTraits",
+                        id);
+            continue;
+        }
+        cfg.forbiddenTraits.push_back(index);
     }
 
     for (const auto &rule : request.constraints.distance) {
@@ -889,6 +1118,35 @@ std::string SerializePreviewEvent(const std::string &jobId,
         root["coord"] = *coordOverride;
     }
     root["preview"] = BuildPreviewJson(preview);
+    return WriteCompactJson(root);
+}
+
+std::string SerializePreviewGeyserDetailsEvent(
+    const std::string &jobId,
+    const SidecarPreviewGeyserDetailsRequest &request,
+    const std::vector<GeyserDetail> &geyserDetails)
+{
+    Json::Value root = BuildBaseEventJson("preview_geyser_details", jobId);
+    root["worldType"] = request.worldType;
+    root["seed"] = request.seed;
+    root["mixing"] = request.mixing;
+    Json::Value details(Json::arrayValue);
+    for (const auto &detail : geyserDetails) {
+        details.append(BuildGeyserDetailJson(detail));
+    }
+    root["geyserDetails"] = details;
+    return WriteCompactJson(root);
+}
+
+std::string SerializeWorldReportEvent(const std::string &jobId,
+                                      const SidecarWorldReportRequest &request,
+                                      const WorldReportData &report)
+{
+    Json::Value root = BuildBaseEventJson("world_report", jobId);
+    root["worldType"] = request.worldType;
+    root["seed"] = request.seed;
+    root["mixing"] = request.mixing;
+    root["report"] = BuildWorldReportJson(report);
     return WriteCompactJson(root);
 }
 

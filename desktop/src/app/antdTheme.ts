@@ -254,7 +254,8 @@ export function createDesktopTheme(mode: DesktopThemeMode): ThemeConfig {
             itemSelectedColor: "#09090b",
           },
       Tooltip: {
-        colorBgSpotlight: isDark ? "#16273c" : "#27272a",
+        colorBgSpotlight: isDark ? "#0f1b2d" : "#ffffff",
+        maxWidth: 220,
       },
     },
   };

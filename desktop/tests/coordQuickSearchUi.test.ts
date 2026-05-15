@@ -9,7 +9,7 @@ import SearchActions from "../src/features/search/SearchActions.tsx";
 
 const APP_CSS = readFileSync(new URL("../src/app/app.css", import.meta.url), "utf8");
 
-test("CoordQuickSearch renders a standalone button search bar for standard coord input", () => {
+test("CoordQuickSearch renders a standalone button search bar for native coord input", () => {
   const markup = renderToStaticMarkup(
     createElement(CoordQuickSearch, {
       value: "V-SNDST-C-123456-0-D3-HD",
@@ -20,7 +20,7 @@ test("CoordQuickSearch renders a standalone button search bar for standard coord
     })
   );
 
-  assert.match(markup, /标准坐标码/);
+  assert.match(markup, /坐标码/);
   assert.match(markup, /搜\s*索/);
   assert.match(markup, /type="button"/);
   assert.match(markup, /coord-quick-search/);
@@ -54,7 +54,7 @@ test("SearchActions disables batch search submit when an external busy state is 
     })
   );
 
-  assert.match(markup, /开始搜索/);
+  assert.match(markup, /正在分析\.\.\./);
   assert.match(markup, /type="submit"/);
   assert.match(markup, /disabled=""/);
 });

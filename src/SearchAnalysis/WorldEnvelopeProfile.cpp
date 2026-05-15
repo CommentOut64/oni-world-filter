@@ -168,6 +168,36 @@ bool RuleAllowsTrait(const TraitRule &rule, const WorldTrait &trait, const World
     return trait.IsValid(world);
 }
 
+int ComputePossibleTraitCountUpper(const SettingsCache &settings, const World &world)
+{
+    if (world.disableWorldTraits || world.worldTraitRules.empty()) {
+        return 0;
+    }
+
+    const auto total = BuildTraitSelectionPool(settings);
+    int upper = 0;
+    for (const auto &rule : world.worldTraitRules) {
+        int specificCount = 0;
+        for (const auto &specificTrait : rule.specificTraits) {
+            if (FindTraitByPath(total, specificTrait) != nullptr) {
+                ++specificCount;
+            }
+        }
+
+        int allowedCount = 0;
+        for (const auto *trait : total) {
+            if (trait == nullptr || !RuleAllowsTrait(rule, *trait, world)) {
+                continue;
+            }
+            ++allowedCount;
+        }
+
+        const int randomUpper = std::min(std::max(rule.min, rule.max), allowedCount);
+        upper += specificCount + randomUpper;
+    }
+    return upper;
+}
+
 std::vector<const WorldTrait *> CollectPotentialEnvelopeTraits(const SettingsCache &settings,
                                                               const World &world)
 {
@@ -205,6 +235,79 @@ std::vector<const WorldTrait *> CollectPotentialEnvelopeTraits(const SettingsCac
         }
     }
     return result;
+}
+
+std::vector<const WorldTrait *> CollectPotentialSelectableTraits(const SettingsCache &settings,
+                                                                const World &world)
+{
+    std::vector<const WorldTrait *> result;
+    if (world.disableWorldTraits || world.worldTraitRules.empty()) {
+        return result;
+    }
+
+    const auto total = BuildTraitSelectionPool(settings);
+    std::set<std::string> dedup;
+    auto tryAppend = [&](const WorldTrait *trait) {
+        if (trait == nullptr) {
+            return;
+        }
+        if (!dedup.insert(trait->filePath).second) {
+            return;
+        }
+        result.push_back(trait);
+    };
+
+    for (const auto &rule : world.worldTraitRules) {
+        for (const auto &specificTrait : rule.specificTraits) {
+            tryAppend(FindTraitByPath(total, specificTrait));
+        }
+
+        if (rule.min <= 0 && rule.max <= 0) {
+            continue;
+        }
+
+        for (const auto *trait : total) {
+            if (trait == nullptr || !RuleAllowsTrait(rule, *trait, world)) {
+                continue;
+            }
+            tryAppend(trait);
+        }
+    }
+    return result;
+}
+
+void BuildTraitPossibility(const SettingsCache &settings,
+                          const World &world,
+                          WorldEnvelopeProfile *profile)
+{
+    if (profile == nullptr) {
+        return;
+    }
+
+    profile->possibleTraitCountUpper = 0;
+    profile->possibleTraitIds.clear();
+    profile->impossibleTraitIds.clear();
+    profile->possibleTraitCountUpper = ComputePossibleTraitCountUpper(settings, world);
+
+    std::set<std::string> possibleSet;
+    for (const auto *trait : CollectPotentialSelectableTraits(settings, world)) {
+        if (trait == nullptr) {
+            continue;
+        }
+        possibleSet.insert(trait->filePath);
+    }
+
+    for (const auto &pair : settings.traits) {
+        const auto &traitId = pair.second.filePath;
+        if (traitId.empty()) {
+            continue;
+        }
+        if (possibleSet.contains(traitId)) {
+            profile->possibleTraitIds.push_back(traitId);
+        } else {
+            profile->impossibleTraitIds.push_back(traitId);
+        }
+    }
 }
 
 std::vector<World *> CollectClusterWorlds(SettingsCache *settings)
@@ -754,6 +857,7 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
     }
 
     World analysisWorld = *targetWorld;
+    BuildTraitPossibility(settings, analysisWorld, &profile);
     for (const auto *trait : CollectPotentialEnvelopeTraits(settings, analysisWorld)) {
         if (trait == nullptr) {
             continue;

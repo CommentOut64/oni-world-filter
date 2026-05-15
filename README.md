@@ -8,14 +8,17 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8DB?logo=tauri&logoColor=white)
 
-<img src="./public/00.png" width="100%" alt="oniWorldApp Preview">
+<img src="./public/00.png" width="100%" alt="oni-world-filter Preview">
 
-oniWorldApp is a local desktop tool for generating, searching, and previewing Oxygen Not Included world seeds. It reuses the C++ world-generation core and provides a Windows desktop interface through Tauri and React.
+oni-world-filter is a local desktop tool for generating, searching, and previewing Oxygen Not Included world seeds. It reuses the C++ world-generation core and provides a Windows desktop interface through Tauri and React.
 
 ## Features
 
 - Search usable seeds by world type and filter conditions.
 - Review search results and preview the corresponding map information.
+- Preview parameter details for all geysers.
+- Switch preview focus between the primary and secondary asteroid.
+- Generate detailed PDF reports.
 - Show an optimistic estimated match probability and major bottleneck hints before searching.
 - Run computation locally without relying on a remote search service.
 
@@ -78,19 +81,6 @@ Notes:
 Before building `Portable-offline`, set `ONI_WEBVIEW2_FIXED_RUNTIME_DIR` to an extracted WebView2 Fixed Runtime directory on the build machine.
 
 Artifacts are unsigned by default, so Windows or security software may show additional prompts during launch or installation.
-
-## Project Structure
-
-```text
-oni_world_app-master/
-├── asset/       Game worldgen resources and templates
-├── desktop/     React + Vite desktop frontend
-├── src-tauri/   Tauri 2 Rust host and packaging config
-├── src/         C++ world-generation core and sidecar entry
-├── scripts/     Development, build, and verification scripts
-├── tests/       Native tests and smoke fixtures
-└── llmdoc/      Current-state architecture docs
-```
 
 ## License
 

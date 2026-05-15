@@ -134,6 +134,21 @@ textarea,
   min-height: 100vh;
 }
 
+.ant-tooltip .ant-tooltip-container {
+  color: var(--text-main);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6px 8px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--line-panel);
+  box-shadow: var(--panel-shadow);
+}
+
+.ant-tooltip .ant-tooltip-arrow::before,
+.ant-tooltip .ant-tooltip-arrow::after {
+  background: var(--bg-overlay);
+}
+
 .desktop-shell {
   height: 100vh;
   min-height: 0;
@@ -378,6 +393,18 @@ textarea,
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.preview-pane-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.preview-world-switch {
+  flex: 0 0 auto;
 }
 
 .preview-pane-alert {
@@ -686,6 +713,10 @@ textarea,
 
 .count-rule-row {
   grid-template-columns: minmax(0, 1fr) minmax(54px, 68px) minmax(54px, 68px) 40px 56px;
+}
+
+.trait-rule-row {
+  grid-template-columns: minmax(0, 1fr) minmax(92px, 112px) 56px;
 }
 
 .count-rule-column-label {
@@ -1071,17 +1102,189 @@ textarea,
 }
 
 .geyser-overlay-item {
+  appearance: none;
+  width: 100%;
+  display: block;
+  text-align: left;
+  background: transparent;
+  border: 0;
   padding: 8px 12px;
   border-bottom: 1px solid var(--line-overlay);
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .geyser-overlay-item:last-child {
   border-bottom: 0;
 }
 
+.geyser-overlay-item {
+  cursor: default;
+}
+
+.geyser-overlay-item-clickable {
+  cursor: pointer;
+}
+
+.geyser-overlay-item-clickable:hover {
+  background: var(--bg-card-soft);
+}
+
+.geyser-overlay-item-active {
+  background: var(--bg-card-soft);
+  border-left: 2px solid var(--line-active);
+  padding-left: 10px;
+}
+
+.geyser-overlay-item-active .ant-typography {
+  color: var(--text-main);
+}
+
 .geyser-overlay-list .ant-typography {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.geyser-list-hover-popover-overlay {
+  z-index: 12;
+}
+
+.geyser-list-hover-popover-overlay .ant-popover-inner {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--line-active);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-overlay);
+  box-shadow: none;
+}
+
+.geyser-list-hover-popover .ant-typography {
+  margin-bottom: 0;
+}
+
+.geyser-list-hover-popover {
+  max-height: 180px;
+  min-width: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.geyser-list-hover-popover-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.geyser-list-hover-popover-label.ant-typography {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.geyser-list-hover-popover-value.ant-typography {
+  color: var(--text-main);
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.geyser-parameter-popover-floating {
+  position: absolute;
+  z-index: 11;
+  width: 100%;
+  max-width: 100%;
+}
+
+.geyser-parameter-popover-overlay .ant-popover-content {
+  width: 100%;
+  max-width: 100%;
+}
+
+.geyser-parameter-popover-overlay .ant-popover-inner {
+  box-sizing: border-box;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-overlay);
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.geyser-parameter-popover-overlay .ant-popover-title {
+  margin: 0;
+  padding: 8px 12px 4px;
+  border-bottom: 0;
+}
+
+.geyser-parameter-popover-overlay .ant-popover-inner-content {
+  padding: 0;
+}
+
+.geyser-parameter-popover-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.geyser-parameter-popover {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.geyser-parameter-popover-title .ant-btn {
+  min-width: 0;
+  font-size: 12px;
+}
+
+.geyser-parameter-popover .ant-btn {
+  min-width: 0;
+  font-size: 12px;
+}
+
+.geyser-parameter-coords.ant-typography {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.geyser-parameter-grid {
+  margin-top: 2px;
+}
+
+.geyser-parameter-grid .ant-descriptions-item-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.geyser-parameter-grid .ant-descriptions-item-content {
+  color: var(--text-main);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.geyser-parameter-message.ant-typography {
+  margin-bottom: 0;
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.geyser-parameter-error.ant-typography {
+  color: var(--error);
 }
 
 .preview-canvas-wrap canvas {

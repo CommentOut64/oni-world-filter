@@ -5,6 +5,7 @@ mod commands;
 mod control_sidecar;
 mod diagnostics;
 mod error;
+mod report_pdf;
 mod sidecar;
 mod state;
 
@@ -70,10 +71,13 @@ fn main() {
             commands::start_search,
             commands::cancel_search,
             commands::load_preview,
+            commands::load_preview_geyser_details,
             commands::load_preview_by_coord,
+            commands::get_world_report,
             commands::list_worlds,
             commands::list_geysers,
             commands::get_host_paths,
+            commands::export_report_pdf,
             commands::get_search_catalog,
             commands::analyze_search_request
         ])
@@ -121,6 +125,26 @@ mod tests {
         assert!(
             permissions.contains(&"core:window:allow-set-focus".to_string()),
             "default capability must allow focusing an existing host debug window"
+        );
+    }
+
+    #[test]
+    fn sidecar_main_should_register_get_world_report_command() {
+        let source = include_str!("main.rs");
+
+        assert!(
+            source.contains("commands::get_world_report"),
+            "main.rs 必须把 get_world_report 注册到 invoke handler"
+        );
+    }
+
+    #[test]
+    fn sidecar_main_should_register_export_report_pdf_command() {
+        let source = include_str!("main.rs");
+
+        assert!(
+            source.contains("commands::export_report_pdf"),
+            "main.rs 必须把 export_report_pdf 注册到 invoke handler"
         );
     }
 }

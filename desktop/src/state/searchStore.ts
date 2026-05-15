@@ -14,6 +14,7 @@ import type {
 } from "../lib/contracts";
 import {
   cancelSearch,
+  formatNativeDisplayMessage,
   formatTauriError,
   getSearchCatalog,
   listGeysers,
@@ -42,6 +43,8 @@ const DEFAULT_CONSTRAINTS: SearchConstraints = {
   forbidden: [],
   distance: [],
   count: [],
+  requiredTraits: [],
+  forbiddenTraits: [],
 };
 
 const DEFAULT_CPU_CONFIG: SearchCpuConfig = {
@@ -153,6 +156,9 @@ function appendMatch(state: SearchState, event: SearchMatchEvent): SearchState {
       summary: {
         seed: event.seed,
         worldType: state.activeWorldType,
+        worldPlacementIndex: 0,
+        isPrimary: true,
+        hasSecondaryPreview: false,
         start: event.summary.start,
         worldSize: event.summary.worldSize,
         traits: event.summary.traits,
@@ -320,7 +326,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
             return;
           }
           useSearchStore.setState({
-            lastError: `[${stderrEvent.jobId}] ${stderrEvent.message}`,
+            lastError: `[${stderrEvent.jobId}] ${formatNativeDisplayMessage(stderrEvent.message)}`,
           });
         }
       );
@@ -349,6 +355,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         forbidden: [...draft.constraints.forbidden],
         distance: [...draft.constraints.distance],
         count: [...draft.constraints.count],
+        requiredTraits: [...draft.constraints.requiredTraits],
+        forbiddenTraits: [...draft.constraints.forbiddenTraits],
       },
       cpu: { ...draft.cpu },
     };
@@ -495,7 +503,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
           ...state.stats,
           currentSeedsPerSecond: 0,
         },
-        lastError: event.message,
+        lastError: formatNativeDisplayMessage(event.message),
       });
       return;
     }

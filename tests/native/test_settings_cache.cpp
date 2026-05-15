@@ -1,4 +1,5 @@
 #include "Setting/SettingsCache.hpp"
+#include "Setting/NativeCoordinate.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "config.h"
 
@@ -307,6 +308,29 @@ bool ApplySearchMutablePath(SettingsCache &settings, const std::string &code)
     return true;
 }
 
+std::vector<const WorldTrait *> GetStartWorldTraitsForCode(SettingsCache &settings,
+                                                           const std::string &code)
+{
+    if (!settings.CoordinateChanged(code, settings)) {
+        return {};
+    }
+    auto worlds = BuildActiveWorlds(settings);
+    if (worlds.empty()) {
+        return {};
+    }
+    settings.DoSubworldMixing(worlds);
+    const int baseSeed = settings.seed;
+    for (size_t i = 0; i < worlds.size(); ++i) {
+        auto *world = worlds[i];
+        if (world == nullptr || world->locationType != LocationType::StartWorld) {
+            continue;
+        }
+        settings.seed = baseSeed + static_cast<int>(i);
+        return settings.GetRandomTraits(*world);
+    }
+    return {};
+}
+
 } // namespace
 
 int RunAllTests()
@@ -357,6 +381,34 @@ int RunAllTests()
             const std::string replayFingerprint = FingerprintMutableState(settings);
             Expect(replayFingerprint == mutatedFingerprint,
                    "restored state should reproduce the same mutable search runtime state",
+                   failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for primary trait regression checks",
+               failures);
+
+        if (error.empty()) {
+            const auto vanillaSandstoneTraits =
+                GetStartWorldTraitsForCode(settings, BuildCoordinateCode("V-SNDST-C-", 123456, 0));
+            Expect(vanillaSandstoneTraits.empty(),
+                   "V-SNDST-C primary should not generate runtime traits",
+                   failures);
+
+            const auto terraMoonletTraits =
+                GetStartWorldTraitsForCode(settings, BuildCoordinateCode("SNDST-C-", 123456, 0));
+            Expect(terraMoonletTraits.empty(),
+                   "SNDST-C primary should not generate runtime traits",
+                   failures);
+
+            const auto vanillaArboriaTraits =
+                GetStartWorldTraitsForCode(settings, BuildCoordinateCode("V-LUSH-C-", 123456, 0));
+            Expect(!vanillaArboriaTraits.empty(),
+                   "classic primary trait generation should stay enabled on non-Terra worlds",
                    failures);
         }
     }
@@ -438,6 +490,39 @@ int RunAllTests()
                 }
             }
         }
+    }
+
+    {
+        NativeCoordinate::NativeCoordinateResolution nativeCoord;
+        Expect(NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-1927980015-0-3A-0",
+                                                         &nativeCoord),
+               "native coord should resolve",
+               failures);
+        Expect(nativeCoord.worldType == 13,
+               "native coord should resolve sandstone cluster worldType",
+               failures);
+        Expect(nativeCoord.seed == 1927980015,
+               "native coord should preserve seed",
+               failures);
+        Expect(nativeCoord.mixing == 0,
+               "native coord should decode zero mixing from trailing 0",
+               failures);
+    }
+
+    {
+        NativeCoordinate::NativeCoordinateResolution invalidCoord;
+        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-HD",
+                                                          &invalidCoord),
+               "short non-zero trailing mixing code should be rejected",
+               failures);
+    }
+
+    {
+        NativeCoordinate::NativeCoordinateResolution invalidCoord;
+        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ABCDE1",
+                                                          &invalidCoord),
+               "non-zero trailing mixing code longer than five chars should be rejected",
+               failures);
     }
 
     std::atomic<int> loadCalls{0};

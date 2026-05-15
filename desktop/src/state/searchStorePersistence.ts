@@ -101,11 +101,32 @@ function normalizeSearchCpuConfig(cpu: unknown): SearchCpuConfig {
   };
 }
 
+function normalizeSearchConstraints(constraints: unknown): SearchDraft["constraints"] {
+  const source = isRecord(constraints) ? constraints : {};
+  return {
+    required: Array.isArray(source.required) ? cloneValue(source.required as string[]) : [],
+    forbidden: Array.isArray(source.forbidden) ? cloneValue(source.forbidden as string[]) : [],
+    distance: Array.isArray(source.distance)
+      ? cloneValue(source.distance as SearchDraft["constraints"]["distance"])
+      : [],
+    count: Array.isArray(source.count)
+      ? cloneValue(source.count as SearchDraft["constraints"]["count"])
+      : [],
+    requiredTraits: Array.isArray(source.requiredTraits)
+      ? cloneValue(source.requiredTraits as string[])
+      : [],
+    forbiddenTraits: Array.isArray(source.forbiddenTraits)
+      ? cloneValue(source.forbiddenTraits as string[])
+      : [],
+  };
+}
+
 function normalizeSearchDraft(draft: SearchDraft): SearchDraft {
   const { threads: _legacyThreads, ...rest } = draft as SearchDraft & { threads?: unknown };
   return {
     ...rest,
     cpu: normalizeSearchCpuConfig(rest.cpu),
+    constraints: normalizeSearchConstraints(rest.constraints),
   };
 }
 
@@ -114,11 +135,13 @@ function normalizeSearchRequest(request: SearchRequest): SearchRequest {
   if (!request.cpu) {
     return {
       ...rest,
+      constraints: normalizeSearchConstraints(rest.constraints),
     };
   }
   return {
     ...rest,
     cpu: normalizeSearchCpuConfig(rest.cpu),
+    constraints: normalizeSearchConstraints(rest.constraints),
   };
 }
 

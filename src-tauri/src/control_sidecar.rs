@@ -10,8 +10,9 @@ use tauri::AppHandle;
 use crate::error::HostError;
 use crate::diagnostics;
 use crate::sidecar::{
-    self, CoordPreviewRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
-    SearchCatalogPayload, SearchRequestPayload,
+    self, CoordPreviewRequestPayload, PreviewGeyserDetailsEventPayload,
+    PreviewGeyserDetailsRequestPayload, PreviewRequestPayload, SearchAnalysisPayload,
+    SearchCatalogPayload, SearchRequestPayload, WorldReportRequestPayload,
 };
 
 #[derive(Clone)]
@@ -168,6 +169,35 @@ pub fn load_preview(
     Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
 }
 
+pub fn load_preview_geyser_details(
+    app: Option<&AppHandle>,
+    manager: &ControlSidecarManager,
+    request: &PreviewGeyserDetailsRequestPayload,
+) -> Result<PreviewGeyserDetailsEventPayload, HostError> {
+    sidecar::validate_preview_geyser_details_request(request)?;
+    let payload = sidecar::build_preview_geyser_details_command(request);
+    let events = manager.request_or_fallback(app, &payload)?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("preview_geyser_details 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("preview_geyser_details")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return sidecar::deserialize_preview_geyser_details_event(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest(
+        "未收到 preview_geyser_details 事件".to_string(),
+    ))
+}
+
 pub fn load_preview_by_coord(
     app: Option<&AppHandle>,
     manager: &ControlSidecarManager,
@@ -193,6 +223,35 @@ pub fn load_preview_by_coord(
     }
 
     Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
+}
+
+pub fn load_world_report(
+    app: Option<&AppHandle>,
+    manager: &ControlSidecarManager,
+    request: &WorldReportRequestPayload,
+) -> Result<Value, HostError> {
+    sidecar::validate_world_report_request(request)?;
+    let payload = sidecar::build_world_report_command(request);
+    let events = manager.request_or_fallback(app, &payload)?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("world_report 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("world_report")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return Ok(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest(
+        "未收到 world_report 事件".to_string(),
+    ))
 }
 
 pub fn get_search_catalog(
@@ -491,6 +550,8 @@ fn drain_stderr_into(stderr: ChildStderr, lines: Arc<Mutex<Vec<String>>>) {
 fn terminal_event_name(request: &Value) -> Result<&'static str, HostError> {
     match request.get("command").and_then(Value::as_str) {
         Some("preview" | "preview_coord") => Ok("preview"),
+        Some("preview_geyser_details") => Ok("preview_geyser_details"),
+        Some("world_report") => Ok("world_report"),
         Some("get_search_catalog") => Ok("search_catalog"),
         Some("analyze_search_request") => Ok("search_analysis"),
         Some(other) => Err(HostError::InvalidRequest(format!(
@@ -515,7 +576,9 @@ mod tests {
 
     use crate::state::{JobRegistry, RunningJobHandles};
 
-    use super::{ControlSidecarManager, SidecarLauncher};
+    use super::{
+        load_preview_geyser_details, load_world_report, ControlSidecarManager, SidecarLauncher,
+    };
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -623,7 +686,156 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 pid = $PID
                 spawnCount = $spawnCount
                 preview = @{
+                    summary = @{
+                        seed = $request.seed
+                        worldPlacementIndex = 4
+                        isPrimary = $false
+                    }
+                }
+            }
+        }
+        'preview_geyser_details' {
+            if ($Mode -eq 'preview-geyser-details-failed') {
+                $event = @{
+                    event = 'failed'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    message = 'preview_geyser_details failed'
+                }
+            } elseif ($Mode -eq 'preview-geyser-details-missing-field') {
+                $event = @{
+                    event = 'preview_geyser_details'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    worldType = $request.worldType
                     seed = $request.seed
+                    mixing = $request.mixing
+                }
+            } else {
+                $event = @{
+                    event = 'preview_geyser_details'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    worldType = $request.worldType
+                    seed = $request.seed
+                    mixing = $request.mixing
+                    geyserDetails = @(
+                        @{
+                            index = 0
+                            summary = @{
+                                type = 0
+                                x = 70
+                                y = 90
+                                id = 'steam'
+                            }
+                            hasParameters = $true
+                            parameterKind = 'geyser'
+                            native = @{
+                                averageActiveYieldKgPerCycle = 1443.45
+                                eruptionPeriodSeconds = 646.84
+                                eruptionRatio = 0.62
+                                activePeriodSeconds = 66194.12
+                                activeRatio = 0.65
+                            }
+                            derived = @{
+                                eruptionRateKgPerSecond = 3.85
+                                averageOverallYieldGPerSecond = 1560.99
+                                eruptionSeconds = 403.64
+                                activeSeconds = 42950.63
+                                activeCycles = 71.58
+                                totalCycles = 110.32
+                                temperatureCelsius = 110.0
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        'world_report' {
+            if ($Mode -eq 'world-report-failed') {
+                $event = @{
+                    event = 'failed'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    message = 'world_report failed'
+                }
+            } elseif ($Mode -eq 'world-report-missing-event') {
+                $event = @{
+                    event = 'preview'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    preview = @{
+                        seed = $request.seed
+                    }
+                }
+            } else {
+                $event = @{
+                    event = 'world_report'
+                    jobId = $request.jobId
+                    pid = $PID
+                    spawnCount = $spawnCount
+                    report = @{
+                        preview = @{
+                            summary = @{
+                                seed = $request.seed
+                                worldType = $request.worldType
+                                start = @{
+                                    x = 10
+                                    y = 20
+                                }
+                                worldSize = @{
+                                    w = 256
+                                    h = 384
+                                }
+                                traits = @(1, 2)
+                                geysers = @(
+                                    @{
+                                        type = 0
+                                        x = 70
+                                        y = 90
+                                        id = 'steam'
+                                    }
+                                )
+                            }
+                            polygons = @()
+                        }
+                        geyserDetails = @(
+                            @{
+                                index = 0
+                                summary = @{
+                                    type = 0
+                                    x = 70
+                                    y = 90
+                                    id = 'steam'
+                                }
+                                hasParameters = $true
+                                parameterKind = 'geyser'
+                                native = @{
+                                    averageActiveYieldKgPerCycle = 1443.45
+                                    eruptionPeriodSeconds = 646.84
+                                    eruptionRatio = 0.62
+                                    activePeriodSeconds = 66194.12
+                                    activeRatio = 0.65
+                                }
+                                derived = @{
+                                    eruptionRateKgPerSecond = 3.85
+                                    averageOverallYieldGPerSecond = 1560.99
+                                    eruptionSeconds = 403.64
+                                    activeSeconds = 42950.63
+                                    activeCycles = 71.58
+                                    totalCycles = 110.32
+                                    temperatureCelsius = 110.0
+                                }
+                            }
+                        )
+                        mixing = $request.mixing
+                        coord = 'V-SNDST-C-100123-0-D3-HD'
+                    }
                 }
             }
         }
@@ -757,8 +969,167 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
             .expect("preview request should succeed");
 
         assert_eq!(preview_events[0]["event"].as_str(), Some("preview"));
+        assert_eq!(
+            preview_events[0]["preview"]["summary"]["worldPlacementIndex"].as_i64(),
+            Some(4)
+        );
+        assert_eq!(
+            preview_events[0]["preview"]["summary"]["isPrimary"].as_bool(),
+            Some(false)
+        );
         assert_eq!(registry.get_status("streaming-job"), Some(crate::state::JobStatus::Running));
         assert_eq!(registry.get_status("preview-001"), None);
+    }
+
+    #[test]
+    fn control_sidecar_load_preview_geyser_details_should_return_payload() {
+        let root = create_temp_root("preview-geyser-details");
+        let manager = create_test_manager(&root, "persistent", true);
+
+        let payload = load_preview_geyser_details(
+            None,
+            &manager,
+            &crate::sidecar::PreviewGeyserDetailsRequestPayload {
+                job_id: "preview-geyser-details-001".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+                target: crate::sidecar::PreviewTargetPayload::Secondary,
+            },
+        )
+        .expect("preview_geyser_details request should succeed");
+
+        assert_eq!(payload.event, "preview_geyser_details");
+        assert_eq!(payload.job_id, "preview-geyser-details-001");
+        assert_eq!(payload.geyser_details.len(), 1);
+        assert_eq!(payload.geyser_details[0].summary.id.as_deref(), Some("steam"));
+    }
+
+    #[test]
+    fn control_sidecar_load_preview_geyser_details_should_surface_failed_event() {
+        let root = create_temp_root("preview-geyser-details-failed");
+        let manager = create_test_manager(&root, "preview-geyser-details-failed", true);
+
+        let error = load_preview_geyser_details(
+            None,
+            &manager,
+            &crate::sidecar::PreviewGeyserDetailsRequestPayload {
+                job_id: "preview-geyser-details-002".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+                target: crate::sidecar::PreviewTargetPayload::Primary,
+            },
+        )
+        .expect_err("failed event should surface as host error");
+
+        assert!(error.to_string().contains("preview_geyser_details failed"));
+    }
+
+    #[test]
+    fn control_sidecar_load_preview_geyser_details_should_reject_missing_fields() {
+        let root = create_temp_root("preview-geyser-details-missing-field");
+        let manager = create_test_manager(&root, "preview-geyser-details-missing-field", true);
+
+        let error = load_preview_geyser_details(
+            None,
+            &manager,
+            &crate::sidecar::PreviewGeyserDetailsRequestPayload {
+                job_id: "preview-geyser-details-003".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+                target: crate::sidecar::PreviewTargetPayload::Primary,
+            },
+        )
+        .expect_err("missing geyserDetails field should be rejected");
+
+        assert!(error.to_string().contains("preview_geyser_details"));
+    }
+
+    #[test]
+    fn control_sidecar_world_report_source_should_define_bridge_and_terminal_event() {
+        let source = include_str!("control_sidecar.rs");
+
+        assert!(
+            source.contains(&["load_", "world_report"].join("")),
+            "control_sidecar.rs 应定义 load_world_report 桥接"
+        );
+        assert!(
+            source.contains(&["world_", "report 请求失败"].join("")),
+            "control_sidecar.rs 应显式透传 world_report failed 事件"
+        );
+        assert!(
+            source.contains(&["未收到 world_", "report 事件"].join("")),
+            "control_sidecar.rs 应在缺少 world_report 事件时返回明确错误"
+        );
+        assert!(
+            source.contains(&["Some(\"world_", "report\") => Ok(\"world_report\")"].join("")),
+            "control_sidecar.rs 应把 world_report 识别为终止事件"
+        );
+    }
+
+    #[test]
+    fn control_sidecar_load_world_report_should_return_event() {
+        let root = create_temp_root("world-report");
+        let manager = create_test_manager(&root, "persistent", true);
+
+        let event = load_world_report(
+            None,
+            &manager,
+            &crate::sidecar::WorldReportRequestPayload {
+                job_id: "world-report-001".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+            },
+        )
+        .expect("world_report request should succeed");
+
+        assert_eq!(event["event"].as_str(), Some("world_report"));
+        assert_eq!(event["jobId"].as_str(), Some("world-report-001"));
+        assert_eq!(event["report"]["coord"].as_str(), Some("V-SNDST-C-100123-0-D3-HD"));
+        assert_eq!(event["report"]["mixing"].as_i64(), Some(625));
+    }
+
+    #[test]
+    fn control_sidecar_load_world_report_should_surface_failed_event() {
+        let root = create_temp_root("world-report-failed");
+        let manager = create_test_manager(&root, "world-report-failed", true);
+
+        let error = load_world_report(
+            None,
+            &manager,
+            &crate::sidecar::WorldReportRequestPayload {
+                job_id: "world-report-002".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+            },
+        )
+        .expect_err("failed event should surface as host error");
+
+        assert!(error.to_string().contains("world_report failed"));
+    }
+
+    #[test]
+    fn control_sidecar_load_world_report_should_reject_missing_terminal_event() {
+        let root = create_temp_root("world-report-missing-event");
+        let manager = create_test_manager(&root, "world-report-missing-event", false);
+
+        let error = load_world_report(
+            None,
+            &manager,
+            &crate::sidecar::WorldReportRequestPayload {
+                job_id: "world-report-003".to_string(),
+                world_type: 13,
+                seed: 100123,
+                mixing: 625,
+            },
+        )
+        .expect_err("missing world_report event should be rejected");
+
+        assert!(error.to_string().contains("未收到 world_report 事件"));
     }
 
     #[test]

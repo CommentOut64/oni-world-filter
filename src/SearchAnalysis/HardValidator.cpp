@@ -1,6 +1,8 @@
 #include "SearchAnalysis/HardValidator.hpp"
 
 #include <algorithm>
+#include <ranges>
+#include <unordered_set>
 
 #include "SearchAnalysis/BottleneckSelectivityPredictor.hpp"
 #include "SearchAnalysis/SearchConstraintNormalizer.hpp"
@@ -131,6 +133,12 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
                     std::vector<ValidationIssue> *errors,
                     std::vector<ValidationIssue> *warnings)
 {
+    auto hasSearchableTrait = [&](const std::string &traitId) {
+        return std::ranges::any_of(catalog.traits, [&](const TraitMeta &trait) {
+            return trait.id == traitId && trait.searchable;
+        });
+    };
+
     if (request.worldType < 0 ||
         request.worldType >= static_cast<int>(catalog.worlds.size())) {
         AddIssue(errors,
@@ -150,8 +158,54 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
         }
     }
 
+    for (const auto &traitId : request.requiredTraits) {
+        if (!hasSearchableTrait(traitId)) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.unknown_trait",
+                     "constraints.requiredTraits",
+                     "存在未知主星特质: " + traitId);
+        }
+    }
+    for (const auto &traitId : request.forbiddenTraits) {
+        if (!hasSearchableTrait(traitId)) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.unknown_trait",
+                     "constraints.forbiddenTraits",
+                     "存在未知主星特质: " + traitId);
+        }
+    }
+
     if (worldProfile == nullptr || !worldProfile->valid) {
         return;
+    }
+
+    for (const auto &traitId : request.requiredTraits) {
+        if (std::ranges::contains(worldProfile->impossibleTraitIds, traitId)) {
+            AddIssue(errors,
+                     "layer2",
+                     "world.required_trait_impossible",
+                     "constraints.requiredTraits",
+                     "当前 worldType + mixing 下主星特质不可能出现: " + traitId);
+        }
+    }
+    for (const auto &traitId : request.forbiddenTraits) {
+        if (std::ranges::contains(worldProfile->impossibleTraitIds, traitId)) {
+            AddIssue(warnings,
+                     "layer2",
+                     "world.forbidden_trait_already_impossible",
+                     "constraints.forbiddenTraits",
+                     "当前 worldType + mixing 下主星特质已天然不可能出现: " + traitId);
+        }
+    }
+    if (worldProfile->possibleTraitCountUpper > 0 &&
+        static_cast<int>(request.requiredTraits.size()) > worldProfile->possibleTraitCountUpper) {
+        AddIssue(errors,
+                 "layer2",
+                 "world.required_trait_count_gt_possible_max",
+                 "constraints.requiredTraits",
+                 "requiredTraits 数量超过当前 worldType + mixing 下主星特质可生成上限");
     }
 
     std::vector<int> enabledDisabledSlots;
@@ -240,8 +294,77 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
 }
 
 void ValidateLayer3(const NormalizedSearchRequest &request,
+                    const SearchCatalog &catalog,
                     std::vector<ValidationIssue> *errors)
 {
+    auto findTrait = [&](const std::string &traitId) -> const TraitMeta * {
+        const auto itr = std::ranges::find(catalog.traits, traitId, &TraitMeta::id);
+        return (itr == catalog.traits.end()) ? nullptr : &*itr;
+    };
+
+    std::unordered_set<std::string> requiredTraits;
+    for (const auto &traitId : request.requiredTraits) {
+        if (!requiredTraits.insert(traitId).second) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.required_trait_duplicate",
+                     "constraints.requiredTraits",
+                     "主星特质不能重复设置 must include: " + traitId);
+        }
+    }
+
+    std::unordered_set<std::string> forbiddenTraits;
+    for (const auto &traitId : request.forbiddenTraits) {
+        if (!forbiddenTraits.insert(traitId).second) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.forbidden_trait_duplicate",
+                     "constraints.forbiddenTraits",
+                     "主星特质不能重复设置 must exclude: " + traitId);
+        }
+    }
+
+    for (const auto &traitId : requiredTraits) {
+        if (forbiddenTraits.contains(traitId)) {
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.required_forbidden_trait",
+                     "constraints.requiredTraits/constraints.forbiddenTraits",
+                     "同一主星特质不能同时 must include 和 must exclude: " + traitId);
+        }
+    }
+
+    std::vector<std::string> uniqueRequiredTraits(requiredTraits.begin(), requiredTraits.end());
+    for (size_t i = 0; i < uniqueRequiredTraits.size(); ++i) {
+        const auto *lhs = findTrait(uniqueRequiredTraits[i]);
+        if (lhs == nullptr) {
+            continue;
+        }
+        for (size_t j = i + 1; j < uniqueRequiredTraits.size(); ++j) {
+            const auto *rhs = findTrait(uniqueRequiredTraits[j]);
+            if (rhs == nullptr) {
+                continue;
+            }
+
+            const bool explicitConflict =
+                std::ranges::contains(lhs->exclusiveWith, rhs->id) ||
+                std::ranges::contains(rhs->exclusiveWith, lhs->id);
+            const bool tagConflict =
+                std::ranges::any_of(lhs->exclusiveWithTags, [&](const std::string &tag) {
+                    return std::ranges::contains(rhs->exclusiveWithTags, tag);
+                });
+            if (!explicitConflict && !tagConflict) {
+                continue;
+            }
+
+            AddIssue(errors,
+                     "layer3",
+                     "conflict.required_traits_mutually_exclusive",
+                     "constraints.requiredTraits",
+                     "主星特质互斥，不能同时 must include: " + lhs->id + " / " + rhs->id);
+        }
+    }
+
     for (const auto &group : request.groups) {
         if (group.hasRequired && group.hasForbidden) {
             AddIssue(errors,
@@ -307,7 +430,7 @@ SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
                    worldProfile,
                    &result.errors,
                    &layer2Warnings);
-    ValidateLayer3(result.normalizedRequest, &result.errors);
+    ValidateLayer3(result.normalizedRequest, catalog, &result.errors);
     if (result.errors.empty()) {
         RunBottleneckSelectivityPredictor(result.normalizedRequest,
                                           worldProfile,

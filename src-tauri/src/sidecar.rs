@@ -144,6 +144,10 @@ pub struct SearchConstraints {
     pub distance: Vec<DistanceRule>,
     #[serde(default)]
     pub count: Vec<CountRule>,
+    #[serde(default)]
+    pub required_traits: Vec<String>,
+    #[serde(default)]
+    pub forbidden_traits: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -187,6 +191,14 @@ pub struct CountRule {
     pub max_count: i32,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PreviewTargetPayload {
+    #[default]
+    Primary,
+    Secondary,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewRequestPayload {
@@ -195,6 +207,31 @@ pub struct PreviewRequestPayload {
     pub seed: i32,
     #[serde(default)]
     pub mixing: i32,
+    #[serde(default)]
+    pub target: PreviewTargetPayload,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GeyserSummaryPayload {
+    #[serde(rename = "type")]
+    pub r#type: i32,
+    pub x: i32,
+    pub y: i32,
+    #[serde(default)]
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewGeyserDetailsRequestPayload {
+    pub job_id: String,
+    pub world_type: i32,
+    pub seed: i32,
+    #[serde(default)]
+    pub mixing: i32,
+    #[serde(default)]
+    pub target: PreviewTargetPayload,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -202,6 +239,60 @@ pub struct PreviewRequestPayload {
 pub struct CoordPreviewRequestPayload {
     pub job_id: String,
     pub coord: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldReportRequestPayload {
+    pub job_id: String,
+    pub world_type: i32,
+    pub seed: i32,
+    #[serde(default)]
+    pub mixing: i32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GeyserNativeParametersPayload {
+    pub average_active_yield_kg_per_cycle: f64,
+    pub eruption_period_seconds: f64,
+    pub eruption_ratio: f64,
+    pub active_period_seconds: f64,
+    pub active_ratio: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GeyserDerivedParametersPayload {
+    pub eruption_rate_kg_per_second: f64,
+    pub average_overall_yield_g_per_second: f64,
+    pub eruption_seconds: f64,
+    pub active_seconds: f64,
+    pub active_cycles: f64,
+    pub total_cycles: f64,
+    pub temperature_celsius: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GeyserDetailPayload {
+    pub index: i32,
+    pub summary: GeyserSummaryPayload,
+    pub has_parameters: bool,
+    pub parameter_kind: String,
+    pub native: GeyserNativeParametersPayload,
+    pub derived: GeyserDerivedParametersPayload,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewGeyserDetailsEventPayload {
+    pub event: String,
+    pub job_id: String,
+    pub world_type: i32,
+    pub seed: i32,
+    pub mixing: i32,
+    pub geyser_details: Vec<GeyserDetailPayload>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -293,6 +384,10 @@ pub struct NormalizedSearchRequestPayload {
     pub seed_start: i32,
     pub seed_end: i32,
     pub mixing: i32,
+    #[serde(default)]
+    pub required_traits: Vec<String>,
+    #[serde(default)]
+    pub forbidden_traits: Vec<String>,
     pub groups: Vec<NormalizedConstraintGroup>,
 }
 
@@ -337,6 +432,12 @@ pub struct WorldEnvelopeProfilePayload {
     pub diagonal: f64,
     pub active_mixing_slots: Vec<i32>,
     pub disabled_mixing_slots: Vec<i32>,
+    #[serde(default)]
+    pub possible_trait_count_upper: i32,
+    #[serde(default)]
+    pub possible_trait_ids: Vec<String>,
+    #[serde(default)]
+    pub impossible_trait_ids: Vec<String>,
     pub possible_geyser_types: Vec<String>,
     pub impossible_geyser_types: Vec<String>,
     pub possible_max_count_by_type: BTreeMap<String, i32>,
@@ -619,6 +720,74 @@ pub fn load_preview_by_coord(
     Err(HostError::InvalidRequest("未收到 preview 事件".to_string()))
 }
 
+pub fn load_preview_geyser_details(
+    app: Option<&AppHandle>,
+    request: &PreviewGeyserDetailsRequestPayload,
+) -> Result<PreviewGeyserDetailsEventPayload, HostError> {
+    validate_preview_geyser_details_request(request)?;
+    let sidecar_path = resolve_sidecar_path(app)?;
+    let payload = build_preview_geyser_details_command(request);
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+        app,
+    )?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("preview_geyser_details 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("preview_geyser_details")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return deserialize_preview_geyser_details_event(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest(
+        "未收到 preview_geyser_details 事件".to_string(),
+    ))
+}
+
+pub fn load_world_report(
+    app: Option<&AppHandle>,
+    request: &WorldReportRequestPayload,
+) -> Result<Value, HostError> {
+    validate_world_report_request(request)?;
+    let sidecar_path = resolve_sidecar_path(app)?;
+    let payload = build_world_report_command(request);
+    let events = run_sidecar_request_collect(
+        &sidecar_path,
+        &payload,
+        sidecar_request_priority(&payload),
+        app,
+    )?;
+
+    for event in events {
+        if event.get("event").and_then(Value::as_str) == Some("failed") {
+            let message = event
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("world_report 请求失败");
+            return Err(HostError::InvalidRequest(message.to_string()));
+        }
+        if event.get("event").and_then(Value::as_str) == Some("world_report")
+            && event.get("jobId").and_then(Value::as_str) == Some(request.job_id.as_str())
+        {
+            return Ok(event);
+        }
+    }
+
+    Err(HostError::InvalidRequest(
+        "未收到 world_report 事件".to_string(),
+    ))
+}
+
 pub fn get_search_catalog(app: Option<&AppHandle>) -> Result<SearchCatalogPayload, HostError> {
     let sidecar_path = resolve_sidecar_path(app)?;
     let job_id = "search-catalog";
@@ -658,6 +827,17 @@ pub(crate) fn deserialize_search_catalog_payload(
 ) -> Result<SearchCatalogPayload, HostError> {
     serde_json::from_value(catalog).map_err(|error| {
         HostError::InvalidRequest(format!("search_catalog 反序列化失败: {}", error))
+    })
+}
+
+pub(crate) fn deserialize_preview_geyser_details_event(
+    event: Value,
+) -> Result<PreviewGeyserDetailsEventPayload, HostError> {
+    serde_json::from_value(event).map_err(|error| {
+        HostError::InvalidRequest(format!(
+            "preview_geyser_details 反序列化失败: {}",
+            error
+        ))
     })
 }
 
@@ -1156,6 +1336,8 @@ fn build_search_command(request: &SearchRequestPayload) -> Value {
             "forbidden": request.constraints.forbidden,
             "distance": request.constraints.distance,
             "count": request.constraints.count,
+            "requiredTraits": request.constraints.required_traits,
+            "forbiddenTraits": request.constraints.forbidden_traits,
         },
         "cpu": cpu,
     })
@@ -1185,6 +1367,34 @@ pub(crate) fn validate_preview_coord_request(
     Ok(())
 }
 
+pub(crate) fn validate_preview_geyser_details_request(
+    request: &PreviewGeyserDetailsRequestPayload,
+) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+        return Err(HostError::InvalidRequest(
+            "worldType 超出有效范围".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_world_report_request(
+    request: &WorldReportRequestPayload,
+) -> Result<(), HostError> {
+    if request.job_id.trim().is_empty() {
+        return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
+    }
+    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+        return Err(HostError::InvalidRequest(
+            "worldType 超出有效范围".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_analyze_search_request(
     request: &SearchRequestPayload,
 ) -> Result<(), HostError> {
@@ -1200,7 +1410,8 @@ pub(crate) fn build_preview_command(request: &PreviewRequestPayload) -> Value {
         "jobId": request.job_id,
         "worldType": request.world_type,
         "seed": request.seed,
-        "mixing": request.mixing
+        "mixing": request.mixing,
+        "target": request.target
     })
 }
 
@@ -1209,6 +1420,29 @@ pub(crate) fn build_preview_coord_command(request: &CoordPreviewRequestPayload) 
         "command": "preview_coord",
         "jobId": request.job_id,
         "coord": request.coord
+    })
+}
+
+pub(crate) fn build_preview_geyser_details_command(
+    request: &PreviewGeyserDetailsRequestPayload,
+) -> Value {
+    json!({
+        "command": "preview_geyser_details",
+        "jobId": request.job_id,
+        "worldType": request.world_type,
+        "seed": request.seed,
+        "mixing": request.mixing,
+        "target": request.target
+    })
+}
+
+pub(crate) fn build_world_report_command(request: &WorldReportRequestPayload) -> Value {
+    json!({
+        "command": "world_report",
+        "jobId": request.job_id,
+        "worldType": request.world_type,
+        "seed": request.seed,
+        "mixing": request.mixing
     })
 }
 
@@ -1232,6 +1466,8 @@ pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Va
             "forbidden": request.constraints.forbidden,
             "distance": request.constraints.distance,
             "count": request.constraints.count,
+            "requiredTraits": request.constraints.required_traits,
+            "forbiddenTraits": request.constraints.forbidden_traits,
         },
         "cpu": request.cpu,
     })
@@ -1240,7 +1476,7 @@ pub(crate) fn build_analyze_search_command(request: &SearchRequestPayload) -> Va
 fn sidecar_request_priority(request: &Value) -> SidecarProcessPriority {
     if matches!(
         request.get("command").and_then(Value::as_str),
-        Some("preview" | "preview_coord")
+        Some("preview" | "preview_coord" | "preview_geyser_details")
     ) {
         return SidecarProcessPriority::LowPerfAffinity;
     }
@@ -1275,9 +1511,19 @@ pub(crate) fn sanitize_sidecar_stderr(stderr_text: &str) -> String {
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
-        .filter(|line| !line.starts_with(SIDECAR_DIAGNOSTIC_PREFIX))
+        .filter(|line| !should_ignore_sidecar_stderr_line(line))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn should_ignore_sidecar_stderr_line(line: &str) -> bool {
+    line.starts_with(SIDECAR_DIAGNOSTIC_PREFIX)
+        || line.contains("compute child node pd failed, fallback to compute node.")
+        || line.contains("compute node pd failed, fallback to compute node.")
+        || line.contains("compute node pd failed after convert unknown cells")
+        || line.contains("can not place all templates")
+        || (line.contains("Intersect:") && line.contains("intersection result is empty."))
+        || (line.contains("Intersect:") && line.contains("subj:") && line.contains("clip:"))
 }
 
 fn drain_stderr(stderr: ChildStderr) -> String {
@@ -1329,7 +1575,9 @@ fn spawn_stderr_logger(app: AppHandle, job_id: String, stderr: ChildStderr) {
             if line.trim().is_empty() {
                 continue;
             }
-            eprintln!("[sidecar:{}] {}", job_id, line);
+            if !should_ignore_sidecar_stderr_line(&line) {
+                eprintln!("[sidecar:{}] {}", job_id, line);
+            }
             let _ = app.emit(
                 SIDECAR_STDERR_CHANNEL,
                 json!({
@@ -1634,14 +1882,21 @@ mod tests {
 
     use super::{
         abort_all_running_jobs_for_shutdown, begin_host_cancellation,
-        build_preview_coord_command, collect_sidecar_candidates, finalize_cancelled_from_snapshot,
-        finalize_cancelled_from_stdout_eof,
+        build_analyze_search_command, build_preview_command, build_preview_coord_command,
+        build_preview_geyser_details_command, build_search_command, build_world_report_command,
+        collect_sidecar_candidates, deserialize_preview_geyser_details_event,
+        finalize_cancelled_from_snapshot, finalize_cancelled_from_stdout_eof,
         first_existing_sidecar_path, force_stop_child_process, list_geyser_options,
         list_world_options, prepare_runtime_sidecar_copy, preview_affinity_mask_for_cpu_sets,
         request_search_cancel, resolve_sidecar_path, run_sidecar_request_collect,
         sanitize_sidecar_stderr, should_emit_failed_for_exit, should_forward_sidecar_event,
-        sidecar_spawn_creation_flags, validate_preview_coord_request, CoordPreviewRequestPayload,
-        PreviewCpuSetInfo, SearchCatalogPayload, SidecarProcessPriority,
+        should_ignore_sidecar_stderr_line,
+        sidecar_spawn_creation_flags, validate_preview_coord_request,
+        validate_preview_geyser_details_request, validate_world_report_request, CountRule,
+        CoordPreviewRequestPayload, DistanceRule, PreviewCpuSetInfo,
+        PreviewGeyserDetailsRequestPayload, PreviewRequestPayload, PreviewTargetPayload,
+        SearchCatalogPayload, SearchConstraints, SearchCpuConfig, SearchRequestPayload,
+        SidecarProcessPriority, WorldReportRequestPayload,
     };
 
     fn create_temp_root(name: &str) -> PathBuf {
@@ -1739,11 +1994,28 @@ mod tests {
     }
 
     #[test]
+    fn sanitize_sidecar_stderr_should_drop_recoverable_template_diagnostics() {
+        let stderr = "error ApplyTemplateRules:430 can not place all templates\nreal failure";
+
+        assert_eq!(sanitize_sidecar_stderr(stderr), "real failure");
+    }
+
+    #[test]
     fn sanitize_sidecar_stderr_should_keep_real_errors() {
         assert_eq!(
             sanitize_sidecar_stderr("sidecar 进程异常退出(code=Some(-1073741819))"),
             "sidecar 进程异常退出(code=Some(-1073741819))"
         );
+    }
+
+    #[test]
+    fn ignore_sidecar_stderr_line_should_match_recoverable_template_diagnostics() {
+        assert!(should_ignore_sidecar_stderr_line(
+            "error ApplyTemplateRules:430 can not place all templates"
+        ));
+        assert!(!should_ignore_sidecar_stderr_line(
+            "sidecar 进程异常退出(code=Some(-1073741819))"
+        ));
     }
 
     #[test]
@@ -2386,6 +2658,231 @@ mod tests {
         .expect_err("blank coord should be rejected");
 
         assert!(error.to_string().contains("coord"));
+    }
+
+    #[test]
+    fn preview_request_should_default_target_to_primary() {
+        let payload: PreviewRequestPayload = serde_json::from_value(json!({
+            "jobId": "preview-001",
+            "worldType": 13,
+            "seed": 100123,
+            "mixing": 625
+        }))
+        .expect("preview request should deserialize with default target");
+
+        assert_eq!(payload.target, PreviewTargetPayload::Primary);
+    }
+
+    #[test]
+    fn build_preview_command_should_emit_target_payload() {
+        let command = build_preview_command(&PreviewRequestPayload {
+            job_id: "preview-002".to_string(),
+            world_type: 13,
+            seed: 100123,
+            mixing: 625,
+            target: PreviewTargetPayload::Secondary,
+        });
+
+        assert_eq!(command["command"].as_str(), Some("preview"));
+        assert_eq!(command["jobId"].as_str(), Some("preview-002"));
+        assert_eq!(command["target"].as_str(), Some("secondary"));
+    }
+
+    #[test]
+    fn build_preview_geyser_details_command_should_emit_target_only_payload() {
+        let command = build_preview_geyser_details_command(&PreviewGeyserDetailsRequestPayload {
+            job_id: "preview-geyser-details-001".to_string(),
+            world_type: 13,
+            seed: 100123,
+            mixing: 625,
+            target: PreviewTargetPayload::Secondary,
+        });
+
+        assert_eq!(command["command"].as_str(), Some("preview_geyser_details"));
+        assert_eq!(command["jobId"].as_str(), Some("preview-geyser-details-001"));
+        assert_eq!(command["worldType"].as_i64(), Some(13));
+        assert_eq!(command["seed"].as_i64(), Some(100123));
+        assert_eq!(command["mixing"].as_i64(), Some(625));
+        assert_eq!(command["target"].as_str(), Some("secondary"));
+        assert!(command.get("worldHeight").is_none());
+        assert!(command.get("geysers").is_none());
+    }
+
+    #[test]
+    fn validate_preview_geyser_details_request_should_accept_target_only_payload() {
+        validate_preview_geyser_details_request(&PreviewGeyserDetailsRequestPayload {
+            job_id: "preview-geyser-details-002".to_string(),
+            world_type: 13,
+            seed: 100123,
+            mixing: 625,
+            target: PreviewTargetPayload::Primary,
+        })
+        .expect("target-only payload should be accepted");
+    }
+
+    #[test]
+    fn deserialize_preview_geyser_details_event_should_parse_payload() {
+        let event = json!({
+            "event": "preview_geyser_details",
+            "jobId": "preview-geyser-details-001",
+            "worldType": 13,
+            "seed": 100123,
+            "mixing": 625,
+            "geyserDetails": [
+                {
+                    "index": 0,
+                    "summary": {"type": 0, "x": 70, "y": 90, "id": "steam"},
+                    "hasParameters": true,
+                    "parameterKind": "geyser",
+                    "native": {
+                        "averageActiveYieldKgPerCycle": 1443.45,
+                        "eruptionPeriodSeconds": 646.84,
+                        "eruptionRatio": 0.62,
+                        "activePeriodSeconds": 66194.12,
+                        "activeRatio": 0.65
+                    },
+                    "derived": {
+                        "eruptionRateKgPerSecond": 3.85,
+                        "averageOverallYieldGPerSecond": 1560.99,
+                        "eruptionSeconds": 403.64,
+                        "activeSeconds": 42950.63,
+                        "activeCycles": 71.58,
+                        "totalCycles": 110.32,
+                        "temperatureCelsius": 110.0
+                    }
+                }
+            ]
+        });
+
+        let payload = deserialize_preview_geyser_details_event(event)
+            .expect("event payload should deserialize");
+        assert_eq!(payload.event, "preview_geyser_details");
+        assert_eq!(payload.job_id, "preview-geyser-details-001");
+        assert_eq!(payload.geyser_details.len(), 1);
+        assert_eq!(payload.geyser_details[0].summary.id.as_deref(), Some("steam"));
+        assert!(payload.geyser_details[0].has_parameters);
+    }
+
+    #[test]
+    fn sidecar_world_report_source_should_define_request_validation_and_command_builder() {
+        let source = include_str!("sidecar.rs");
+
+        assert!(
+            source.contains(&["WorldReport", "RequestPayload"].join("")),
+            "sidecar.rs 应定义 WorldReportRequestPayload"
+        );
+        assert!(
+            source.contains(&["validate_", "world_report_request"].join("")),
+            "sidecar.rs 应定义 world_report 请求校验"
+        );
+        assert!(
+            source.contains(&["build_", "world_report_command"].join("")),
+            "sidecar.rs 应定义 world_report 命令构造"
+        );
+        assert!(
+            source.contains(&["load_", "world_report"].join("")),
+            "sidecar.rs 应定义 world_report 加载入口"
+        );
+    }
+
+    #[test]
+    fn build_world_report_command_should_emit_full_payload() {
+        let command = build_world_report_command(&WorldReportRequestPayload {
+            job_id: "world-report-001".to_string(),
+            world_type: 13,
+            seed: 100123,
+            mixing: 625,
+        });
+
+        assert_eq!(command["command"].as_str(), Some("world_report"));
+        assert_eq!(command["jobId"].as_str(), Some("world-report-001"));
+        assert_eq!(command["worldType"].as_i64(), Some(13));
+        assert_eq!(command["seed"].as_i64(), Some(100123));
+        assert_eq!(command["mixing"].as_i64(), Some(625));
+    }
+
+    #[test]
+    fn build_search_command_includes_trait_constraints() {
+        let command = build_search_command(&SearchRequestPayload {
+            job_id: "search-001".to_string(),
+            world_type: 13,
+            seed_start: 100000,
+            seed_end: 120000,
+            mixing: 625,
+            constraints: SearchConstraints {
+                required: vec!["steam".to_string()],
+                forbidden: vec!["methane".to_string()],
+                distance: vec![DistanceRule {
+                    geyser: "hot_water".to_string(),
+                    min_dist: 0.0,
+                    max_dist: 80.0,
+                }],
+                count: vec![CountRule {
+                    geyser: "salt_water".to_string(),
+                    min_count: 1,
+                    max_count: 2,
+                }],
+                required_traits: vec!["traits/MagmaVents".to_string()],
+                forbidden_traits: vec!["traits/GeoDormant".to_string()],
+            },
+            cpu: Some(SearchCpuConfig {
+                mode: "balanced".to_string(),
+                allow_smt: true,
+                allow_low_perf: false,
+                placement: "strict".to_string(),
+            }),
+        });
+
+        assert_eq!(
+            command["constraints"]["requiredTraits"][0].as_str(),
+            Some("traits/MagmaVents")
+        );
+        assert_eq!(
+            command["constraints"]["forbiddenTraits"][0].as_str(),
+            Some("traits/GeoDormant")
+        );
+    }
+
+    #[test]
+    fn build_analyze_search_command_includes_trait_constraints() {
+        let command = build_analyze_search_command(&SearchRequestPayload {
+            job_id: "analyze-001".to_string(),
+            world_type: 13,
+            seed_start: 100000,
+            seed_end: 120000,
+            mixing: 625,
+            constraints: SearchConstraints {
+                required: vec![],
+                forbidden: vec![],
+                distance: vec![],
+                count: vec![],
+                required_traits: vec!["traits/MagmaVents".to_string()],
+                forbidden_traits: vec!["traits/GeoDormant".to_string()],
+            },
+            cpu: None,
+        });
+
+        assert_eq!(
+            command["constraints"]["requiredTraits"][0].as_str(),
+            Some("traits/MagmaVents")
+        );
+        assert_eq!(
+            command["constraints"]["forbiddenTraits"][0].as_str(),
+            Some("traits/GeoDormant")
+        );
+    }
+
+    #[test]
+    fn validate_world_report_request_should_reject_invalid_world_type() {
+        let error = validate_world_report_request(&WorldReportRequestPayload {
+            job_id: "world-report-002".to_string(),
+            world_type: -1,
+            seed: 100123,
+            mixing: 625,
+        })
+        .expect_err("invalid world type should be rejected");
+
+        assert!(error.to_string().contains("worldType"));
     }
 
     #[test]

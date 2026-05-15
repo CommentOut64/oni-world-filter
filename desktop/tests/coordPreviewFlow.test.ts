@@ -54,20 +54,20 @@ test("runCoordPreviewFlow loads preview by coord and opens single direct result"
         calls.push("view-results");
       },
     },
-    "V-SNDST-C-123456-0-D3-HD"
+    "V-SNDST-C-1927980015-0-3A-0"
   );
 
   assert.equal(capturedMatches.length, 1);
   assert.deepEqual(calls, [
-    "load:V-SNDST-C-123456-0-D3-HD",
-    "open:V-SNDST-C-123456-0-D3-HD",
-    "prime:V-SNDST-C-123456-0-D3-HD:123456",
+    "load:V-SNDST-C-1927980015-0-3A-0",
+    "open:V-SNDST-C-1927980015-0-3A-0",
+    "prime:V-SNDST-C-1927980015-0-3A-0:123456",
     "view-results",
   ]);
   assert.equal(capturedMatches[0]?.seed, 123456);
   assert.equal(capturedMatches[0]?.worldType, 13);
   assert.equal(capturedMatches[0]?.mixing, 625);
-  assert.equal(capturedMatches[0]?.coord, "V-SNDST-C-123456-0-D3-HD");
+  assert.equal(capturedMatches[0]?.coord, "V-SNDST-C-1927980015-0-3A-0");
   assert.deepEqual(capturedMatches[0]?.traits, [1, 2]);
   assert.deepEqual(capturedMatches[0]?.start, { x: 10, y: 20 });
   assert.deepEqual(capturedMatches[0]?.worldSize, { w: 256, h: 384 });
