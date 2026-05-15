@@ -124,8 +124,9 @@ target_include_directories(oni-sidecar
 )
 target_link_libraries(oni-sidecar PUBLIC clipper jsoncpp miniz)
 if(MSVC)
+add_compile_options("/utf-8")
 target_compile_options(oni-sidecar
-    PUBLIC /EHsc "/source-charset:utf-8" "/execution-charset:GBK" /MP /W4 /WX /wd4244 /wd4267
+    PUBLIC /EHsc /MP /W4 /WX /wd4244 /wd4267
     PUBLIC "$<$<CONFIG:Release>:/Zi>")
 target_link_options(oni-sidecar
     PRIVATE "$<$<CONFIG:Release>:/DEBUG:FULL>"
@@ -286,6 +287,7 @@ add_executable(test_sidecar_protocol
     "../tests/native/test_sidecar_protocol.cpp"
     "Batch/SidecarProtocol.cpp"
     "Batch/FilterConfig.cpp"
+    "SearchAnalysis/TraitCatalog.cpp"
 )
 target_include_directories(test_sidecar_protocol
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
