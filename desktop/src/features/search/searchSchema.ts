@@ -74,6 +74,11 @@ const countRuleSchema = z.object({
     ),
 });
 
+const traitRuleSchema = z.object({
+  traitId: z.string().min(1, "请选择特质"),
+  mode: z.enum(["required", "forbidden"]),
+});
+
 function normalizeBlankNumberInput(value: unknown): unknown {
   if (value === null || value === undefined || value === "") {
     return undefined;
@@ -145,6 +150,7 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
       forbidden: z.array(geyserItemSchema),
       distance: z.array(distanceRuleSchema),
       count: z.array(countRuleSchema),
+      traitRules: z.array(traitRuleSchema),
     })
     .superRefine((value, ctx) => {
       if (value.seedStart > value.seedEnd) {
@@ -262,12 +268,70 @@ export function createSearchSchema(options?: SearchSchemaOptions) {
           message: "已经设置“必须排除”时，不能再设置“必须包含”",
         });
       });
+
+      const seenRequiredTraits = new Set<string>();
+      const seenForbiddenTraits = new Set<string>();
+      value.traitRules.forEach((item, index) => {
+        if (item.mode === "required") {
+          if (seenRequiredTraits.has(item.traitId)) {
+            ctx.addIssue({
+              path: ["traitRules", index, "traitId"],
+              code: z.ZodIssueCode.custom,
+              message: "“主星特质”里有重复特质",
+            });
+            return;
+          }
+          seenRequiredTraits.add(item.traitId);
+          return;
+        }
+        if (seenForbiddenTraits.has(item.traitId)) {
+          ctx.addIssue({
+            path: ["traitRules", index, "traitId"],
+            code: z.ZodIssueCode.custom,
+            message: "“主星特质”里有重复特质",
+          });
+          return;
+        }
+        seenForbiddenTraits.add(item.traitId);
+      });
+
+      value.traitRules.forEach((item, index) => {
+        if (item.mode !== "forbidden" || !seenRequiredTraits.has(item.traitId)) {
+          return;
+        }
+        ctx.addIssue({
+          path: ["traitRules", index, "traitId"],
+          code: z.ZodIssueCode.custom,
+          message: "同一个主星特质不能同时设置“必须包含”和“必须排除”",
+        });
+      });
     });
 }
 
 export const searchSchema = createSearchSchema();
 
 export type SearchFormValues = z.infer<typeof searchSchema>;
+
+function splitTraitRules(
+  traitRules: SearchFormValues["traitRules"]
+): Pick<SearchDraft["constraints"], "requiredTraits" | "forbiddenTraits"> {
+  const requiredTraits: string[] = [];
+  const forbiddenTraits: string[] = [];
+  traitRules.forEach((item) => {
+    if (!item.traitId) {
+      return;
+    }
+    if (item.mode === "required") {
+      requiredTraits.push(item.traitId);
+      return;
+    }
+    forbiddenTraits.push(item.traitId);
+  });
+  return {
+    requiredTraits,
+    forbiddenTraits,
+  };
+}
 
 function mergeRequiredIntoCountRows(
   constraints: SearchDraft["constraints"]
@@ -289,6 +353,21 @@ function mergeRequiredIntoCountRows(
     });
   });
   return rows;
+}
+
+function mergeTraitRules(
+  constraints: SearchDraft["constraints"]
+): SearchFormValues["traitRules"] {
+  return [
+    ...constraints.requiredTraits.map((traitId) => ({
+      traitId,
+      mode: "required" as const,
+    })),
+    ...constraints.forbiddenTraits.map((traitId) => ({
+      traitId,
+      mode: "forbidden" as const,
+    })),
+  ];
 }
 
 export function resolveCountAutoMax(
@@ -317,6 +396,7 @@ export function resolveCountAutoMax(
 }
 
 export function toSearchDraft(values: SearchFormValues): SearchDraft {
+  const { requiredTraits, forbiddenTraits } = splitTraitRules(values.traitRules);
   return {
     worldType: values.worldType,
     mixing: values.mixing,
@@ -341,6 +421,8 @@ export function toSearchDraft(values: SearchFormValues): SearchDraft {
         minCount: item.minCount,
         maxCount: item.maxCount,
       })),
+      requiredTraits,
+      forbiddenTraits,
     },
   };
 }
@@ -362,5 +444,6 @@ export function toSearchFormValues(draft: SearchDraft): SearchFormValues {
       maxDist: item.maxDist,
     })),
     count: mergeRequiredIntoCountRows(draft.constraints),
+    traitRules: mergeTraitRules(draft.constraints),
   };
 }

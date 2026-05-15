@@ -1,4 +1,5 @@
 #include "Batch/SidecarProtocol.hpp"
+#include "Setting/SettingsCache.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -255,6 +256,18 @@ int RunAllTests()
         Expect(result.request.analyze.constraints.count[0].maxCount == 2,
                "analyze_search_request maxCount mismatch",
                failures);
+        Expect(result.request.analyze.constraints.requiredTraits.size() == 1,
+               "analyze_search_request requiredTraits size mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.requiredTraits[0] == "traits/MagmaVents",
+               "analyze_search_request requiredTraits value mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.forbiddenTraits.size() == 1,
+               "analyze_search_request forbiddenTraits size mismatch",
+               failures);
+        Expect(result.request.analyze.constraints.forbiddenTraits[0] == "traits/GeoDormant",
+               "analyze_search_request forbiddenTraits value mismatch",
+               failures);
         Expect(!result.request.analyze.cpu.hasValue,
                "analyze_search_request should not require cpu section",
                failures);
@@ -298,6 +311,57 @@ int RunAllTests()
         if (!cfg.countRules.empty()) {
             Expect(cfg.countRules[0].minCount == 1, "sidecar count min mismatch", failures);
             Expect(cfg.countRules[0].maxCount == 2, "sidecar count max mismatch", failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        settings.traits["traits/GeoDormant"] = WorldTrait{
+            .filePath = "traits/GeoDormant",
+            .name = "Geo Dormant",
+        };
+        settings.traits["traits/MagmaVents"] = WorldTrait{
+            .filePath = "traits/MagmaVents",
+            .name = "Magma Vents",
+        };
+
+        Batch::SidecarSearchRequest request;
+        request.worldType = 13;
+        request.seedStart = 100000;
+        request.seedEnd = 100100;
+        request.constraints.requiredTraits.push_back("traits/MagmaVents");
+        request.constraints.forbiddenTraits.push_back("traits/GeoDormant");
+
+        std::vector<Batch::FilterError> errors;
+        const auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors, &settings);
+        Expect(errors.empty(), "sidecar trait mapping should not produce errors", failures);
+        Expect(cfg.requiredTraits.size() == 1, "sidecar trait required size mismatch", failures);
+        Expect(cfg.forbiddenTraits.size() == 1, "sidecar trait forbidden size mismatch", failures);
+        if (!cfg.requiredTraits.empty()) {
+            Expect(cfg.requiredTraits[0] == 1, "required trait summary index mismatch", failures);
+        }
+        if (!cfg.forbiddenTraits.empty()) {
+            Expect(cfg.forbiddenTraits[0] == 0, "forbidden trait summary index mismatch", failures);
+        }
+    }
+
+    {
+        Batch::SidecarSearchRequest request;
+        request.worldType = 13;
+        request.seedStart = 100000;
+        request.seedEnd = 100100;
+        request.constraints.requiredTraits.push_back("traits/UnknownTrait");
+
+        std::vector<Batch::FilterError> errors;
+        const auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors);
+        Expect(cfg.requiredTraits.empty(),
+               "unknown sidecar trait should not be appended to filter config",
+               failures);
+        Expect(errors.size() == 1, "unknown sidecar trait should produce one error", failures);
+        if (!errors.empty()) {
+            Expect(errors[0].field == "constraints.requiredTraits",
+                   "unknown sidecar trait error field mismatch",
+                   failures);
         }
     }
 
@@ -437,7 +501,7 @@ int RunAllTests()
             .exclusiveWithTags = {"unique"},
             .forbiddenDLCIds = {"EXPANSION1_ID"},
             .effectSummary = {"globalFeatureMods=1"},
-            .searchable = false,
+            .searchable = true,
         });
         catalog.mixingSlots.push_back(SearchAnalysis::MixingSlotMeta{
             .slot = 0,
@@ -460,14 +524,19 @@ int RunAllTests()
         analysis.normalizedRequest.mixing = 625;
         analysis.normalizedRequest.seedStart = 100000;
         analysis.normalizedRequest.seedEnd = 101000;
+        analysis.normalizedRequest.requiredTraits = {"traits/MagmaVents"};
+        analysis.normalizedRequest.forbiddenTraits = {"traits/GeoDormant"};
         analysis.worldProfile.valid = true;
         analysis.worldProfile.worldType = 13;
         analysis.worldProfile.worldCode = "V-SNDST-C-";
         analysis.worldProfile.width = 256;
         analysis.worldProfile.height = 384;
         analysis.worldProfile.diagonal = 461.7;
+        analysis.worldProfile.possibleTraitCountUpper = 2;
         analysis.worldProfile.activeMixingSlots = {0, 1};
         analysis.worldProfile.disabledMixingSlots = {6, 7, 8, 9, 10};
+        analysis.worldProfile.possibleTraitIds = {"traits/MagmaVents", "traits/GeoDormant"};
+        analysis.worldProfile.impossibleTraitIds = {"traits/FrozenCore"};
         analysis.worldProfile.possibleGeyserTypes = {"hot_water", "steam"};
         analysis.worldProfile.impossibleGeyserTypes = {"molten_niobium"};
         analysis.worldProfile.possibleMaxCountByType["hot_water"] = 3;
@@ -650,17 +719,47 @@ int RunAllTests()
         Expect(searchCatalogJson["catalog"]["parameterSpecs"][0]["supportsDynamicRange"].asBool(),
                "search catalog parameter spec dynamic flag mismatch",
                failures);
+        Expect(searchCatalogJson["catalog"]["traits"][0]["searchable"].asBool(),
+               "search catalog trait searchable flag mismatch",
+               failures);
         Expect(searchAnalysisJson["event"].asString() == "search_analysis",
                "search analysis event type mismatch",
                failures);
         Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["groups"].size() == 1,
                "search analysis normalized groups size mismatch",
                failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["requiredTraits"].size() == 1,
+               "search analysis normalized requiredTraits size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["requiredTraits"][0].asString() ==
+                   "traits/MagmaVents",
+               "search analysis normalized requiredTraits value mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["forbiddenTraits"].size() == 1,
+               "search analysis normalized forbiddenTraits size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["forbiddenTraits"][0].asString() ==
+                   "traits/GeoDormant",
+               "search analysis normalized forbiddenTraits value mismatch",
+               failures);
         Expect(searchAnalysisJson["analysis"]["normalizedRequest"]["threads"].isNull(),
                "search analysis normalized request should not serialize legacy threads",
                failures);
         Expect(searchAnalysisJson["analysis"]["worldProfile"]["valid"].asBool(),
                "search analysis worldProfile valid mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleTraitCountUpper"].asInt() == 2,
+               "search analysis worldProfile possibleTraitCountUpper mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleTraitIds"].size() == 2,
+               "search analysis worldProfile possibleTraitIds size mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleTraitIds"][0].asString() ==
+                   "traits/MagmaVents",
+               "search analysis worldProfile possibleTraitIds value mismatch",
+               failures);
+        Expect(searchAnalysisJson["analysis"]["worldProfile"]["impossibleTraitIds"].size() == 1,
+               "search analysis worldProfile impossibleTraitIds size mismatch",
                failures);
         Expect(searchAnalysisJson["analysis"]["worldProfile"]["possibleMaxCountByType"]["hot_water"].asInt() == 3,
                "search analysis worldProfile possibleMaxCountByType mismatch",

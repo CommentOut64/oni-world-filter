@@ -49,10 +49,22 @@ std::vector<TraitMeta> BuildTraitCatalog(const SettingsCache &settings)
         meta.exclusiveWithTags = trait.exclusiveWithTags;
         meta.forbiddenDLCIds = trait.forbiddenDLCIds;
         meta.effectSummary = BuildEffectSummary(trait);
-        meta.searchable = false;
+        meta.searchable = true;
         catalog.push_back(std::move(meta));
     }
     return catalog;
+}
+
+int ResolveTraitSummaryIndexById(const SettingsCache &settings, const std::string &traitId)
+{
+    int index = 0;
+    for (const auto &pair : settings.traits) {
+        if (pair.second.filePath == traitId) {
+            return index;
+        }
+        ++index;
+    }
+    return -1;
 }
 
 } // namespace SearchAnalysis

@@ -97,7 +97,7 @@ void AddParameterSpec(std::vector<ParameterSpec> *specs,
 std::vector<ParameterSpec> BuildParameterSpecs()
 {
     std::vector<ParameterSpec> specs;
-    specs.reserve(9);
+    specs.reserve(11);
     AddParameterSpec(&specs,
                      "worldType",
                      "enum",
@@ -141,6 +141,20 @@ std::vector<ParameterSpec> BuildParameterSpecs()
                      true,
                      "BatchMatcher");
     AddParameterSpec(&specs,
+                     "requiredTraits",
+                     "traitId[]",
+                     "主星必须包含的特质",
+                     "成员必须来自 traitCatalog",
+                     true,
+                     "BatchMatcher");
+    AddParameterSpec(&specs,
+                     "forbiddenTraits",
+                     "traitId[]",
+                     "主星必须排除的特质",
+                     "成员必须来自 traitCatalog",
+                     true,
+                     "BatchMatcher");
+    AddParameterSpec(&specs,
                      "distance",
                      "{geyser,minDist,maxDist}[]",
                      "喷口到起点距离约束",
@@ -157,9 +171,9 @@ std::vector<ParameterSpec> BuildParameterSpecs()
     AddParameterSpec(&specs,
                      "traitCatalog",
                      "catalog",
-                     "trait 目录（本期只读，不作为显式搜索字段；其生成影响会隐式进入 world envelope 分析）",
-                     "searchable=false",
-                     false,
+                     "trait 目录；searchable=true 的条目可作为主星特质显式搜索字段",
+                     "traitId -> searchable",
+                     true,
                      "asset/worldgen/traits/*.json");
     return specs;
 }

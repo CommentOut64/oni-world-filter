@@ -9,6 +9,8 @@
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "SearchAnalysis/SearchConstraintModel.hpp"
 
+class SettingsCache;
+
 namespace Batch {
 
 enum class PreviewTarget {
@@ -44,6 +46,8 @@ struct SidecarCountRule {
 struct SidecarConstraints {
     std::vector<std::string> required;
     std::vector<std::string> forbidden;
+    std::vector<std::string> requiredTraits;
+    std::vector<std::string> forbiddenTraits;
     std::vector<SidecarDistanceRule> distance;
     std::vector<SidecarCountRule> count;
 };
@@ -144,7 +148,8 @@ struct SidecarParseResult {
 
 SidecarParseResult ParseSidecarRequest(const std::string &jsonText);
 FilterConfig BuildFilterConfigFromSidecarSearch(const SidecarSearchRequest &request,
-                                                std::vector<FilterError> *errors = nullptr);
+                                                std::vector<FilterError> *errors = nullptr,
+                                                const SettingsCache *settings = nullptr);
 
 std::string SerializeStartedEvent(const std::string &jobId,
                                   const SearchStartedEvent &event);

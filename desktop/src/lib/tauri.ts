@@ -32,6 +32,9 @@ export function shouldIgnoreSidecarStderr(message: string): boolean {
     normalized.includes("compute child node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed after convert unknown cells") ||
+    normalized.includes("start location should not overlap bounds.") ||
+    normalized.includes("override placement is wrong, rule:") ||
+    normalized.includes("the site is already used.") ||
     normalized.includes("can not place all templates") ||
     (normalized.includes("Intersect:") && normalized.includes("intersection result is empty.")) ||
     (normalized.includes("Intersect:") && normalized.includes("subj:") && normalized.includes("clip:"))
@@ -52,11 +55,51 @@ function normalizeError(error: unknown): string {
   return "未知错误";
 }
 
-function localizeSidecarError(message: string): string {
-  if (message.includes("authoritative worldOffset is unavailable")) {
+export function formatNativeDisplayMessage(message: string): string {
+  const normalized = message.trim();
+  if (!normalized) {
+    return "未知错误";
+  }
+  if (normalized.includes("authoritative worldOffset is unavailable")) {
     return "当前版本缺少可验证的 worldOffset 数据，已停止返回喷口参数以避免错误结果。";
   }
-  return message;
+  if (normalized.includes("secondary preview is not available for current seed")) {
+    return "当前种子没有可用的副星预览。";
+  }
+  if (normalized.includes("invalid native coord")) {
+    return "坐标格式无效，尾部混搭编码必须是 0 或 5 位 base36。";
+  }
+  if (normalized.includes("another search job is still running")) {
+    return "已有搜索任务仍在运行，请稍后再试。";
+  }
+  if (normalized.includes("job is not running")) {
+    return "当前任务未在运行。";
+  }
+  if (normalized.includes("preview payload is empty")) {
+    return "预览结果为空。";
+  }
+  if (normalized.includes("world report payload is empty")) {
+    return "地图报告结果为空。";
+  }
+  if (normalized.includes("failed to load shared settings cache")) {
+    return "加载设置缓存失败。";
+  }
+  if (normalized.includes("failed to open settings asset blob")) {
+    return "打开设置资源失败。";
+  }
+  if (normalized.includes("failed to read settings asset blob")) {
+    return "读取设置资源失败。";
+  }
+  if (normalized.includes("settings asset blob is empty")) {
+    return "设置资源为空。";
+  }
+  if (normalized.includes("sidecar command crashed")) {
+    return "后端命令执行异常中断。";
+  }
+  if (normalized.includes("search thread crashed")) {
+    return "搜索线程异常中断。";
+  }
+  return normalized;
 }
 
 export async function startSearch(request: SearchRequest): Promise<void> {
@@ -172,5 +215,5 @@ export async function subscribeSidecar(
 }
 
 export function formatTauriError(error: unknown): string {
-  return localizeSidecarError(normalizeError(error));
+  return formatNativeDisplayMessage(normalizeError(error));
 }

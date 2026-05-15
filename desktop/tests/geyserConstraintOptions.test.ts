@@ -84,6 +84,8 @@ test("required section blocks geysers that already have count or distance semant
       forbidden: [],
       distance: [{ geyser: "hot_water", minDist: 0, maxDist: 80 }],
       count: [{ geyser: "salt_water", minCount: 1, maxCount: 2 }],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
   });
 
@@ -104,6 +106,8 @@ test("count section allows building count plus distance but blocks required and 
       forbidden: [{ geyser: "hot_water" }],
       distance: [{ geyser: "salt_water", minDist: 0, maxDist: 80 }],
       count: [],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
   });
 
@@ -124,6 +128,8 @@ test("distance section blocks forbidden and required but allows existing count s
       forbidden: [{ geyser: "hot_water" }],
       distance: [],
       count: [{ geyser: "salt_water", minCount: 1, maxCount: 2 }],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
   });
 
@@ -144,6 +150,8 @@ test("findFirstAvailableGeyserForSection skips geysers that are invalid for the 
       forbidden: [{ geyser: "hot_water" }],
       distance: [{ geyser: "salt_water", minDist: 0, maxDist: 80 }],
       count: [],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
   });
 

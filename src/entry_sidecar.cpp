@@ -882,8 +882,16 @@ void RunSearchCommand(const Batch::SidecarSearchRequest &request)
                    " seedStart=" + std::to_string(request.seedStart) +
                    " seedEnd=" + std::to_string(request.seedEnd) +
                    " mixing=" + std::to_string(request.mixing));
+    std::string errorMessage;
+    const auto settings = SharedSettingsCache::GetOrCreate(ReadSettingsBlob, &errorMessage);
+    if (!settings) {
+        const std::string message =
+            errorMessage.empty() ? "failed to load shared settings cache" : errorMessage;
+        EmitLine(Batch::SerializeFailedEvent(request.jobId, message));
+        return;
+    }
     std::vector<Batch::FilterError> errors;
-    auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors);
+    auto cfg = Batch::BuildFilterConfigFromSidecarSearch(request, &errors, settings.get());
     if (cfg.seedStart > cfg.seedEnd) {
         errors.push_back(Batch::FilterError{
             .code = Batch::FilterErrorCode::InvalidSeedRange,
@@ -1205,6 +1213,8 @@ SearchAnalysis::SearchAnalysisRequest BuildAnalysisRequest(
 
     analysisRequest.constraints.required = request.constraints.required;
     analysisRequest.constraints.forbidden = request.constraints.forbidden;
+    analysisRequest.constraints.requiredTraits = request.constraints.requiredTraits;
+    analysisRequest.constraints.forbiddenTraits = request.constraints.forbiddenTraits;
     analysisRequest.constraints.distance.reserve(request.constraints.distance.size());
     for (const auto &item : request.constraints.distance) {
         analysisRequest.constraints.distance.push_back(SearchAnalysis::DistanceConstraint{
@@ -1243,6 +1253,8 @@ void RunAnalyzeSearchCommand(const Batch::SidecarAnalyzeSearchRequest &request)
     const auto analysisRequest = BuildAnalysisRequest(request);
     const bool hasConstraints = !request.constraints.required.empty() ||
                                 !request.constraints.forbidden.empty() ||
+                                !request.constraints.requiredTraits.empty() ||
+                                !request.constraints.forbiddenTraits.empty() ||
                                 !request.constraints.distance.empty() ||
                                 !request.constraints.count.empty();
     const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(*settings,

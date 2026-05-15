@@ -27,6 +27,8 @@ const SAMPLE_DRAFT = {
     forbidden: [],
     distance: [],
     count: [],
+    requiredTraits: [],
+    forbiddenTraits: [],
   },
 };
 
@@ -72,6 +74,8 @@ function createRequest(): SearchRequest {
       forbidden: [],
       distance: [],
       count: [],
+      requiredTraits: [],
+      forbiddenTraits: [],
     },
   };
 }
@@ -96,6 +100,60 @@ test("restoreSearchSessionSnapshot restores results and draft from persisted sna
   assert.equal(restored.selectedSeed, 100456);
   assert.deepEqual(restored.results, results);
   assert.deepEqual(restored.lastSubmittedRequest, request);
+});
+
+test("restoreSearchSessionSnapshot backfills missing trait constraint arrays from legacy snapshot body", () => {
+  const storage = createMemoryStorage({
+    [SEARCH_SESSION_STORAGE_KEY]: JSON.stringify({
+      version: 2,
+      draft: {
+        worldType: 13,
+        seedStart: 100000,
+        seedEnd: 120000,
+        mixing: 625,
+        cpu: {
+          mode: "balanced",
+          allowSmt: true,
+          allowLowPerf: false,
+          placement: "strict",
+        },
+        constraints: {
+          required: [],
+          forbidden: [],
+          distance: [],
+          count: [],
+        },
+      },
+      results: [createMatch(100123)],
+      selectedSeed: 100123,
+      lastSubmittedRequest: {
+        jobId: "search-001",
+        worldType: 13,
+        seedStart: 100000,
+        seedEnd: 120000,
+        mixing: 625,
+        cpu: {
+          mode: "balanced",
+          allowSmt: true,
+          allowLowPerf: false,
+          placement: "strict",
+        },
+        constraints: {
+          required: [],
+          forbidden: [],
+          distance: [],
+          count: [],
+        },
+      },
+    }),
+  });
+
+  const restored = restoreSearchSessionSnapshot(storage);
+  assert.ok(restored);
+  assert.deepEqual(restored.draft.constraints.requiredTraits, []);
+  assert.deepEqual(restored.draft.constraints.forbiddenTraits, []);
+  assert.deepEqual(restored.lastSubmittedRequest?.constraints.requiredTraits, []);
+  assert.deepEqual(restored.lastSubmittedRequest?.constraints.forbiddenTraits, []);
 });
 
 test("restoreSearchSessionSnapshot clears invalid selected seed when result set changed", () => {
