@@ -2,9 +2,9 @@
 name = "oni-world-filter"
 version = "1.0.0"
 description = "oni-world-filter desktop host"
-authors = ["wgh"]
+authors = ["CommentOut64"]
 license = "MIT"
-edition = "2021"
+edition = "2026"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -84,4 +84,5 @@ Artifacts are unsigned by default, so Windows or security software may show addi
 
 ## License
 
-This project is licensed under the [MIT License](./LICENSE).
+This project is based on work originally released by genrwoody under the [MIT License](./LICENSE).
+
