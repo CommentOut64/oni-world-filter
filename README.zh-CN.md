@@ -83,4 +83,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-desktop.ps1 -Package al
 
 ## License
 
-本项目采用 [MIT License](./LICENSE)。
+本项目基于 genrwoody 以 [MIT License](./LICENSE) 发布的上游项目继续开发。
