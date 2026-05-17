@@ -3,8 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "Cluster/ClusterWorldOffsetSolver.hpp"
 #include "App/ResultSink.hpp"
 #include "Setting/SettingsCache.hpp"
+#include "Setting/WorldEffectiveState.hpp"
 #include "WorldGen.hpp"
 
 class AppRuntime
@@ -54,21 +56,21 @@ public:
 private:
     AppRuntime() = default;
 
-    bool BuildWorldList(std::vector<World *> &worlds);
+    bool BuildWorldList(std::vector<ResolvedWorldPlacement> &placements);
     bool GenerateCurrentState(int traitsFlag, bool genWarpWorld);
-    static int FindPrimaryPlacementIndex(const std::vector<World *> &worlds);
-    static std::vector<int> CollectPreviewPlacementIndexes(const std::vector<World *> &worlds,
-                                                           bool genWarpWorld);
-    bool GenerateWorldsForPlacementIndexes(std::vector<World *> &worlds,
+    static int FindPrimaryPlacementIndex(const std::vector<ResolvedWorldPlacement> &placements);
+    static std::vector<int> CollectPreviewPlacementIndexes(
+        const std::vector<ResolvedWorldPlacement> &placements,
+        bool genWarpWorld);
+    bool GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlacement> &placements,
                                            int traitsFlag,
                                            const std::vector<int> &placementIndexes,
                                            int primaryPlacementIndex);
     void SetSeedWithTraits(const std::vector<World *> &worlds, int traitsFlag);
     GeneratedWorldSummary BuildSummary(int seed,
-                                       int worldPlacementIndex,
-                                       World *world,
+                                       const WorldEffectiveState &state,
+                                       const ClusterWorldOffset &worldOffset,
                                        std::vector<Site> &sites,
-                                       const std::vector<const WorldTrait *> &traits,
                                        const WorldGen &worldGen);
     GeneratedWorldPreview BuildPreview(World *world,
                                        std::vector<Site> &sites,

@@ -12,16 +12,6 @@ struct TemplateSpawner {
     const TemplateContainer *container;
 };
 
-struct WorldGenDebugPhaseFingerprint {
-    std::string afterSeedPoints;
-    std::string afterInitialDiagram;
-    std::string afterDistanceTags;
-    std::string afterConvertUnknownCells;
-    std::string afterPostConvertDiagram;
-    std::string afterGenerateChildren;
-    std::string templatePlacements;
-};
-
 class WorldGen
 {
 public:
@@ -53,7 +43,6 @@ public:
     }
 
     bool GenerateOverworld(std::vector<Site> &sites);
-    bool DebugCapturePhaseFingerprint(WorldGenDebugPhaseFingerprint *fingerprint);
 
     std::vector<Vector3i> GetGeysers(int seed) const;
 #if 0

@@ -188,98 +188,116 @@ bool AppRuntime::GenerateSelectedPlacements(const std::string &code,
         return false;
     }
 
-    std::vector<World *> worlds;
-    if (!BuildWorldList(worlds)) {
+    std::vector<ResolvedWorldPlacement> placements;
+    if (!BuildWorldList(placements)) {
         return false;
     }
-    return GenerateWorldsForPlacementIndexes(worlds,
+    return GenerateWorldsForPlacementIndexes(placements,
                                              traitsFlag,
                                              placementIndexes,
                                              primaryPlacementIndex);
 }
 
-bool AppRuntime::BuildWorldList(std::vector<World *> &worlds)
+bool AppRuntime::BuildWorldList(std::vector<ResolvedWorldPlacement> &placements)
 {
-    worlds.clear();
-    if (m_settings.cluster == nullptr) {
-        LogE("cluster is null before BuildWorldList()");
+    std::string errorMessage;
+    if (!BuildResolvedWorldPlacements(m_settings, &placements, &errorMessage)) {
+        LogE("BuildWorldList failed: %s", errorMessage.c_str());
         return false;
-    }
-    for (auto &worldPlacement : m_settings.cluster->worldPlacements) {
-        auto itr = m_settings.worlds.find(worldPlacement.world);
-        if (itr == m_settings.worlds.end()) {
-            LogE("world %s was wrong.", worldPlacement.world.c_str());
-            return false;
-        }
-        itr->second.locationType = worldPlacement.locationType;
-        worlds.push_back(&itr->second);
-    }
-    if (worlds.size() == 1) {
-        worlds[0]->locationType = LocationType::StartWorld;
     }
     return true;
 }
 
 bool AppRuntime::GenerateCurrentState(int traitsFlag, bool genWarpWorld)
 {
-    std::vector<World *> worlds;
-    if (!BuildWorldList(worlds)) {
+    std::vector<ResolvedWorldPlacement> placements;
+    if (!BuildWorldList(placements)) {
         return false;
     }
-    const auto placementIndexes = CollectPreviewPlacementIndexes(worlds, genWarpWorld);
-    return GenerateWorldsForPlacementIndexes(worlds,
+    const auto placementIndexes = CollectPreviewPlacementIndexes(placements, genWarpWorld);
+    return GenerateWorldsForPlacementIndexes(placements,
                                              traitsFlag,
                                              placementIndexes,
-                                             FindPrimaryPlacementIndex(worlds));
+                                             FindPrimaryPlacementIndex(placements));
 }
 
-int AppRuntime::FindPrimaryPlacementIndex(const std::vector<World *> &worlds)
+int AppRuntime::FindPrimaryPlacementIndex(const std::vector<ResolvedWorldPlacement> &placements)
 {
-    for (size_t index = 0; index < worlds.size(); ++index) {
-        if (worlds[index] != nullptr &&
-            worlds[index]->locationType == LocationType::StartWorld) {
-            return static_cast<int>(index);
+    for (const auto &placement : placements) {
+        if (placement.sourceWorld != nullptr &&
+            placement.sourceWorld->locationType == LocationType::StartWorld) {
+            return placement.placementIndex;
         }
     }
     return -1;
 }
 
-std::vector<int> AppRuntime::CollectPreviewPlacementIndexes(const std::vector<World *> &worlds,
+std::vector<int> AppRuntime::CollectPreviewPlacementIndexes(
+    const std::vector<ResolvedWorldPlacement> &placements,
                                                             bool genWarpWorld)
 {
     std::vector<int> placementIndexes;
-    placementIndexes.reserve(worlds.size());
-    for (size_t index = 0; index < worlds.size(); ++index) {
-        const auto *world = worlds[index];
+    placementIndexes.reserve(placements.size());
+    for (const auto &placement : placements) {
+        const auto *world = placement.sourceWorld;
         if (world == nullptr || world->locationType == LocationType::Cluster) {
             continue;
         }
         if (world->locationType == LocationType::StartWorld) {
-            placementIndexes.push_back(static_cast<int>(index));
+            placementIndexes.push_back(placement.placementIndex);
             continue;
         }
         if (genWarpWorld && world->startingBaseTemplate.contains("::bases/warpworld")) {
-            placementIndexes.push_back(static_cast<int>(index));
+            placementIndexes.push_back(placement.placementIndex);
         }
     }
     return placementIndexes;
 }
 
-bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<World *> &worlds,
+bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlacement> &placements,
                                                    int traitsFlag,
                                                    const std::vector<int> &placementIndexes,
                                                    int primaryPlacementIndex)
 {
+    std::vector<WorldEffectiveState> states;
+    std::string errorMessage;
+    if (!InitializeWorldEffectiveStates(m_settings, placements, &states, &errorMessage)) {
+        LogE("InitializeWorldEffectiveStates failed: %s", errorMessage.c_str());
+        return false;
+    }
+    std::vector<ClusterWorldOffset> worldOffsets;
+    if (!ComputeClusterWorldOffsets(placements, &worldOffsets, &errorMessage)) {
+        LogE("ComputeClusterWorldOffsets failed: %s", errorMessage.c_str());
+        return false;
+    }
+    auto effectiveWorlds = CollectWorldEffectivePointers(states);
+
     if (traitsFlag != 0) {
-        SetSeedWithTraits(worlds, traitsFlag);
+        SetSeedWithTraits(effectiveWorlds, traitsFlag);
     }
 
-    m_settings.DoSubworldMixing(worlds);
     int seed = m_settings.seed;
+    for (auto &state : states) {
+        auto *world = &state.world;
+        if (world->locationType == LocationType::Cluster) {
+            continue;
+        }
+
+        m_settings.seed = seed + state.placementIndex;
+        state.randomTraits = m_settings.GetRandomTraits(*world);
+        for (const auto *trait : state.randomTraits) {
+            if (trait != nullptr) {
+                world->ApplayTraits(*trait, m_settings);
+            }
+        }
+    }
+    m_settings.seed = seed;
+    ApplySubworldMixingToWorldEffectiveStates(m_settings, states);
+
     std::vector<int> normalizedPlacementIndexes;
     normalizedPlacementIndexes.reserve(placementIndexes.size());
     for (const int placementIndex : placementIndexes) {
-        if (placementIndex < 0 || placementIndex >= static_cast<int>(worlds.size())) {
+        if (placementIndex < 0 || placementIndex >= static_cast<int>(placements.size())) {
             LogE("placement index %d is out of range.", placementIndex);
             return false;
         }
@@ -290,22 +308,18 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<World *> &worlds,
     }
 
     for (const int placementIndex : normalizedPlacementIndexes) {
-        auto *world = worlds[static_cast<size_t>(placementIndex)];
-        if (world == nullptr) {
-            LogE("world at placement index %d is null.", placementIndex);
+        auto *state = FindWorldEffectiveState(states, placementIndex);
+        if (state == nullptr) {
+            LogE("world effective state at placement index %d is null.", placementIndex);
             return false;
         }
+        auto *world = &state->world;
         if (world->locationType == LocationType::Cluster) {
             LogE("placement index %d points to cluster-only world.", placementIndex);
             return false;
         }
 
         m_settings.seed = seed + placementIndex;
-        auto traits = m_settings.GetRandomTraits(*world);
-        for (auto trait : traits) {
-            world->ApplayTraits(*trait, m_settings);
-        }
-
         WorldGen worldGen(*world, m_settings);
         std::vector<Site> sites;
         if (!worldGen.GenerateOverworld(sites)) {
@@ -317,7 +331,12 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<World *> &worlds,
             return false;
         }
 
-        auto summary = BuildSummary(seed, placementIndex, world, sites, traits, worldGen);
+        const auto *worldOffset = FindClusterWorldOffset(worldOffsets, placementIndex);
+        if (worldOffset == nullptr) {
+            LogE("cluster world offset at placement index %d is missing.", placementIndex);
+            return false;
+        }
+        auto summary = BuildSummary(seed, *state, *worldOffset, sites, worldGen);
         summary.isPrimary = primaryPlacementIndex >= 0
                                 ? placementIndex == primaryPlacementIndex
                                 : world->locationType == LocationType::StartWorld;
@@ -382,29 +401,27 @@ void AppRuntime::SetSeedWithTraits(const std::vector<World *> &worlds, int trait
 }
 
 GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
-                                               int worldPlacementIndex,
-                                               World *world,
+                                               const WorldEffectiveState &state,
+                                               const ClusterWorldOffset &worldOffset,
                                                std::vector<Site> &sites,
-                                               const std::vector<const WorldTrait *> &traits,
                                                const WorldGen &worldGen)
 {
     GeneratedWorldSummary summary;
+    World *world = const_cast<World *>(&state.world);
     summary.seed = seed;
+    summary.geyserSeed = seed + (int)m_settings.cluster->worldPlacements.size() - 1;
     summary.isPrimary = world->locationType == LocationType::StartWorld;
     summary.worldType = summary.isPrimary ? 0 : 1;
-    summary.worldPlacementIndex = worldPlacementIndex;
-    if (m_settings.cluster != nullptr &&
-        worldPlacementIndex >= 0 &&
-        worldPlacementIndex < static_cast<int>(m_settings.cluster->worldPlacements.size())) {
-        summary.worldAssetId =
-            m_settings.cluster->worldPlacements[static_cast<size_t>(worldPlacementIndex)].world;
-    }
+    summary.worldPlacementIndex = state.placementIndex;
+    summary.worldAssetId = state.worldAssetId;
     summary.start = {sites[0].x, sites[0].y};
     summary.worldSize = world->worldsize;
     summary.start.y = summary.worldSize.y - summary.start.y;
+    summary.worldOffsetX = worldOffset.offset.x;
+    summary.worldOffsetY = worldOffset.offset.y;
 
-    summary.traits.reserve(traits.size());
-    for (auto &item : traits) {
+    summary.traits.reserve(state.randomTraits.size());
+    for (auto &item : state.randomTraits) {
         uint32_t index = 0;
         for (auto &pair : m_settings.traits) {
             if (item == &pair.second) {
@@ -415,8 +432,7 @@ GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
         }
     }
 
-    int geyserSeed = seed + (int)m_settings.cluster->worldPlacements.size() - 1;
-    auto geysers = worldGen.GetGeysers(geyserSeed);
+    auto geysers = worldGen.GetGeysers(summary.geyserSeed);
     summary.geysers.reserve(geysers.size());
     for (auto &item : geysers) {
         summary.geysers.push_back({item.z, item.x, item.y});

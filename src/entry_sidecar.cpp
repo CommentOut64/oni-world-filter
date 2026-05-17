@@ -26,7 +26,6 @@
 #include "Batch/ThreadPolicy.hpp"
 #include "BatchCpu/CpuOptimization.hpp"
 #include "Geyser/GeyserParameterCalculator.hpp"
-#include "Geyser/PreviewWorldOffsetPolicy.hpp"
 #include "SearchAnalysis/HardValidator.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "SearchAnalysis/WorldEnvelopeProfile.hpp"
@@ -416,34 +415,6 @@ bool LoadSettingsForCode(const std::string &code,
     return true;
 }
 
-bool BuildWorldList(SettingsCache &settings,
-                    std::vector<World *> &worlds,
-                    std::string *errorMessage)
-{
-    worlds.clear();
-    if (settings.cluster == nullptr) {
-        if (errorMessage != nullptr) {
-            *errorMessage = "cluster is null";
-        }
-        return false;
-    }
-    for (auto &worldPlacement : settings.cluster->worldPlacements) {
-        auto itr = settings.worlds.find(worldPlacement.world);
-        if (itr == settings.worlds.end()) {
-            if (errorMessage != nullptr) {
-                *errorMessage = "world placement target is missing";
-            }
-            return false;
-        }
-        itr->second.locationType = worldPlacement.locationType;
-        worlds.push_back(&itr->second);
-    }
-    if (worlds.size() == 1) {
-        worlds[0]->locationType = LocationType::StartWorld;
-    }
-    return true;
-}
-
 struct PreviewPlacementSelection {
     int primaryPlacementIndex{-1};
     std::optional<int> secondaryPlacementIndex;
@@ -452,54 +423,15 @@ struct PreviewPlacementSelection {
 bool ResolvePreviewPlacementSelection(const SettingsCache &settings,
                                       PreviewPlacementSelection *selection,
                                       std::string *errorMessage);
+bool GeneratePreviewSession(const Batch::SidecarPreviewRequest &request,
+                            PreviewWorldSession *session,
+                            std::string *errorMessage);
 
 struct GeyserSeedContext {
     int geyserSeed{};
     int worldOffsetX{};
     int worldOffsetY{};
 };
-
-bool ResolvePreviewWorldOffset(const SettingsCache &settings,
-                               const PreviewPlacementSelection &selection,
-                               Batch::PreviewTarget target,
-                               GeyserSeedContext *context,
-                               std::string *errorMessage)
-{
-    if (context == nullptr || settings.cluster == nullptr) {
-        if (errorMessage != nullptr) {
-            *errorMessage = "cluster is null before resolving preview world offset";
-        }
-        return false;
-    }
-
-    (void)selection;
-    context->worldOffsetX = 0;
-    context->worldOffsetY = 0;
-
-    if (IsPrimaryTarget(target)) {
-        PreviewWorldOffsetPolicy::PreviewWorldOffset offset;
-        if (!PreviewWorldOffsetPolicy::ResolveLegacyPrimaryWorldOffset(settings, &offset)) {
-            if (errorMessage != nullptr) {
-                *errorMessage = "legacy primary worldOffset resolution failed";
-            }
-            return false;
-        }
-        context->worldOffsetX = offset.x;
-        context->worldOffsetY = offset.y;
-        return true;
-    }
-
-    if (settings.IsSpaceOutEnabled()) {
-        if (errorMessage != nullptr) {
-            *errorMessage = "authoritative worldOffset is unavailable for current target";
-        }
-        return false;
-    }
-    if (errorMessage != nullptr) {
-        *errorMessage = "secondary world offset is not mapped for current cluster";
-    }
-    return false;
-}
 
 bool ResolveGeyserSeedContext(int worldType,
                               int seed,
@@ -515,44 +447,35 @@ bool ResolveGeyserSeedContext(int worldType,
         return false;
     }
 
-    std::string code;
-    if (!BuildWorldCode(worldType, seed, mixing, &code)) {
-        if (errorMessage != nullptr) {
-            *errorMessage = "invalid worldType";
-        }
+    Batch::SidecarPreviewRequest previewRequest;
+    previewRequest.worldType = worldType;
+    previewRequest.seed = seed;
+    previewRequest.mixing = mixing;
+    previewRequest.target = target;
+
+    PreviewWorldSession session;
+    if (!GeneratePreviewSession(previewRequest, &session, errorMessage)) {
         return false;
     }
 
-    SettingsCache settings;
-    if (!LoadSettingsForCode(code, &settings, errorMessage)) {
-        return false;
-    }
-
-    PreviewPlacementSelection selection;
-    if (!ResolvePreviewPlacementSelection(settings, &selection, errorMessage)) {
-        return false;
-    }
-    if (!IsPrimaryTarget(target) && !selection.secondaryPlacementIndex.has_value()) {
+    const GeneratedWorldPreview *preview = IsPrimaryTarget(target)
+                                               ? (session.primaryPreview.has_value()
+                                                      ? &session.primaryPreview.value()
+                                                      : nullptr)
+                                               : (session.secondaryPreview.has_value()
+                                                      ? &session.secondaryPreview.value()
+                                                      : nullptr);
+    if (preview == nullptr) {
         if (errorMessage != nullptr) {
             *errorMessage = "secondary preview is not available for current seed";
         }
         return false;
     }
 
-    std::vector<World *> worlds;
-    if (!BuildWorldList(settings, worlds, errorMessage)) {
-        return false;
-    }
-    settings.DoSubworldMixing(worlds);
-    if (settings.cluster == nullptr) {
-        if (errorMessage != nullptr) {
-            *errorMessage = "cluster is null after mixing";
-        }
-        return false;
-    }
-
-    context->geyserSeed = settings.seed + static_cast<int>(settings.cluster->worldPlacements.size()) - 1;
-    return ResolvePreviewWorldOffset(settings, selection, target, context, errorMessage);
+    context->geyserSeed = preview->summary.geyserSeed;
+    context->worldOffsetX = preview->summary.worldOffsetX;
+    context->worldOffsetY = preview->summary.worldOffsetY;
+    return true;
 }
 
 struct PreviewWorldContext {
@@ -824,20 +747,10 @@ bool ResolvePreviewWorldContext(const PreviewWorldSession &session,
         return false;
     }
 
-    GeyserSeedContext geyserContext;
-    if (!ResolveGeyserSeedContext(session.worldType,
-                                  session.seed,
-                                  session.mixing,
-                                  target,
-                                  &geyserContext,
-                                  errorMessage)) {
-        return false;
-    }
-
     context->summary = preview->summary;
-    context->geyserSeed = geyserContext.geyserSeed;
-    context->worldOffsetX = geyserContext.worldOffsetX;
-    context->worldOffsetY = geyserContext.worldOffsetY;
+    context->geyserSeed = preview->summary.geyserSeed;
+    context->worldOffsetX = preview->summary.worldOffsetX;
+    context->worldOffsetY = preview->summary.worldOffsetY;
     return true;
 }
 
@@ -1013,7 +926,7 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
     if (!NativeCoordinate::ResolveNativeCoordinate(request.coord, &resolved)) {
         EmitLine(Batch::SerializeFailedEvent(
             request.jobId,
-            "invalid native coord; trailing mixing code must be 0 or 5-char base36"));
+            "invalid native coord; trailing mixing code must be 1 to 5-char base36 within mixing range"));
         return;
     }
 
@@ -1157,26 +1070,13 @@ void RunGetWorldReportCommand(const Batch::SidecarWorldReportRequest &request)
 
     std::string code = session.coord;
 
-    GeyserSeedContext geyserContext;
-    if (!ResolveGeyserSeedContext(request.worldType,
-                                  request.seed,
-                                  request.mixing,
-                                  Batch::PreviewTarget::Primary,
-                                  &geyserContext,
-                                  &errorMessage)) {
-        EmitLine(Batch::SerializeFailedEvent(request.jobId,
-                                             errorMessage.empty() ? "resolve geyser seed failed"
-                                                                  : errorMessage));
-        return;
-    }
-
     const auto report =
         GeyserCalc::BuildWorldReportData(*session.primaryPreview,
-                                         geyserContext.geyserSeed,
+                                         session.primaryPreview->summary.geyserSeed,
                                          request.mixing,
                                          code,
-                                         geyserContext.worldOffsetX,
-                                         geyserContext.worldOffsetY);
+                                         session.primaryPreview->summary.worldOffsetX,
+                                         session.primaryPreview->summary.worldOffsetY);
     EmitLine(Batch::SerializeWorldReportEvent(request.jobId, request, report));
 }
 

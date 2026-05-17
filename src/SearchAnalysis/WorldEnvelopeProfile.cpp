@@ -12,7 +12,9 @@
 
 #include "Batch/FilterConfig.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
+#include "Setting/ContentActivation.hpp"
 #include "Setting/SettingsCache.hpp"
+#include "Setting/WorldEffectiveState.hpp"
 #include "WorldGen.hpp"
 
 namespace SearchAnalysis {
@@ -310,36 +312,44 @@ void BuildTraitPossibility(const SettingsCache &settings,
     }
 }
 
-std::vector<World *> CollectClusterWorlds(SettingsCache *settings)
+bool BuildEffectiveWorldStatesForAnalysis(SettingsCache *settings,
+                                          std::vector<WorldEffectiveState> *states,
+                                          std::string *errorMessage)
 {
-    std::vector<World *> worlds;
-    if (settings == nullptr || settings->cluster == nullptr) {
-        return worlds;
-    }
-    worlds.reserve(settings->cluster->worldPlacements.size());
-    for (const auto &placement : settings->cluster->worldPlacements) {
-        const auto itr = settings->worlds.find(placement.world);
-        if (itr == settings->worlds.end()) {
-            continue;
+    if (states == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "world effective state output is null";
         }
-        itr->second.locationType = placement.locationType;
-        worlds.push_back(&itr->second);
+        return false;
     }
-    if (worlds.size() == 1) {
-        worlds.front()->locationType = LocationType::StartWorld;
+    states->clear();
+    if (settings == nullptr || settings->cluster == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "cluster 未绑定可用 world";
+        }
+        return false;
     }
-    return worlds;
+
+    std::vector<ResolvedWorldPlacement> placements;
+    if (!BuildResolvedWorldPlacements(*settings, &placements, errorMessage)) {
+        return false;
+    }
+    if (!InitializeWorldEffectiveStates(*settings, placements, states, errorMessage)) {
+        return false;
+    }
+    ApplySubworldMixingToWorldEffectiveStates(*settings, *states);
+    return true;
 }
 
-World *PickTargetWorld(const std::vector<World *> &worlds)
+World *PickTargetWorld(std::vector<WorldEffectiveState> &states)
 {
-    for (auto *world : worlds) {
-        if (world != nullptr && world->locationType == LocationType::StartWorld) {
-            return world;
+    for (auto &state : states) {
+        if (state.world.locationType == LocationType::StartWorld) {
+            return &state.world;
         }
     }
-    if (!worlds.empty()) {
-        return worlds.front();
+    if (!states.empty()) {
+        return &states.front().world;
     }
     return nullptr;
 }
@@ -504,11 +514,11 @@ std::vector<std::string> ExtractTemplateGeyserIds(const SettingsCache &settings,
         return result;
     }
     if (templateName.starts_with("expansion1::poi/warp/receiver")) {
-        result.push_back("warp_sender");
+        result.push_back("warp_receiver");
         return result;
     }
     if (templateName.starts_with("expansion1::poi/warp/sender")) {
-        result.push_back("warp_receiver");
+        result.push_back("warp_sender");
         return result;
     }
     if (templateName.starts_with("expansion1::poi/warp/teleporter")) {
@@ -810,16 +820,12 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
         return profile;
     }
 
-    auto worlds = CollectClusterWorlds(&settings);
-    if (worlds.empty()) {
-        if (errorMessage != nullptr) {
-            *errorMessage = "cluster 未绑定可用 world";
-        }
+    std::vector<WorldEffectiveState> states;
+    if (!BuildEffectiveWorldStatesForAnalysis(&settings, &states, errorMessage)) {
         return profile;
     }
 
-    settings.DoSubworldMixing(worlds);
-    World *targetWorld = PickTargetWorld(worlds);
+    World *targetWorld = PickTargetWorld(states);
     if (targetWorld == nullptr) {
         if (errorMessage != nullptr) {
             *errorMessage = "无法确定目标 world";
@@ -835,6 +841,7 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
 
     profile.activeMixingSlots.clear();
     profile.disabledMixingSlots.clear();
+    profile.illegalEnabledMixingSlots.clear();
     for (size_t slot = 0; slot < settings.mixConfigs.size(); ++slot) {
         const auto level = settings.mixConfigs[slot].level;
         if (level != MixingLevel::Disabled) {
@@ -852,6 +859,36 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
                 if (probeSettings.mixConfigs[slot].level == MixingLevel::Disabled) {
                     profile.disabledMixingSlots.push_back(static_cast<int>(slot));
                 }
+            }
+        }
+    }
+
+    {
+        const ActiveContentSet activeContent = settings.BuildActiveContentSet();
+        for (size_t slot = 0; slot < settings.mixConfigs.size(); ++slot) {
+            const auto &config = settings.mixConfigs[slot];
+            if (config.level == MixingLevel::Disabled) {
+                continue;
+            }
+            const WorldMixingSettings *worldSetting = nullptr;
+            const SubworldMixingSettings *subworldSetting = nullptr;
+            if (config.type == 1) {
+                const auto itr = settings.worldMixing.find(config.path);
+                if (itr != settings.worldMixing.end()) {
+                    worldSetting = &itr->second;
+                }
+            } else if (config.type == 2) {
+                const auto itr = settings.subworldMixing.find(config.path);
+                if (itr != settings.subworldMixing.end()) {
+                    subworldSetting = &itr->second;
+                }
+            }
+            if (!IsMixingConfigAllowed(config,
+                                       settings.cluster,
+                                       activeContent,
+                                       worldSetting,
+                                       subworldSetting)) {
+                profile.illegalEnabledMixingSlots.push_back(static_cast<int>(slot));
             }
         }
     }

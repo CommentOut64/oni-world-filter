@@ -435,6 +435,26 @@ int RunAllTests()
         request.worldType = 1;
         request.seedStart = 10;
         request.seedEnd = 20;
+
+        SearchAnalysis::WorldEnvelopeProfile profile;
+        profile.valid = true;
+        profile.worldType = 1;
+        profile.diagonal = 100.0;
+        profile.illegalEnabledMixingSlots = {6, 10};
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(request,
+                                                              BuildMockCatalog(),
+                                                              &profile);
+        Expect(HasIssue(result.errors, "world.illegal_mixing_slot_enabled"),
+               "illegal enabled mixing slots should be rejected in layer2",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
         request.constraints.requiredTraits = {"traits/GeoDormant", "traits/MagmaVents"};
 
         SearchAnalysis::WorldEnvelopeProfile profile;

@@ -1872,6 +1872,8 @@ struct Deserializer<WorldMixingSettings>
             count += Setting::deserialize(*ptr, obj.icon) ? 1 : 0;
         if ((ptr = value.find("forbiddenClusterTags")) != nullptr)
             count += Setting::deserialize(*ptr, obj.forbiddenClusterTags) ? 1 : 0;
+        if ((ptr = value.find("required_content")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.required_content) ? 1 : 0;
         if ((ptr = value.find("world")) != nullptr)
             count += Setting::deserialize(*ptr, obj.world) ? 1 : 0;
 
@@ -2090,6 +2092,8 @@ struct Deserializer<SubworldMixingSettings>
             count += Setting::deserialize(*ptr, obj.icon) ? 1 : 0;
         if ((ptr = value.find("forbiddenClusterTags")) != nullptr)
             count += Setting::deserialize(*ptr, obj.forbiddenClusterTags) ? 1 : 0;
+        if ((ptr = value.find("required_content")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.required_content) ? 1 : 0;
         if ((ptr = value.find("subworld")) != nullptr)
             count += Setting::deserialize(*ptr, obj.subworld) ? 1 : 0;
         if ((ptr = value.find("mixingTags")) != nullptr)

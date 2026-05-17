@@ -97,6 +97,40 @@ static MixingConfig *FindSubworldMixing(SubworldMixingRule &rule,
     return nullptr;
 }
 
+static void CleanupUnusedMixingProxyNames(World &world)
+{
+    for (auto *filter : world.unknownCellsAllowedSubworlds2) {
+        auto *mutableFilter = const_cast<AllowedCellsFilter *>(filter);
+        if (mutableFilter == nullptr) {
+            continue;
+        }
+        auto remove = std::remove_if(
+            mutableFilter->subworldNames.begin(),
+            mutableFilter->subworldNames.end(),
+            [](const std::string &name) { return name.starts_with('('); });
+        mutableFilter->subworldNames.erase(remove, mutableFilter->subworldNames.end());
+    }
+}
+
+void World::ApplayWorldMixing(const WorldMixing &mixing)
+{
+    for (auto &subworld : mixing.additionalSubworldFiles) {
+        subworldFiles2.push_back(&subworld);
+    }
+    for (auto &filter : mixing.additionalUnknownCellFilters) {
+        unknownCellsAllowedSubworlds2.push_back(&filter);
+    }
+    BubbleSort(unknownCellsAllowedSubworlds2);
+    for (auto &rule : mixing.additionalWorldTemplateRules) {
+        worldTemplateRules2.push_back(&rule);
+    }
+    for (const auto &season : mixing.additionalSeasons) {
+        if (!std::ranges::contains(seasons, season)) {
+            seasons.push_back(season);
+        }
+    }
+}
+
 void World::ApplayMixings(std::vector<MixingConfig *> &mixings)
 {
     std::set<SubworldMixingRule *> appliedRules;
@@ -135,6 +169,7 @@ void World::ApplayMixings(std::vector<MixingConfig *> &mixings)
             mixings.erase(itr);
         }
     }
+    CleanupUnusedMixingProxyNames(*this);
 }
 
 void World::ApplayTraits(const WorldTrait &trait, const SettingsCache &settings)

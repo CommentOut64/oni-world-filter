@@ -36,6 +36,12 @@ test("shouldIgnoreSidecarStderr ignores recoverable template placement diagnosti
     ),
     true
   );
+  assert.equal(
+    shouldIgnoreSidecarStderr(
+      "[search-1778998291263-3gl4cy] error RelaxGeneratedChildren:256 relax child node pdfailed, fallback to compute node."
+    ),
+    true
+  );
 });
 
 test("shouldIgnoreSidecarStderr ignores sidecar diagnostic progress lines", () => {
@@ -52,10 +58,6 @@ test("shouldIgnoreSidecarStderr keeps real stderr errors visible", () => {
 });
 
 test("formatNativeDisplayMessage localizes common sidecar runtime failures", () => {
-  assert.equal(
-    formatNativeDisplayMessage("authoritative worldOffset is unavailable for current target"),
-    "当前版本缺少可验证的 worldOffset 数据，已停止返回喷口参数以避免错误结果。"
-  );
   assert.equal(
     formatNativeDisplayMessage("secondary preview is not available for current seed"),
     "当前种子没有可用的副星预览。"
