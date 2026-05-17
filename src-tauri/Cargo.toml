@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "oni-world-filter desktop host"
 authors = ["CommentOut64"]
 license = "MIT"
-edition = "2026"
+edition = "2024"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -1,3 +1,7 @@
+param(
+    [int]$Port = 1420
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -7,7 +11,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Push-Location $repoRoot
 try {
     Sync-AppIconAssets -RepoRoot $repoRoot
-    Invoke-Yarn -Args @("--cwd", "desktop", "dev")
+    Invoke-Yarn -Args @("--cwd", "desktop", "dev", "--host", "127.0.0.1", "--port", "$Port", "--strictPort")
 } finally {
     Pop-Location
 }

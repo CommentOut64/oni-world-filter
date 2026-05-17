@@ -55,3 +55,7 @@ Desktop.ini
 /desktop/public/*.webp
 /desktop/public/*.gif
 /desktop/public/*.bmp
+
+# Local temporary reverse-engineering workspace
+.tmp_ilspy/
+.tmp_ilspy_current/
