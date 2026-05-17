@@ -67,7 +67,7 @@ export function formatNativeDisplayMessage(message: string): string {
     return "当前种子没有可用的副星预览。";
   }
   if (normalized.includes("invalid native coord")) {
-    return "坐标格式无效，尾部混搭编码必须是 0 或 5 位 base36。";
+    return "坐标格式无效，尾部混搭编码需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。";
   }
   if (normalized.includes("another search job is still running")) {
     return "已有搜索任务仍在运行，请稍后再试。";

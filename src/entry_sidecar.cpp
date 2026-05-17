@@ -926,7 +926,7 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
     if (!NativeCoordinate::ResolveNativeCoordinate(request.coord, &resolved)) {
         EmitLine(Batch::SerializeFailedEvent(
             request.jobId,
-            "invalid native coord; trailing mixing code must be 0 or 5-char base36"));
+            "invalid native coord; trailing mixing code must be 1 to 5-char base36 within mixing range"));
         return;
     }
 

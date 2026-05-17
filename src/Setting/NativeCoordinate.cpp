@@ -15,6 +15,8 @@ namespace NativeCoordinate {
 
 namespace {
 
+constexpr uint32_t kMixingMax = 48828124;
+
 bool IsAsciiDigits(std::string_view text)
 {
     return !text.empty() &&
@@ -54,10 +56,10 @@ bool SplitCoordSuffix(std::string_view suffix,
 
 bool IsValidNativeMixingPart(std::string_view mixingPart)
 {
-    if (mixingPart == "0") {
-        return true;
+    if (mixingPart.empty() || mixingPart.size() > 5 || !IsUpperBase36(mixingPart)) {
+        return false;
     }
-    return mixingPart.size() == 5 && IsUpperBase36(mixingPart);
+    return SettingsCache::Base36ToBinary(std::string(mixingPart)) <= kMixingMax;
 }
 
 } // namespace
