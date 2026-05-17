@@ -3,12 +3,28 @@
 #include <iostream>
 #include <algorithm>
 #include <functional>
+#include <iomanip>
+#include <sstream>
 #include <string_view>
 
 #include "Utils/PointGenerator.hpp"
 #include "Utils/SortHelper.hpp"
 
 using TagSet = std::vector<std::string>;
+
+namespace {
+
+Vector2f ResolveTemplateRulePosition(const Site &site,
+                                     const TemplateSpawnRules &rule)
+{
+    const auto &centroid = site.polygon.Centroid();
+    return Vector2f{static_cast<float>(static_cast<int>(centroid.x) +
+                                       static_cast<int>(rule.overrideOffset.x)),
+                    static_cast<float>(static_cast<int>(centroid.y) +
+                                       static_cast<int>(rule.overrideOffset.y))};
+}
+
+} // namespace
 
 class TemplateSpawning
 {
@@ -22,8 +38,7 @@ private:
     std::vector<TemplateSpawner> m_templates;
 
 public:
-    TemplateSpawning(KRandom &random, const World &world,
-                     const SettingsCache &settings)
+    TemplateSpawning(KRandom &random, const World &world, const SettingsCache &settings)
         : m_world{world}
         , m_settings{settings}
         , m_random{random}
@@ -60,7 +75,8 @@ private:
     bool ApplyTemplateRules(const TemplateSpawnRules &rule,
                             std::set<std::string> &usedTemplates);
     Site *FindTargetForTemplate(const TemplateContainer &templt,
-                                const TemplateSpawnRules &rule, bool guarantee);
+                                const TemplateSpawnRules &rule,
+                                bool guarantee);
 };
 
 bool TemplateSpawning::IsPOIOverlappingBounds(const Rect &templateBounds) const
@@ -181,8 +197,8 @@ static bool DoesCellMatchFilter(const Site &site,
         }
         return true;
     case TagCommand::DistanceFromTag: {
-        auto itr = site.parent->minDistanceToTag.find(filter.tag);
-        if (itr != site.parent->minDistanceToTag.end()) {
+        auto itr = site.minDistanceToTag.find(filter.tag);
+        if (itr != site.minDistanceToTag.end()) {
             if (itr->second >= filter.minDistance) {
                 return itr->second <= filter.maxDistance;
             }
@@ -236,7 +252,7 @@ bool TemplateSpawning::RemoveOverlappingPOI(
     const Site *site, const TemplateContainer &templt,
     const TemplateSpawnRules &rule) const
 {
-    auto position = site->polygon.Centroid() + rule.overrideOffset;
+    auto position = ResolveTemplateRulePosition(*site, rule);
     Rect templateBounds = templt.info.GetBounds(position, m_poiPadding);
     if (IsPOIOverlappingBounds(templateBounds)) {
         return true;
@@ -412,8 +428,7 @@ bool TemplateSpawning::ApplyTemplateRules(const TemplateSpawnRules &rule,
         } else {
             site = FindTargetForTemplate(templt, rule, guarantee);
             if (site != nullptr) {
-                auto &centroid = site->polygon.Centroid();
-                position = centroid + rule.overrideOffset;
+                position = ResolveTemplateRulePosition(*site, rule);
             }
         }
         if (site != nullptr) {
@@ -547,7 +562,8 @@ void TemplateSpawning::DrawWorldBorder()
     }
 }
 
-bool WorldGen::DetermineTemplates(std::vector<Site *> &sites, KRandom &random)
+bool WorldGen::DetermineTemplates(std::vector<Site *> &sites,
+                                  KRandom &random)
 {
     TemplateSpawning spawning(random, m_world, m_settings);
     spawning.DetermineTemplatesForWorld(sites);

@@ -1518,6 +1518,8 @@ pub(crate) fn sanitize_sidecar_stderr(stderr_text: &str) -> String {
 
 fn should_ignore_sidecar_stderr_line(line: &str) -> bool {
     line.starts_with(SIDECAR_DIAGNOSTIC_PREFIX)
+        || (line.contains("RelaxGeneratedChildren") && line.contains("fallback to compute node."))
+        || line.contains("relax child node pd failed, fallback to compute node.")
         || line.contains("compute child node pd failed, fallback to compute node.")
         || line.contains("compute node pd failed, fallback to compute node.")
         || line.contains("compute node pd failed after convert unknown cells")
@@ -2012,6 +2014,9 @@ mod tests {
     fn ignore_sidecar_stderr_line_should_match_recoverable_template_diagnostics() {
         assert!(should_ignore_sidecar_stderr_line(
             "error ApplyTemplateRules:430 can not place all templates"
+        ));
+        assert!(should_ignore_sidecar_stderr_line(
+            "[sidecar:search-1779000786583-m1xxam] error RelaxGeneratedChildren:256 relax child node pd failed, fallback to compute node."
         ));
         assert!(!should_ignore_sidecar_stderr_line(
             "sidecar 进程异常退出(code=Some(-1073741819))"

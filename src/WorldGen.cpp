@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <map>
 #include <unordered_set>
-#include <queue>
 #include <numeric>
 
 #include "Utils/Voronoi.hpp"
@@ -37,72 +36,120 @@ static std::vector<Site *> ForceLowestToLeaf(std::vector<Site> &sites);
 static void ApplySwapTags(std::vector<Site> &sites, KRandom &random);
 extern void WriteToBinary(const std::vector<Site> &sites);
 
-std::string FingerprintTags(const std::set<std::string> &tags)
+static void MoveChildToCentroid(Site &child)
 {
-    std::ostringstream builder;
-    for (const auto &tag : tags) {
-        builder << tag << ',';
-    }
-    return builder.str();
+    const auto &centroid = child.polygon.Centroid();
+    child.x = centroid.x;
+    child.y = centroid.y;
+    child.z = static_cast<double>(child.x) * child.x +
+              static_cast<double>(child.y) * child.y - child.currentWeight;
 }
 
-std::string FingerprintDistances(const std::map<std::string, int> &distances)
+static void PlaceGeneratedChildren(Site &site, int seed)
 {
-    std::ostringstream builder;
-    for (const auto &[tag, distance] : distances) {
-        builder << tag << ':' << distance << ',';
+    if (site.children == nullptr || site.children->empty()) {
+        return;
     }
-    return builder.str();
-}
-
-std::string FingerprintSite(const Site &site, bool includeChildren)
-{
-    std::ostringstream builder;
-    builder << std::fixed << std::setprecision(3);
-    const auto bounds = site.polygon.Bounds();
-    builder << site.idx << '@' << site.x << ',' << site.y;
-    builder << "|w=" << site.weight << "|cw=" << site.currentWeight;
-    builder << "|sub=" << (site.subworld != nullptr ? site.subworld->name : "null");
-    builder << "|feature=" << (site.globalFeature != nullptr ? site.globalFeature->type : "null");
-    builder << "|neighbors=" << site.neighbours.size();
-    builder << "|bounds=" << bounds.x << ',' << bounds.y << ',' << bounds.width << ',' << bounds.height;
-    builder << "|tags=" << FingerprintTags(site.tags);
-    builder << "|dist=" << FingerprintDistances(site.minDistanceToTag);
-    builder << "|template=" << site.templateTag;
-    if (!includeChildren) {
-        return builder.str();
-    }
-    builder << "|children=";
-    if (site.children == nullptr) {
-        builder << "null";
-        return builder.str();
-    }
+    KRandom random(seed);
+    std::vector<Vector2f> replacementPoints;
+    std::vector<Vector2f> occupiedPoints;
+    occupiedPoints.reserve(site.children->size());
     for (const auto &child : *site.children) {
-        builder << '{' << FingerprintSite(child, false) << '}';
+        occupiedPoints.emplace_back(child.x, child.y);
     }
-    return builder.str();
+    int replacementIndex = 0;
+    for (auto &child : *site.children) {
+        if (!site.polygon.Contains(child.x, child.y)) {
+            if (replacementPoints.empty()) {
+                replacementPoints =
+                    GetRandomPoints(site.polygon, 5.0f, 1.0f, occupiedPoints,
+                                    SampleBehaviour::PoissonDisk, true, random);
+            }
+            if (replacementIndex >=
+                static_cast<int>(replacementPoints.size()) - 1) {
+                occupiedPoints.insert(occupiedPoints.end(),
+                                      replacementPoints.begin(),
+                                      replacementPoints.end());
+                replacementPoints =
+                    GetRandomPoints(site.polygon, 0.5f, 0.5f, occupiedPoints,
+                                    SampleBehaviour::PoissonDisk, true, random);
+                replacementIndex = 0;
+            }
+            if (replacementPoints.empty()) {
+                const auto &fallback = site.children->front();
+                const float fallbackOffset = random.NextSingle();
+                child.x = fallback.x + fallbackOffset;
+                child.y = fallback.y + fallbackOffset;
+            } else {
+                const auto &replacement =
+                    replacementPoints[replacementIndex++];
+                child.x = replacement.x;
+                child.y = replacement.y;
+            }
+            child.z = static_cast<double>(child.x) * child.x +
+                      static_cast<double>(child.y) * child.y -
+                      child.currentWeight;
+        }
+    }
+    std::vector<Vector2f> uniquePoints;
+    uniquePoints.reserve(site.children->size());
+    for (auto &child : *site.children) {
+        const bool duplicated = std::ranges::any_of(
+            uniquePoints, [&child](const Vector2f &point) {
+                return point.x == child.x && point.y == child.y;
+            });
+        if (duplicated) {
+            child.x += random.NextSingle();
+            child.y += random.NextSingle();
+            child.z = static_cast<double>(child.x) * child.x +
+                      static_cast<double>(child.y) * child.y -
+                      child.currentWeight;
+        }
+        uniquePoints.emplace_back(child.x, child.y);
+        child.polygon.Clear();
+        child.neighbours.clear();
+    }
 }
 
-std::string FingerprintSites(const std::vector<Site> &sites, bool includeChildren)
+static bool RelaxGeneratedChildren(Site &site, int iterations, float minEnergy,
+                                   bool usePD)
 {
-    std::ostringstream builder;
-    builder << "count=" << sites.size() << ';';
-    for (const auto &site : sites) {
-        builder << '[' << FingerprintSite(site, includeChildren) << ']';
+    if (site.children == nullptr || site.children->empty()) {
+        return true;
     }
-    return builder.str();
-}
-
-std::string FingerprintTemplates(const std::vector<TemplateSpawner> &templates)
-{
-    std::ostringstream builder;
-    builder << std::fixed << std::setprecision(3);
-    builder << "count=" << templates.size() << ';';
-    for (const auto &templt : templates) {
-        builder << '[' << (templt.container != nullptr ? templt.container->name : "null");
-        builder << '@' << templt.position.x << ',' << templt.position.y << ']';
+    float energy = std::numeric_limits<float>::max();
+    for (int iteration = 0; iteration < iterations; ++iteration) {
+        if (!(energy > minEnergy)) {
+            break;
+        }
+        float nextEnergy = 0.0f;
+        for (auto &child : *site.children) {
+            const auto &centroid = child.polygon.Centroid();
+            const float dx = child.x - centroid.x;
+            const float dy = child.y - centroid.y;
+            nextEnergy += std::sqrt(dx * dx + dy * dy);
+            MoveChildToCentroid(child);
+        }
+        energy = nextEnergy;
+        PlaceGeneratedChildren(site, 0);
+        Diagram diagram(site.polygon, *site.children);
+        if (usePD) {
+            if (!diagram.ComputeNodePD()) {
+                if (ShouldEmitRecoverableWorldGenDiagnostic(
+                        "relax child node pd failed, fallback to compute node.")) {
+                    LogE("relax child node pd failed, fallback to compute node.");
+                }
+                if (!diagram.ComputeNode()) {
+                    LogE("fallback relax child node failed.");
+                    return false;
+                }
+            }
+        } else if (!diagram.ComputeNode()) {
+            LogE("relax child node failed.");
+            return false;
+        }
     }
-    return builder.str();
+    return true;
 }
 
 bool WorldGen::GenerateOverworld(std::vector<Site> &sites)
@@ -162,62 +209,6 @@ bool WorldGen::GenerateOverworld(std::vector<Site> &sites)
     return true;
 }
 
-bool WorldGen::DebugCapturePhaseFingerprint(WorldGenDebugPhaseFingerprint *fingerprint)
-{
-    if (fingerprint == nullptr) {
-        return false;
-    }
-
-    KRandom random(m_seed);
-    std::vector<Site> sites;
-    if (!GenerateSeedPoints(random, sites)) {
-        return false;
-    }
-    fingerprint->afterSeedPoints = FingerprintSites(sites, false);
-
-    const bool usePD = m_world.layoutMethod == LayoutMethod::PowerTree;
-    Polygon bounds(Rect(0.0f, 0.0f, m_world.worldsize.x, m_world.worldsize.y));
-    Diagram diagram(bounds, sites);
-    if (usePD) {
-        if (!diagram.ComputeNode()) {
-            return false;
-        }
-        if (!diagram.ComputeNodePD() && !diagram.ComputeNode()) {
-            return false;
-        }
-    } else if (!diagram.ComputeNode()) {
-        return false;
-    }
-    fingerprint->afterInitialDiagram = FingerprintSites(sites, false);
-
-    PropagateDistanceTags(sites);
-    fingerprint->afterDistanceTags = FingerprintSites(sites, false);
-
-    ConvertUnknownCells(sites, random);
-    fingerprint->afterConvertUnknownCells = FingerprintSites(sites, false);
-
-    if (usePD) {
-        if (!diagram.ComputeNodePD() && !diagram.ComputeNode()) {
-            return false;
-        }
-    }
-    fingerprint->afterPostConvertDiagram = FingerprintSites(sites, false);
-
-    for (int i = 0; i < static_cast<int>(sites.size()); ++i) {
-        if (!GenerateChildren(sites[i], random, m_seed + i, usePD)) {
-            return false;
-        }
-    }
-    fingerprint->afterGenerateChildren = FingerprintSites(sites, true);
-
-    auto allSites = ForceLowestToLeaf(sites);
-    random = KRandom(m_seed);
-    ApplySwapTags(sites, random);
-    DetermineTemplates(allSites, random);
-    fingerprint->templatePlacements = FingerprintTemplates(m_templates);
-    return true;
-}
-
 static std::vector<Site *> ForceLowestToLeaf(std::vector<Site> &sites)
 {
     int index = 1;
@@ -267,21 +258,33 @@ static void ApplySwapTags(std::vector<Site> &sites, KRandom &random)
             }
         }
         ShuffleSeeded(nodes, random);
-        std::queue<Site *> above;
-        std::queue<Site *> below;
+        std::vector<Site *> wetAbove;
+        std::vector<Site *> dryBelow;
         for (auto node : nodes) {
             bool isWet = node->tags.contains("Wet");
             bool isAbove = node->y > site.y;
             if (isWet && isAbove) {
-                above.push(node);
+                if (!dryBelow.empty()) {
+                    SwitchNodes(*node, *dryBelow.front());
+                    dryBelow.erase(dryBelow.begin());
+                } else {
+                    wetAbove.push_back(node);
+                }
             } else if (!isWet && !isAbove) {
-                below.push(node);
+                if (!wetAbove.empty()) {
+                    SwitchNodes(*node, *wetAbove.front());
+                    wetAbove.erase(wetAbove.begin());
+                } else {
+                    dryBelow.push_back(node);
+                }
             }
         }
-        while (!above.empty() && !below.empty()) {
-            SwitchNodes(*above.front(), *below.front());
-            above.pop();
-            below.pop();
+        for (auto wetNode : wetAbove) {
+            if (dryBelow.empty()) {
+                break;
+            }
+            SwitchNodes(*wetNode, *dryBelow.front());
+            dryBelow.erase(dryBelow.begin());
         }
     }
 }
@@ -428,31 +431,25 @@ static void ApplySubworldToNode(Site &site, const SubWorld &subWorld,
 
 void WorldGen::ConvertUnknownCells(std::vector<Site> &sites, KRandom &random)
 {
-    std::vector<int> indices(sites.size() - 1);
-    std::iota(indices.begin(), indices.end(), 1);
+    const bool hasStartSubworld = !m_world.startSubworldName.empty();
+    const size_t beginIndex = hasStartSubworld ? 1 : 0;
+    std::vector<int> indices(sites.size() - beginIndex);
+    std::iota(indices.begin(), indices.end(), static_cast<int>(beginIndex));
     ShuffleSeeded(indices, random);
     std::vector<WeightedSubWorld> subworldsForWorld;
-    const std::vector<SubWorld *> *subworldList = nullptr;
-    if (m_settings.IsSpaceOutEnabled()) {
-        auto itr = m_settings.orderedSubworlds.find("SPACEOUT");
-        if (itr != m_settings.orderedSubworlds.end()) {
-            subworldList = &itr->second;
+    subworldsForWorld.reserve(m_world.subworldFiles2.size());
+    for (auto subworld : m_world.subworldFiles2) {
+        if (subworld == nullptr) {
+            continue;
         }
-    } else {
-        auto itr = m_settings.orderedSubworlds.find("VANILLA");
-        if (itr != m_settings.orderedSubworlds.end()) {
-            subworldList = &itr->second;
+        auto itr = m_settings.subworlds.find(subworld->name);
+        if (itr == m_settings.subworlds.end()) {
+            continue;
         }
+        subworldsForWorld.emplace_back(&itr->second, *subworld);
     }
-    if (subworldList == nullptr) {
+    if (subworldsForWorld.empty()) {
         return;
-    }
-    for (auto item : *subworldList) {
-        for (auto subworld : m_world.subworldFiles2) {
-            if (item->name == subworld->name) {
-                subworldsForWorld.emplace_back(item, *subworld);
-            }
-        }
     }
     std::map<int, std::vector<WeightedSubWorld *>> dict1;
     for (int i = 0; i <= (int)Range::ExtremelyHot; ++i) {
@@ -571,8 +568,10 @@ void WorldGen::PropagateDistanceTags(std::vector<Site> &sites) const
 {
     std::map<std::string, std::vector<Site *>> sitesWithTags;
 
-    sites[0].tags.emplace("AtStart");
-    sitesWithTags["AtStart"].emplace_back(&sites[0]);
+    if (!sites.empty() && !m_world.startSubworldName.empty()) {
+        sites[0].tags.emplace("AtStart");
+        sitesWithTags["AtStart"].emplace_back(&sites[0]);
+    }
 
     TagTopAndBottomSites(m_world.worldsize.y, sites, sitesWithTags);
     TagEdgeSites(m_world.worldsize.x, sites, sitesWithTags);
@@ -616,33 +615,38 @@ bool WorldGen::GenerateSeedPoints(KRandom &random, std::vector<Site> &sites)
     auto densityMax = GetDefaultData<float>("OverworldDensityMax");
     auto density = random.Next(densityMin, densityMax);
     auto avoidRadius = GetDefaultData<float>("OverworldAvoidRadius");
-    auto startX = m_world.startingPositionHorizontal2.GetRandomValue(random);
-    auto startY = m_world.startingPositionVertical2.GetRandomValue(random);
     std::vector<Vector2f> position;
-    position.emplace_back(startX * mapWidth, startY * mapHeight);
+    const bool hasStartSubworld = !m_world.startSubworldName.empty();
+    if (hasStartSubworld) {
+        auto startX = m_world.startingPositionHorizontal2.GetRandomValue(random);
+        auto startY = m_world.startingPositionVertical2.GetRandomValue(random);
+        position.emplace_back(startX * mapWidth, startY * mapHeight);
+    }
     auto &sampler = GetDefaultData<std::string>("OverworldSampleBehaviour");
     auto enumSampler = sampler == "UniformHex" ? SampleBehaviour::UniformHex
                                                : SampleBehaviour::PoissonDisk;
     auto points = GetRandomPoints(poly, density, avoidRadius, position,
                                   enumSampler, false, random, false, true);
-    auto subworldFile = std::ranges::find_if(
-        m_world.subworldFiles2, [this](const WeightedSubworldName *x) {
-            return x->name == m_world.startSubworldName;
-        });
-    auto subworld = m_settings.subworlds.find(m_world.startSubworldName);
-    if (subworld == m_settings.subworlds.end()) {
-        LogE("start subworld %s wrong.", m_world.startSubworldName.c_str());
-        return false;
-    }
-    float overridePower = -1.0f;
-    if (subworldFile != m_world.subworldFiles2.end() &&
-        (*subworldFile)->overridePower > 0.0f) {
-        overridePower = (*subworldFile)->overridePower;
-    }
     int index = 1;
     sites.reserve(points.size() + 10); // reserve with dummy sites;
-    sites.emplace_back(index++, position[0]);
-    ApplySubworldToNode(sites.back(), subworld->second, overridePower);
+    if (hasStartSubworld) {
+        auto subworldFile = std::ranges::find_if(
+            m_world.subworldFiles2, [this](const WeightedSubworldName *x) {
+                return x->name == m_world.startSubworldName;
+            });
+        auto subworld = m_settings.subworlds.find(m_world.startSubworldName);
+        if (subworld == m_settings.subworlds.end()) {
+            LogE("start subworld %s wrong.", m_world.startSubworldName.c_str());
+            return false;
+        }
+        float overridePower = -1.0f;
+        if (subworldFile != m_world.subworldFiles2.end() &&
+            (*subworldFile)->overridePower > 0.0f) {
+            overridePower = (*subworldFile)->overridePower;
+        }
+        sites.emplace_back(index++, position[0]);
+        ApplySubworldToNode(sites.back(), subworld->second, overridePower);
+    }
     for (auto &point : points) {
         sites.emplace_back(index++, point);
     }
@@ -689,7 +693,9 @@ void WorldGen::SetFeatureBiome(Site &site, KRandom &random,
     }
 }
 
-bool WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
+bool WorldGen::GenerateChildren(Site &site,
+                                KRandom &externRrandom,
+                                int seed,
                                 bool usePD)
 {
     KRandom random(seed);
@@ -720,6 +726,7 @@ bool WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
         auto &feature = subworld.centralFeature.value();
         child.subworld = site.subworld;
         child.tags = site.tags;
+        child.minDistanceToTag = site.minDistanceToTag;
         child.tags.insert("CenteralFeature");
         child.parent = &site;
         SetFeatureBiome(child, externRrandom, &feature);
@@ -762,6 +769,7 @@ bool WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
         auto &child = site.children->back();
         child.subworld = site.subworld;
         child.tags = site.tags;
+        child.minDistanceToTag = site.minDistanceToTag;
         child.parent = &site;
         SetFeatureBiome(child, externRrandom, feature);
     }
@@ -771,20 +779,12 @@ bool WorldGen::GenerateChildren(Site &site, KRandom &externRrandom, int seed,
         return false;
     }
     if (!subworld.dontRelaxChildren) {
-        if (usePD) {
-            if (!diagram.ComputeNodePD()) {
-                if (ShouldEmitRecoverableWorldGenDiagnostic(
-                        "compute child node pd failed, fallback to compute node.")) {
-                    LogE("compute child node pd failed, fallback to compute node.");
-                }
-                if (!diagram.ComputeNode()) {
-                    LogE("fallback compute child node failed.");
-                    return false;
-                }
-            }
-        } else {
-            if (!diagram.ComputeNode()) {
-                LogE("compute child node re-run failed.");
+        if (!RelaxGeneratedChildren(site, 10, 1.0f, usePD)) {
+            return false;
+        }
+        for (const auto &child : *site.children) {
+            if (child.polygon.Vertices.size() < 3) {
+                LogE("child polygon invalid after relax.");
                 return false;
             }
         }
@@ -821,9 +821,9 @@ std::vector<Vector3i> WorldGen::GetGeysers(int globalWorldSeed) const
         } else if (name.starts_with("poi/oil/")) {
             result.emplace_back(pos.x, pos.y, std::size(configs) + 1);
         } else if (name.starts_with("expansion1::poi/warp/receiver")) {
-            result.emplace_back(pos.x, pos.y, std::size(configs) + 2);
-        } else if (name.starts_with("expansion1::poi/warp/sender")) {
             result.emplace_back(pos.x, pos.y, std::size(configs) + 3);
+        } else if (name.starts_with("expansion1::poi/warp/sender")) {
+            result.emplace_back(pos.x, pos.y, std::size(configs) + 2);
         } else if (name.starts_with("expansion1::poi/warp/teleporter")) {
             result.emplace_back(pos.x, pos.y, std::size(configs) + 4);
         } else if (name.starts_with("expansion1::poi/traits/cryopod")) {
@@ -836,9 +836,10 @@ std::vector<Vector3i> WorldGen::GetGeysers(int globalWorldSeed) const
                 std::string geyser = item.id.substr(14);
                 for (int index = 0; index < (int)std::size(configs); ++index) {
                     if (geyser == configs[index]) {
-                        pos.x += item.location_x;
-                        pos.y -= item.location_y;
-                        result.emplace_back(pos.x, pos.y, index);
+                        Vector2<int> geyserPos{pos};
+                        geyserPos.x += item.location_x;
+                        geyserPos.y -= item.location_y;
+                        result.emplace_back(geyserPos.x, geyserPos.y, index);
                         break;
                     }
                 }

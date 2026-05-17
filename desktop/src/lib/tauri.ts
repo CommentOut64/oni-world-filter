@@ -29,6 +29,9 @@ export function shouldIgnoreSidecarStderr(message: string): boolean {
   const normalized = message.trim();
   return (
     normalized.startsWith("[sidecar-diagnostic]") ||
+    (normalized.includes("RelaxGeneratedChildren") &&
+      normalized.includes("fallback to compute node.")) ||
+    normalized.includes("pdfailed, fallback to compute node.") ||
     normalized.includes("compute child node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed after convert unknown cells") ||
@@ -59,9 +62,6 @@ export function formatNativeDisplayMessage(message: string): string {
   const normalized = message.trim();
   if (!normalized) {
     return "未知错误";
-  }
-  if (normalized.includes("authoritative worldOffset is unavailable")) {
-    return "当前版本缺少可验证的 worldOffset 数据，已停止返回喷口参数以避免错误结果。";
   }
   if (normalized.includes("secondary preview is not available for current seed")) {
     return "当前种子没有可用的副星预览。";

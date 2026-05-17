@@ -49,6 +49,7 @@ struct PolygonSummary {
 
 struct GeneratedWorldSummary {
     int seed{};
+    int geyserSeed{};
     int worldType{}; // 兼容旧链路：0=主星，1=非主星
     int worldPlacementIndex{-1};
     std::string worldAssetId;
@@ -56,6 +57,8 @@ struct GeneratedWorldSummary {
     bool hasSecondaryPreview{};
     Vector2i worldSize{};
     Vector2i start{};
+    int worldOffsetX{};
+    int worldOffsetY{};
     std::vector<TraitSummary> traits;
     std::vector<GeyserSummary> geysers;
 };

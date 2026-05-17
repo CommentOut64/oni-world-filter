@@ -230,6 +230,15 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
                  std::move(message));
     }
 
+    for (const int slot : worldProfile->illegalEnabledMixingSlots) {
+        AddIssue(errors,
+                 "layer2",
+                 "world.illegal_mixing_slot_enabled",
+                 "mixing",
+                 "当前 worldType + content 组合下 mixing slot 非法启用: " +
+                     std::to_string(slot));
+    }
+
     for (size_t i = 0; i < rawRequest.constraints.distance.size(); ++i) {
         const auto &rule = rawRequest.constraints.distance[i];
         if (rule.maxDist > worldProfile->diagonal) {
