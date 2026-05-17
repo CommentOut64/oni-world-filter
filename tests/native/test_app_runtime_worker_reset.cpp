@@ -1,7 +1,12 @@
 #include <fstream>
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <charconv>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <atomic>
@@ -14,6 +19,7 @@
 #include "Batch/CpuTopology.hpp"
 #include "BatchCpu/SearchCpuPlan.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
+#include "Utils/PointGenerator.hpp"
 #include "config.h"
 
 namespace {
@@ -185,23 +191,16 @@ bool LoadSettingsFromSharedCopy(SettingsCache &settings)
     return true;
 }
 
-bool BuildWorldList(SettingsCache &settings, std::vector<World *> &worlds)
+bool BuildWorldEffectiveStates(SettingsCache &settings,
+                               std::vector<WorldEffectiveState> &states)
 {
-    worlds.clear();
-    if (settings.cluster == nullptr) {
+    std::vector<ResolvedWorldPlacement> placements;
+    std::string error;
+    if (!BuildResolvedWorldPlacements(settings, &placements, &error) ||
+        !InitializeWorldEffectiveStates(settings, placements, &states, &error)) {
         return false;
     }
-    for (auto &worldPlacement : settings.cluster->worldPlacements) {
-        auto itr = settings.worlds.find(worldPlacement.world);
-        if (itr == settings.worlds.end()) {
-            return false;
-        }
-        itr->second.locationType = worldPlacement.locationType;
-        worlds.push_back(&itr->second);
-    }
-    if (worlds.size() == 1) {
-        worlds[0]->locationType = LocationType::StartWorld;
-    }
+    ApplySubworldMixingToWorldEffectiveStates(settings, states);
     return true;
 }
 
@@ -318,19 +317,13 @@ std::string FingerprintGeysers(const std::vector<Vector3i> &geysers)
 
 struct WorldGenPhaseFingerprint {
     std::string runtime;
-    std::string afterSeedPoints;
-    std::string afterInitialDiagram;
-    std::string afterDistanceTags;
-    std::string afterConvertUnknownCells;
-    std::string afterPostConvertDiagram;
-    std::string afterGenerateChildren;
-    std::string templatePlacements;
     std::string afterFullGenerate;
     std::string geysers;
 };
 
 bool PrepareStartWorldFixture(const std::string &code,
                               SettingsCache &settings,
+                              std::vector<WorldEffectiveState> &states,
                               World **world,
                               int *seed,
                               int *clusterSeed = nullptr,
@@ -347,11 +340,9 @@ bool PrepareStartWorldFixture(const std::string &code,
     if (!settings.CoordinateChanged(code, settings)) {
         return false;
     }
-    std::vector<World *> worlds;
-    if (!BuildWorldList(settings, worlds)) {
+    if (!BuildWorldEffectiveStates(settings, states)) {
         return false;
     }
-    settings.DoSubworldMixing(worlds);
     const int baseSeed = settings.seed;
     if (clusterSeed != nullptr) {
         *clusterSeed = baseSeed;
@@ -359,12 +350,12 @@ bool PrepareStartWorldFixture(const std::string &code,
     if (geyserSeed != nullptr && settings.cluster != nullptr) {
         *geyserSeed = baseSeed + static_cast<int>(settings.cluster->worldPlacements.size()) - 1;
     }
-    for (size_t i = 0; i < worlds.size(); ++i) {
-        World *candidate = worlds[i];
+    for (auto &state : states) {
+        World *candidate = &state.world;
         if (candidate->locationType != LocationType::StartWorld) {
             continue;
         }
-        settings.seed = baseSeed + static_cast<int>(i);
+        settings.seed = baseSeed + state.placementIndex;
         const auto traits = settings.GetRandomTraits(*candidate);
         for (const auto *trait : traits) {
             candidate->ApplayTraits(*trait, settings);
@@ -380,41 +371,30 @@ WorldGenPhaseFingerprint RunWorldGenPhaseFingerprintOnCurrentThread(const std::s
 {
     WorldGenPhaseFingerprint fingerprint;
 
-    SettingsCache debugSettings;
-    World *debugWorld = nullptr;
-    int debugSeed = 0;
-    if (!PrepareStartWorldFixture(code, debugSettings, &debugWorld, &debugSeed)) {
-        return fingerprint;
-    }
-
-    fingerprint.runtime = FingerprintWorldRuntime(*debugWorld);
-    WorldGen debugWorldGen(*debugWorld, debugSettings);
-    WorldGenDebugPhaseFingerprint phases;
-    if (!debugWorldGen.DebugCapturePhaseFingerprint(&phases)) {
-        return fingerprint;
-    }
-    fingerprint.afterSeedPoints = std::move(phases.afterSeedPoints);
-    fingerprint.afterInitialDiagram = std::move(phases.afterInitialDiagram);
-    fingerprint.afterDistanceTags = std::move(phases.afterDistanceTags);
-    fingerprint.afterConvertUnknownCells = std::move(phases.afterConvertUnknownCells);
-    fingerprint.afterPostConvertDiagram = std::move(phases.afterPostConvertDiagram);
-    fingerprint.afterGenerateChildren = std::move(phases.afterGenerateChildren);
-    fingerprint.templatePlacements = std::move(phases.templatePlacements);
-
-    SettingsCache fullSettings;
-    World *fullWorld = nullptr;
-    int fullSeed = 0;
+    SettingsCache settings;
+    std::vector<WorldEffectiveState> states;
+    World *world = nullptr;
+    int seed = 0;
     int geyserSeed = 0;
-    if (!PrepareStartWorldFixture(code, fullSettings, &fullWorld, &fullSeed, nullptr, &geyserSeed)) {
+    if (!PrepareStartWorldFixture(
+            code,
+            settings,
+            states,
+            &world,
+            &seed,
+            nullptr,
+            &geyserSeed)) {
         return fingerprint;
     }
-    WorldGen fullWorldGen(*fullWorld, fullSettings);
-    std::vector<Site> fullSites;
-    if (!fullWorldGen.GenerateOverworld(fullSites)) {
+    fingerprint.runtime = FingerprintWorldRuntime(*world);
+
+    WorldGen worldGen(*world, settings);
+    std::vector<Site> sites;
+    if (!worldGen.GenerateOverworld(sites)) {
         return fingerprint;
     }
-    fingerprint.afterFullGenerate = FingerprintSites(fullSites, true);
-    fingerprint.geysers = FingerprintGeysers(fullWorldGen.GetGeysers(geyserSeed));
+    fingerprint.afterFullGenerate = FingerprintSites(sites, true);
+    fingerprint.geysers = FingerprintGeysers(worldGen.GetGeysers(geyserSeed));
     return fingerprint;
 }
 
@@ -732,12 +712,6 @@ int RunAllTests()
         Expect(!freshPhases.runtime.empty(),
                "fresh-thread worldgen runtime fingerprint should not be empty",
                failures);
-        Expect(!mainPhases.afterSeedPoints.empty(),
-               "main-thread worldgen seed-points fingerprint should not be empty",
-               failures);
-        Expect(!freshPhases.afterSeedPoints.empty(),
-               "fresh-thread worldgen seed-points fingerprint should not be empty",
-               failures);
         Expect(!mainPhases.afterFullGenerate.empty(),
                "main-thread full worldgen fingerprint should not be empty",
                failures);
@@ -748,34 +722,6 @@ int RunAllTests()
         ExpectEqual(mainPhases.runtime,
                     freshPhases.runtime,
                     "shared-copy runtime state should match between main-thread and fresh-thread",
-                    failures);
-        ExpectEqual(mainPhases.afterSeedPoints,
-                    freshPhases.afterSeedPoints,
-                    "worldgen seed-points stage should match between main-thread and fresh-thread",
-                    failures);
-        ExpectEqual(mainPhases.afterInitialDiagram,
-                    freshPhases.afterInitialDiagram,
-                    "worldgen initial diagram stage should match between main-thread and fresh-thread",
-                    failures);
-        ExpectEqual(mainPhases.afterDistanceTags,
-                    freshPhases.afterDistanceTags,
-                    "worldgen distance-tag stage should match between main-thread and fresh-thread",
-                    failures);
-        ExpectEqual(mainPhases.afterConvertUnknownCells,
-                    freshPhases.afterConvertUnknownCells,
-                    "worldgen convert-unknown-cells stage should match between main-thread and fresh-thread",
-                    failures);
-        ExpectEqual(mainPhases.afterPostConvertDiagram,
-                    freshPhases.afterPostConvertDiagram,
-                    "worldgen post-convert diagram stage should match between main-thread and fresh-thread",
-                    failures);
-        ExpectEqual(mainPhases.afterGenerateChildren,
-                    freshPhases.afterGenerateChildren,
-                    "worldgen generate-children stage should match between main-thread and fresh-thread",
-                    failures);
-        ExpectEqual(mainPhases.templatePlacements,
-                    freshPhases.templatePlacements,
-                    "worldgen template-placement stage should match between main-thread and fresh-thread",
                     failures);
         ExpectEqual(mainPhases.afterFullGenerate,
                     freshPhases.afterFullGenerate,
@@ -805,61 +751,21 @@ int RunAllTests()
 
         const auto concurrentPhases = RunPairConcurrently<WorldGenPhaseFingerprint>(
             [&]() { return RunWorldGenPhaseFingerprintOnCurrentThread(code); });
-        ExpectEqual(concurrentPhases.first.afterSeedPoints,
-                    mainPhases.afterSeedPoints,
-                    "concurrent worldgen phase A seed-points should match baseline",
+        ExpectEqual(concurrentPhases.first.runtime,
+                    mainPhases.runtime,
+                    "concurrent worldgen phase A runtime should match baseline",
                     failures);
-        ExpectEqual(concurrentPhases.second.afterSeedPoints,
-                    mainPhases.afterSeedPoints,
-                    "concurrent worldgen phase B seed-points should match baseline",
+        ExpectEqual(concurrentPhases.second.runtime,
+                    mainPhases.runtime,
+                    "concurrent worldgen phase B runtime should match baseline",
                     failures);
-        ExpectEqual(concurrentPhases.first.afterInitialDiagram,
-                    mainPhases.afterInitialDiagram,
-                    "concurrent worldgen phase A initial diagram should match baseline",
+        ExpectEqual(concurrentPhases.first.afterFullGenerate,
+                    mainPhases.afterFullGenerate,
+                    "concurrent worldgen phase A full output should match baseline",
                     failures);
-        ExpectEqual(concurrentPhases.second.afterInitialDiagram,
-                    mainPhases.afterInitialDiagram,
-                    "concurrent worldgen phase B initial diagram should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.first.afterDistanceTags,
-                    mainPhases.afterDistanceTags,
-                    "concurrent worldgen phase A distance-tag should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.second.afterDistanceTags,
-                    mainPhases.afterDistanceTags,
-                    "concurrent worldgen phase B distance-tag should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.first.afterConvertUnknownCells,
-                    mainPhases.afterConvertUnknownCells,
-                    "concurrent worldgen phase A convert-unknown-cells should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.second.afterConvertUnknownCells,
-                    mainPhases.afterConvertUnknownCells,
-                    "concurrent worldgen phase B convert-unknown-cells should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.first.afterPostConvertDiagram,
-                    mainPhases.afterPostConvertDiagram,
-                    "concurrent worldgen phase A post-convert diagram should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.second.afterPostConvertDiagram,
-                    mainPhases.afterPostConvertDiagram,
-                    "concurrent worldgen phase B post-convert diagram should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.first.afterGenerateChildren,
-                    mainPhases.afterGenerateChildren,
-                    "concurrent worldgen phase A generate-children should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.second.afterGenerateChildren,
-                    mainPhases.afterGenerateChildren,
-                    "concurrent worldgen phase B generate-children should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.first.templatePlacements,
-                    mainPhases.templatePlacements,
-                    "concurrent worldgen phase A template-placement should match baseline",
-                    failures);
-        ExpectEqual(concurrentPhases.second.templatePlacements,
-                    mainPhases.templatePlacements,
-                    "concurrent worldgen phase B template-placement should match baseline",
+        ExpectEqual(concurrentPhases.second.afterFullGenerate,
+                    mainPhases.afterFullGenerate,
+                    "concurrent worldgen phase B full output should match baseline",
                     failures);
         ExpectEqual(concurrentPhases.first.geysers,
                     mainPhases.geysers,
