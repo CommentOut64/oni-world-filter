@@ -715,10 +715,13 @@ int RunAllTests()
     }
 
     {
-        NativeCoordinate::NativeCoordinateResolution invalidCoord;
-        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-HD",
-                                                          &invalidCoord),
-               "short non-zero trailing mixing code should be rejected",
+        NativeCoordinate::NativeCoordinateResolution nativeCoord;
+        Expect(NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-HD",
+                                                         &nativeCoord),
+               "short non-zero trailing mixing code should resolve",
+               failures);
+        Expect(nativeCoord.mixing == static_cast<int>(SettingsCache::Base36ToBinary("HD")),
+               "short non-zero trailing mixing code should decode mixing value",
                failures);
     }
 
@@ -727,6 +730,14 @@ int RunAllTests()
         Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ABCDE1",
                                                           &invalidCoord),
                "non-zero trailing mixing code longer than five chars should be rejected",
+               failures);
+    }
+
+    {
+        NativeCoordinate::NativeCoordinateResolution invalidCoord;
+        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ZZZZZ",
+                                                          &invalidCoord),
+               "non-zero trailing mixing code outside mixing range should be rejected",
                failures);
     }
 
