@@ -1,5 +1,7 @@
 #include "Setting/SettingsCache.hpp"
 #include "Setting/NativeCoordinate.hpp"
+#include "Setting/WorldEffectiveState.hpp"
+#include "WorldGen.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "config.h"
 
@@ -103,34 +105,56 @@ std::string FindExpansionWorldPrefix(const SettingsCache &settings)
     return {};
 }
 
-std::vector<World *> BuildActiveWorlds(SettingsCache &settings)
+bool BuildEffectiveStates(SettingsCache &settings, std::vector<WorldEffectiveState> &states)
 {
-    std::vector<World *> worlds;
-    if (settings.cluster == nullptr) {
-        return worlds;
+    std::vector<ResolvedWorldPlacement> placements;
+    std::string error;
+    if (!BuildResolvedWorldPlacements(settings, &placements, &error)) {
+        return false;
     }
-    for (auto &worldPlacement : settings.cluster->worldPlacements) {
-        auto itr = settings.worlds.find(worldPlacement.world);
-        if (itr == settings.worlds.end()) {
+    if (!InitializeWorldEffectiveStates(settings, placements, &states, &error)) {
+        return false;
+    }
+    ApplySubworldMixingToWorldEffectiveStates(settings, states);
+    return true;
+}
+
+bool LeafSitesCarryDistanceTags(const std::vector<Site> &sites)
+{
+    bool foundLeaf = false;
+    for (const auto &site : sites) {
+        if (!site.children) {
             continue;
         }
-        itr->second.locationType = worldPlacement.locationType;
-        worlds.push_back(&itr->second);
+        for (const auto &child : *site.children) {
+            foundLeaf = true;
+            if (child.minDistanceToTag.empty()) {
+                return false;
+            }
+        }
     }
-    if (worlds.size() == 1) {
-        worlds[0]->locationType = LocationType::StartWorld;
-    }
-    return worlds;
+    return foundLeaf;
 }
 
 std::vector<std::string> BuildActiveWorldNames(SettingsCache &settings)
 {
     std::vector<std::string> names;
-    const auto worlds = BuildActiveWorlds(settings);
-    names.reserve(worlds.size());
-    for (const auto *world : worlds) {
-        if (world != nullptr) {
-            names.push_back(world->name);
+    if (settings.cluster == nullptr) {
+        return names;
+    }
+    names.reserve(settings.cluster->worldPlacements.size());
+    for (const auto &placement : settings.cluster->worldPlacements) {
+        names.push_back(placement.world);
+    }
+    std::vector<ResolvedWorldPlacement> placements;
+    std::string error;
+    if (!BuildResolvedWorldPlacements(settings, &placements, &error)) {
+        return names;
+    }
+    for (const auto &resolved : placements) {
+        if (resolved.placement != nullptr &&
+            resolved.worldAssetId != resolved.placement->world) {
+            names.push_back(resolved.worldAssetId);
         }
     }
     return names;
@@ -276,13 +300,43 @@ std::string FingerprintMutableState(SettingsCache &settings)
     std::ostringstream builder;
     builder << FingerprintSnapshot(settings.CaptureSearchMutableState());
     builder << "|activeRuntime=";
-    for (const auto *world : BuildActiveWorlds(settings)) {
-        if (world == nullptr) {
-            continue;
+    std::vector<WorldEffectiveState> states;
+    if (BuildEffectiveStates(settings, states)) {
+        for (const auto &state : states) {
+            builder << state.worldAssetId << '=' << FingerprintWorldRuntime(state.world) << ';';
         }
-        builder << world->name << '=' << FingerprintWorldRuntime(*world) << ';';
     }
     return builder.str();
+}
+
+bool WorldRuntimeContainsTemplateName(const World &world, const std::string &templateName)
+{
+    for (const auto *rule : world.worldTemplateRules2) {
+        if (rule == nullptr) {
+            continue;
+        }
+        for (const auto &name : rule->names) {
+            if (name == templateName) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool WorldRuntimeHasMixingProxyNames(const World &world)
+{
+    for (const auto *filter : world.unknownCellsAllowedSubworlds2) {
+        if (filter == nullptr) {
+            continue;
+        }
+        for (const auto &subworldName : filter->subworldNames) {
+            if (!subworldName.empty() && subworldName.front() == '(') {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 bool ApplySearchMutablePath(SettingsCache &settings, const std::string &code)
@@ -290,15 +344,17 @@ bool ApplySearchMutablePath(SettingsCache &settings, const std::string &code)
     if (!settings.CoordinateChanged(code, settings)) {
         return false;
     }
-    auto worlds = BuildActiveWorlds(settings);
-    if (worlds.empty()) {
+    std::vector<WorldEffectiveState> states;
+    if (!BuildEffectiveStates(settings, states) || states.empty()) {
         return false;
     }
-    settings.DoSubworldMixing(worlds);
-    for (auto *world : worlds) {
+    const int baseSeed = settings.seed;
+    for (auto &state : states) {
+        auto *world = &state.world;
         if (world->locationType == LocationType::Cluster) {
             continue;
         }
+        settings.seed = baseSeed + state.placementIndex;
         const auto traits = settings.GetRandomTraits(*world);
         for (const auto *trait : traits) {
             world->ApplayTraits(*trait, settings);
@@ -314,18 +370,17 @@ std::vector<const WorldTrait *> GetStartWorldTraitsForCode(SettingsCache &settin
     if (!settings.CoordinateChanged(code, settings)) {
         return {};
     }
-    auto worlds = BuildActiveWorlds(settings);
-    if (worlds.empty()) {
+    std::vector<WorldEffectiveState> states;
+    if (!BuildEffectiveStates(settings, states) || states.empty()) {
         return {};
     }
-    settings.DoSubworldMixing(worlds);
     const int baseSeed = settings.seed;
-    for (size_t i = 0; i < worlds.size(); ++i) {
-        auto *world = worlds[i];
+    for (const auto &state : states) {
+        auto *world = const_cast<World *>(&state.world);
         if (world == nullptr || world->locationType != LocationType::StartWorld) {
             continue;
         }
-        settings.seed = baseSeed + static_cast<int>(i);
+        settings.seed = baseSeed + state.placementIndex;
         return settings.GetRandomTraits(*world);
     }
     return {};
@@ -360,6 +415,9 @@ int RunAllTests()
             Expect(settings.IsSpaceOutEnabled(),
                    "selected expansion cluster should enable space-out dlc state",
                    failures);
+            Expect(settings.IsContentEnabled("EXPANSION1_ID"),
+                   "selected expansion cluster should expose EXPANSION1_ID via active content set",
+                   failures);
 
             const std::string mutatedFingerprint = FingerprintMutableState(settings);
             Expect(mutatedFingerprint != baselineFingerprint,
@@ -382,6 +440,153 @@ int RunAllTests()
             Expect(replayFingerprint == mutatedFingerprint,
                    "restored state should reproduce the same mutable search runtime state",
                    failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for mixing sanitization checks",
+               failures);
+
+        if (error.empty()) {
+            const std::string code = BuildCoordinateCode("PRE-C-", 123456, 1);
+            Expect(settings.CoordinateChanged(code, settings),
+                   "PRE-C coordinate should resolve for mixing sanitization checks",
+                   failures);
+            if (!settings.mixConfigs.empty()) {
+                Expect(settings.mixConfigs[0].level == MixingLevel::Disabled,
+                       "PRE cluster should sanitize DLC2 mixing slot to disabled when unsupported",
+                       failures);
+            }
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for prehistoric world mixing checks",
+               failures);
+
+        if (error.empty()) {
+            const std::string baseCode = BuildCoordinateCode("SNDST-C-", 123456, 0);
+            const std::string mixedCode = BuildCoordinateCode("SNDST-C-", 123456, 626);
+            std::vector<ResolvedWorldPlacement> basePlacements;
+            std::vector<ResolvedWorldPlacement> mixedPlacements;
+
+            Expect(settings.CoordinateChanged(baseCode, settings),
+                   "SNDST-C base coordinate should resolve",
+                   failures);
+            Expect(BuildResolvedWorldPlacements(settings, &basePlacements, &error),
+                   "SNDST-C base resolved placements should build",
+                   failures);
+
+            bool hasBasePrehistoricMixingWorld = false;
+            for (const auto &placement : basePlacements) {
+                if (placement.worldAssetId == "dlc4::worlds/MixingPrehistoricAsteroid") {
+                    hasBasePrehistoricMixingWorld = true;
+                    break;
+                }
+            }
+            Expect(!hasBasePrehistoricMixingWorld,
+                   "SNDST-C without DLC4 mixing should not replace any placement with MixingPrehistoricAsteroid",
+                   failures);
+
+            Expect(settings.CoordinateChanged(mixedCode, settings),
+                   "SNDST-C mixed coordinate should resolve",
+                   failures);
+            Expect(BuildResolvedWorldPlacements(settings, &mixedPlacements, &error),
+                   "SNDST-C mixed resolved placements should build",
+                   failures);
+
+            bool hasMixedPrehistoricWorld = false;
+            for (const auto &placement : mixedPlacements) {
+                if (placement.worldAssetId == "dlc4::worlds/MixingPrehistoricAsteroid") {
+                    hasMixedPrehistoricWorld = true;
+                    break;
+                }
+            }
+            Expect(hasMixedPrehistoricWorld,
+                   "SNDST-C with DLC4 world mixing should replace at least one placement with MixingPrehistoricAsteroid",
+                   failures);
+
+            std::vector<std::string> expectedPlacementMixingTemplateNames;
+            int mixedPrehistoricPlacementIndex = -1;
+            for (const auto &placement : mixedPlacements) {
+                if (placement.worldAssetId != "dlc4::worlds/MixingPrehistoricAsteroid" ||
+                    placement.placement == nullptr ||
+                    placement.appliedWorldMixingSetting == nullptr) {
+                    continue;
+                }
+                for (const auto &rule : placement.placement->worldMixing.additionalWorldTemplateRules) {
+                    for (const auto &name : rule.names) {
+                        expectedPlacementMixingTemplateNames.push_back(name);
+                    }
+                }
+                if (!expectedPlacementMixingTemplateNames.empty()) {
+                    mixedPrehistoricPlacementIndex = placement.placementIndex;
+                    break;
+                }
+            }
+            Expect(mixedPrehistoricPlacementIndex >= 0,
+                   "SNDST-C mixed prehistoric placement should keep explicit placement world mixing rules",
+                   failures);
+
+            std::vector<WorldEffectiveState> mixedStates;
+            Expect(BuildEffectiveStates(settings, mixedStates),
+                   "SNDST-C mixed effective world states should build",
+                   failures);
+
+            bool validatedMixedStartWorldCleanup = false;
+            for (const auto &state : mixedStates) {
+                if (state.world.locationType != LocationType::StartWorld) {
+                    continue;
+                }
+                validatedMixedStartWorldCleanup = true;
+                Expect(!WorldRuntimeHasMixingProxyNames(state.world),
+                       "SNDST-C mixed start world should remove leftover mixing proxy names after subworld mixing",
+                       failures);
+            }
+            Expect(validatedMixedStartWorldCleanup,
+                   "SNDST-C mixed effective states should include a start world for proxy cleanup checks",
+                   failures);
+
+            if (mixedPrehistoricPlacementIndex >= 0) {
+                const auto *mixedState = FindWorldEffectiveState(mixedStates, mixedPrehistoricPlacementIndex);
+                Expect(mixedState != nullptr,
+                       "SNDST-C mixed prehistoric placement should resolve to an effective world state",
+                       failures);
+                if (mixedState != nullptr) {
+                    for (const auto &templateName : expectedPlacementMixingTemplateNames) {
+                        Expect(WorldRuntimeContainsTemplateName(mixedState->world, templateName),
+                               ("SNDST-C mixed prehistoric runtime should preserve placement world mixing template " +
+                                templateName)
+                                   .c_str(),
+                               failures);
+                    }
+
+                    World runtimeWorld = mixedState->world;
+                    const int baseSeed = settings.seed;
+                    settings.seed = baseSeed + mixedPrehistoricPlacementIndex;
+                    const auto traits = settings.GetRandomTraits(runtimeWorld);
+                    for (const auto *trait : traits) {
+                        runtimeWorld.ApplayTraits(*trait, settings);
+                    }
+
+                    WorldGen worldGen(runtimeWorld, settings);
+                    std::vector<Site> generatedSites;
+                    Expect(worldGen.GenerateOverworld(generatedSites),
+                           "SNDST-C mixed prehistoric world should generate for leaf distance checks",
+                           failures);
+                    if (!generatedSites.empty()) {
+                        Expect(LeafSitesCarryDistanceTags(generatedSites),
+                               "SNDST-C mixed prehistoric generated leaf sites should carry DistanceToTag data",
+                               failures);
+                    }
+                }
+            }
         }
     }
 
@@ -510,10 +715,13 @@ int RunAllTests()
     }
 
     {
-        NativeCoordinate::NativeCoordinateResolution invalidCoord;
-        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-HD",
-                                                          &invalidCoord),
-               "short non-zero trailing mixing code should be rejected",
+        NativeCoordinate::NativeCoordinateResolution nativeCoord;
+        Expect(NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-HD",
+                                                         &nativeCoord),
+               "short non-zero trailing mixing code should resolve",
+               failures);
+        Expect(nativeCoord.mixing == static_cast<int>(SettingsCache::Base36ToBinary("HD")),
+               "short non-zero trailing mixing code should decode mixing value",
                failures);
     }
 
@@ -522,6 +730,14 @@ int RunAllTests()
         Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ABCDE1",
                                                           &invalidCoord),
                "non-zero trailing mixing code longer than five chars should be rejected",
+               failures);
+    }
+
+    {
+        NativeCoordinate::NativeCoordinateResolution invalidCoord;
+        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ZZZZZ",
+                                                          &invalidCoord),
+               "non-zero trailing mixing code outside mixing range should be rejected",
                failures);
     }
 

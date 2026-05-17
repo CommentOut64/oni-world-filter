@@ -13,6 +13,7 @@
 #include <miniz.h>
 
 #include "JsonDeserializeGen.hpp"
+#include "Setting/ContentActivation.hpp"
 #include "Utils/KRandom.hpp"
 #include "Utils/Polygon.hpp"
 #include "Utils/PointGenerator.hpp"
@@ -95,6 +96,7 @@ void SettingsCache::RepairTransientPointersAfterCopy()
             }
         }
     }
+    SanitizeMixingConfigsForCurrentCluster();
 
     for (auto &pair : worlds) {
         pair.second.ClearMixingsAndTraits();
@@ -471,6 +473,7 @@ bool SettingsCache::CoordinateChanged(const std::string &text,
         mixConfigs[6].level = mixConfigs[7].level = mixConfigs[8].level =
             mixConfigs[9].level = mixConfigs[10].level = MixingLevel::Disabled;
     }
+    SanitizeMixingConfigsForCurrentCluster();
     return true;
 }
 
@@ -480,8 +483,56 @@ void SettingsCache::ParseAndApplyMixingSettingsCode(const std::string &code)
     for (auto itr = mixConfigs.rbegin(); itr != mixConfigs.rend(); ++itr) {
         itr->level = (MixingLevel)(num % 5);
         itr->minCount = itr->level == MixingLevel::GuranteeMixing ? 1 : 0;
-        itr->maxCount = 3;
+        itr->maxCount = itr->type == 1 ? 1 : 3;
         num /= 5;
+    }
+}
+
+ActiveContentSet SettingsCache::BuildActiveContentSet() const
+{
+    return ::BuildActiveContentSet(cluster, mixConfigs);
+}
+
+bool SettingsCache::IsContentEnabled(const std::string &id) const
+{
+    return BuildActiveContentSet().HasContent(id);
+}
+
+void SettingsCache::SanitizeMixingConfigsForCurrentCluster()
+{
+    const ActiveContentSet activeContent = BuildActiveContentSet();
+    for (auto &config : mixConfigs) {
+        config.setting = nullptr;
+        const WorldMixingSettings *worldSetting = nullptr;
+        const SubworldMixingSettings *subworldSetting = nullptr;
+        if (config.type == 1) {
+            auto itr = worldMixing.find(config.path);
+            if (itr != worldMixing.end()) {
+                worldSetting = &itr->second;
+            }
+        } else if (config.type == 2) {
+            auto itr = subworldMixing.find(config.path);
+            if (itr != subworldMixing.end()) {
+                subworldSetting = &itr->second;
+            }
+        }
+
+        if (!IsMixingConfigAllowed(config,
+                                   cluster,
+                                   activeContent,
+                                   worldSetting,
+                                   subworldSetting)) {
+            config.level = MixingLevel::Disabled;
+            config.minCount = 0;
+            config.maxCount = 3;
+            continue;
+        }
+
+        if (worldSetting != nullptr) {
+            config.setting = const_cast<WorldMixingSettings *>(worldSetting);
+        } else if (subworldSetting != nullptr) {
+            config.setting = const_cast<SubworldMixingSettings *>(subworldSetting);
+        }
     }
 }
 
@@ -582,7 +633,7 @@ SettingsCache::GetRandomTraits(const World &world) const
     return result;
 }
 
-void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids)
+void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids, bool resetWorldRuntime)
 {
     std::vector<MixingConfig *> filtered;
     for (auto &config : mixConfigs) {
@@ -593,15 +644,7 @@ void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids)
         if (itr == subworldMixing.end()) {
             continue;
         }
-        bool forbidden = false;
-        for (auto &tag : itr->second.forbiddenClusterTags) {
-            auto find = std::ranges::find(cluster->clusterTags, tag);
-            if (find != cluster->clusterTags.end()) {
-                forbidden = true;
-                break;
-            }
-        }
-        if (!forbidden) {
+        if (!HasAnyClusterTag(cluster, itr->second.forbiddenClusterTags)) {
             config.setting = &(itr->second);
             filtered.push_back(&config);
         }
@@ -615,7 +658,9 @@ void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids)
         });
     for (auto world : asteroids) {
         ShuffleSeeded(filtered, random);
-        world->ClearMixingsAndTraits();
+        if (resetWorldRuntime) {
+            world->ClearMixingsAndTraits();
+        }
         world->ApplayMixings(filtered);
     }
 }

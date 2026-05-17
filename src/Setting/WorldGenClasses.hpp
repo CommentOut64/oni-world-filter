@@ -101,6 +101,7 @@ struct WorldMixingSettings {
     std::string description;
     std::string icon;
     std::vector<std::string> forbiddenClusterTags;
+    std::vector<std::string> required_content;
     std::string world;
 };
 
@@ -166,6 +167,7 @@ struct SubworldMixingSettings {
     std::string description;
     std::string icon;
     std::vector<std::string> forbiddenClusterTags;
+    std::vector<std::string> required_content;
     WeightedSubworldName subworld;
     std::vector<std::string> mixingTags;
     std::vector<TemplateSpawnRules> additionalWorldTemplateRules;

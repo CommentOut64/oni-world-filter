@@ -1170,13 +1170,15 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let previous = std::env::var_os("ONI_DESKTOP_CONTROL_SIDECAR");
-        std::env::set_var("ONI_DESKTOP_CONTROL_SIDECAR", "0");
+        unsafe {
+            std::env::set_var("ONI_DESKTOP_CONTROL_SIDECAR", "0");
+        }
 
         let manager = ControlSidecarManager::default();
 
         match previous {
-            Some(value) => std::env::set_var("ONI_DESKTOP_CONTROL_SIDECAR", value),
-            None => std::env::remove_var("ONI_DESKTOP_CONTROL_SIDECAR"),
+            Some(value) => unsafe { std::env::set_var("ONI_DESKTOP_CONTROL_SIDECAR", value) },
+            None => unsafe { std::env::remove_var("ONI_DESKTOP_CONTROL_SIDECAR") },
         }
 
         assert!(
@@ -1191,13 +1193,15 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let previous = std::env::var_os("ONI_DESKTOP_CONTROL_SIDECAR");
-        std::env::remove_var("ONI_DESKTOP_CONTROL_SIDECAR");
+        unsafe {
+            std::env::remove_var("ONI_DESKTOP_CONTROL_SIDECAR");
+        }
 
         let manager = ControlSidecarManager::default();
 
         match previous {
-            Some(value) => std::env::set_var("ONI_DESKTOP_CONTROL_SIDECAR", value),
-            None => std::env::remove_var("ONI_DESKTOP_CONTROL_SIDECAR"),
+            Some(value) => unsafe { std::env::set_var("ONI_DESKTOP_CONTROL_SIDECAR", value) },
+            None => unsafe { std::env::remove_var("ONI_DESKTOP_CONTROL_SIDECAR") },
         }
 
         assert!(

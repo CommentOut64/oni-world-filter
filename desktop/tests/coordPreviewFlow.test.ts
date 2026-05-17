@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import type { PreviewPayload, SearchMatchSummary } from "../src/lib/contracts.ts";
 import { runCoordPreviewFlow } from "../src/features/search/coordPreviewFlow.ts";
-import { loadPreviewByCoord } from "../src/lib/tauri.ts";
+import { formatNativeDisplayMessage, loadPreviewByCoord } from "../src/lib/tauri.ts";
 
 const PREVIEW: PreviewPayload = {
   summary: {
@@ -100,4 +100,11 @@ test("runCoordPreviewFlow only sets error when coord preview fails", async () =>
   );
 
   assert.deepEqual(calls, ["error:坐标无效"]);
+});
+
+test("formatNativeDisplayMessage maps relaxed native coord validation error", () => {
+  assert.equal(
+    formatNativeDisplayMessage("invalid native coord; trailing mixing code must be 1 to 5-char base36 within mixing range"),
+    "坐标格式无效，尾部混搭编码需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。"
+  );
 });

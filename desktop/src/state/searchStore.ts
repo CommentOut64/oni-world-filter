@@ -36,7 +36,7 @@ import {
   persistSearchSessionSnapshot,
   restoreSearchSessionSnapshot,
 } from "./searchStorePersistence.ts";
-import { buildSearchMatchSummaryFromPreview, computeNearestDistanceFromSummary } from "../lib/searchMatchSummary.ts";
+import { computeNearestDistanceFromSummary } from "../lib/searchMatchSummary.ts";
 
 const DEFAULT_CONSTRAINTS: SearchConstraints = {
   required: [],
@@ -148,23 +148,14 @@ function makeJobId(prefix: string): string {
 
 function appendMatch(state: SearchState, event: SearchMatchEvent): SearchState {
   const match: SearchMatchSummary = {
-    ...buildSearchMatchSummaryFromPreview({
-      coord: event.coord,
-      worldType: state.activeWorldType,
-      seed: event.seed,
-      mixing: state.activeMixing,
-      summary: {
-        seed: event.seed,
-        worldType: state.activeWorldType,
-        worldPlacementIndex: 0,
-        isPrimary: true,
-        hasSecondaryPreview: false,
-        start: event.summary.start,
-        worldSize: event.summary.worldSize,
-        traits: event.summary.traits,
-        geysers: event.summary.geysers,
-      },
-    }),
+    seed: event.seed,
+    worldType: state.activeWorldType,
+    mixing: state.activeMixing,
+    coord: event.coord,
+    traits: event.summary.traits,
+    start: event.summary.start,
+    worldSize: event.summary.worldSize,
+    geysers: event.summary.geysers,
     nearestDistance: computeNearestDistanceFromSummary(event.summary.start, event.summary.geysers),
   };
 

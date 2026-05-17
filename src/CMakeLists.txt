@@ -49,6 +49,8 @@ set(ONI_BASE_SOURCES
     "Batch/BatchSearchService.cpp"
     "Batch/SidecarProtocol.hpp"
     "Batch/SidecarProtocol.cpp"
+    "Cluster/ClusterWorldOffsetSolver.hpp"
+    "Cluster/ClusterWorldOffsetSolver.cpp"
     "SearchAnalysis/SearchCatalog.hpp"
     "SearchAnalysis/SearchCatalog.cpp"
     "SearchAnalysis/TraitCatalog.hpp"
@@ -68,10 +70,14 @@ set(ONI_BASE_SOURCES
     "SearchAnalysis/WorldEnvelopeProfile.hpp"
     "SearchAnalysis/WorldEnvelopeProfile.cpp"
     "Setting/ComposableDictionary.hpp"
+    "Setting/ContentActivation.hpp"
+    "Setting/ContentActivation.cpp"
     "Setting/NativeCoordinate.hpp"
     "Setting/NativeCoordinate.cpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
+    "Setting/WorldEffectiveState.hpp"
+    "Setting/WorldEffectiveState.cpp"
     "Setting/WorldGenClasses.cpp"
     "Setting/SettingsCache.cpp"
     "Utils/ConvexHull/Constants.hpp"
@@ -106,8 +112,6 @@ set(ONI_BASE_SOURCES
     "BatchCpu/CpuOptimization.cpp"
     "Geyser/GeyserParameterCalculator.hpp"
     "Geyser/GeyserParameterCalculator.cpp"
-    "Geyser/PreviewWorldOffsetPolicy.hpp"
-    "Geyser/PreviewWorldOffsetPolicy.cpp"
 )
 
 if(ONI_BUILD_SIDECAR)

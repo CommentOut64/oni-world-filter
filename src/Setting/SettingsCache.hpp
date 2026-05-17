@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "ClusterLayout.hpp"
+#include "ContentActivation.hpp"
 #include "TemplateContainer.hpp"
 
 enum class MixingLevel {
@@ -84,8 +85,10 @@ public:
     bool LoadSettingsCache(const std::string_view &content);
     bool CoordinateChanged(const std::string &text, SettingsCache &settings);
     bool IsSpaceOutEnabled() const { return (m_dlcState & 1) == 1; }
+    ActiveContentSet BuildActiveContentSet() const;
+    bool IsContentEnabled(const std::string &id) const;
     std::vector<const WorldTrait *> GetRandomTraits(const World &world) const;
-    void DoSubworldMixing(std::vector<World *> worlds);
+    void DoSubworldMixing(std::vector<World *> worlds, bool resetWorldRuntime = true);
     SearchMutableStateSnapshot CaptureSearchMutableState() const;
     void RestoreSearchMutableState(const SearchMutableStateSnapshot &snapshot);
     static uint32_t Base36ToBinary(const std::string &input);
@@ -110,6 +113,7 @@ public:
 
 private:
     void ParseAndApplyMixingSettingsCode(const std::string &code);
+    void SanitizeMixingConfigsForCurrentCluster();
     void RepairTransientPointersAfterCopy();
 };
 

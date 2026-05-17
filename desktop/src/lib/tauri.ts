@@ -29,6 +29,9 @@ export function shouldIgnoreSidecarStderr(message: string): boolean {
   const normalized = message.trim();
   return (
     normalized.startsWith("[sidecar-diagnostic]") ||
+    (normalized.includes("RelaxGeneratedChildren") &&
+      normalized.includes("fallback to compute node.")) ||
+    normalized.includes("pdfailed, fallback to compute node.") ||
     normalized.includes("compute child node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed, fallback to compute node.") ||
     normalized.includes("compute node pd failed after convert unknown cells") ||
@@ -60,14 +63,11 @@ export function formatNativeDisplayMessage(message: string): string {
   if (!normalized) {
     return "未知错误";
   }
-  if (normalized.includes("authoritative worldOffset is unavailable")) {
-    return "当前版本缺少可验证的 worldOffset 数据，已停止返回喷口参数以避免错误结果。";
-  }
   if (normalized.includes("secondary preview is not available for current seed")) {
     return "当前种子没有可用的副星预览。";
   }
   if (normalized.includes("invalid native coord")) {
-    return "坐标格式无效，尾部混搭编码必须是 0 或 5 位 base36。";
+    return "坐标格式无效，尾部混搭编码需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。";
   }
   if (normalized.includes("another search job is still running")) {
     return "已有搜索任务仍在运行，请稍后再试。";

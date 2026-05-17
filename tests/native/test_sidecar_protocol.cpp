@@ -443,6 +443,7 @@ int RunAllTests()
 
         GeneratedWorldPreview preview;
         preview.summary.seed = 100123;
+        preview.summary.geyserSeed = 100127;
         preview.summary.worldType = 13;
         preview.summary.worldPlacementIndex = 4;
         preview.summary.worldAssetId = "expansion1::worlds/MiniFlippedWarp";
@@ -450,6 +451,8 @@ int RunAllTests()
         preview.summary.hasSecondaryPreview = true;
         preview.summary.start = {128, 200};
         preview.summary.worldSize = {256, 384};
+        preview.summary.worldOffsetX = 212;
+        preview.summary.worldOffsetY = 0;
         preview.summary.traits.push_back({2});
         preview.summary.geysers.push_back({steam, 70, 90});
         PolygonSummary polygon;
@@ -671,11 +674,20 @@ int RunAllTests()
                    "expansion1::worlds/MiniFlippedWarp",
                "preview summary worldAssetId mismatch",
                failures);
+        Expect(previewJson["preview"]["summary"]["geyserSeed"].asInt() == 100127,
+               "preview summary geyserSeed mismatch",
+               failures);
         Expect(!previewJson["preview"]["summary"]["isPrimary"].asBool(),
                "preview summary isPrimary mismatch",
                failures);
         Expect(previewJson["preview"]["summary"]["hasSecondaryPreview"].asBool(),
                "preview summary hasSecondaryPreview mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["worldOffsetX"].asInt() == 212,
+               "preview summary worldOffsetX mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["worldOffsetY"].asInt() == 0,
+               "preview summary worldOffsetY mismatch",
                failures);
         Expect(previewGeyserDetailsJson["geyserDetails"].size() == 2,
                "preview_geyser_details size mismatch",
@@ -700,6 +712,9 @@ int RunAllTests()
                failures);
         Expect(worldReportJson["report"]["preview"]["summary"]["seed"].asInt() == 100123,
                "world_report preview seed mismatch",
+               failures);
+        Expect(worldReportJson["report"]["preview"]["summary"]["worldOffsetX"].asInt() == 212,
+               "world_report preview worldOffsetX mismatch",
                failures);
         Expect(worldReportJson["report"]["geyserDetails"].size() == 2,
                "world_report geyserDetails size mismatch",

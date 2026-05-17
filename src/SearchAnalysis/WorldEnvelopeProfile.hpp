@@ -50,6 +50,7 @@ struct WorldEnvelopeProfile {
     double diagonal = 0.0;
     std::vector<int> activeMixingSlots;
     std::vector<int> disabledMixingSlots;
+    std::vector<int> illegalEnabledMixingSlots;
     int possibleTraitCountUpper = 0;
     std::vector<std::string> possibleTraitIds;
     std::vector<std::string> impossibleTraitIds;

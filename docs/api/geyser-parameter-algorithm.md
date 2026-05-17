@@ -256,10 +256,10 @@ total cycles = active period / 600
 当前预览链路对 `worldOffset` 的实现边界还需特别注意：
 
 1. 游戏里的权威坐标来源是运行时 asteroid `WorldOffset.X/Y`，不是 `coordinatePrefix`、`worldPlacementIndex` 或 teleporter 列号。
-2. 当前仓库仍然只能生成本地 asteroid 预览数据，尚未产出或导出真实 `worldOffset.X/Y`。
-3. 为了兼容已经验证过的旧主星链路，当前 sidecar 已把主星 offset 恢复为一个独立 policy 模块里的 legacy-equivalent 规则：`M-CERS-C / M-BAD-C -> 82`，`M-FLIP-C / M-FRZ-C / M-SWMP-C / M-RAD-C -> 212`，其余主星保持 `0`。
-4. 这条恢复只覆盖主星；副星仍然缺少权威 `worldOffset.X/Y` 来源，因此继续 fail-closed，避免把猜测 offset 伪装成正确结果。
-5. 非 Space Out 的单世界坐标仍沿用 `worldOffset = 0` 的旧语义，因为这条链路不依赖 cluster asteroid 全局排布。
+2. 当前仓库已在 native 生成阶段复刻游戏的 `BestFit.BestFitWorlds(...)` 排版逻辑：先基于 world/world mixing 生效后的真实世界尺寸生成 `WorldPlacement.width/height`，再按高度降序扫描布局，产出每个 placement 的权威 `worldOffsetX/Y`。
+3. `GeneratedWorldSummary` 已直接携带 `geyserSeed`、`worldOffsetX`、`worldOffsetY`；`preview`、`preview_geyser_details` 和 `world_report` 都只消费这份 summary，不再按主星前缀或副星门控二次猜 offset。
+4. 眼冒金星多世界 cluster 下，主星与副星现在都走同一条 offset 数据通路；像 `M-BAD-C -> 82`、`M-FRZ-C -> 212` 这类结果如果出现，来源也是 `BestFit` 排版结果本身，而不是 sidecar 硬编码。
+5. 单世界 cluster 仍会自然得到 `worldOffset = 0,0`，这是 `BestFit` 在单 asteroid 输入下的直接结果，不是单独特判。
 
 当前仓库内与该算法配套的协议 / 宿主接入也已经具备以下能力：
 
@@ -273,5 +273,5 @@ total cycles = active period / 600
 2. 地图预览采用“两阶段”体验：地图主体先显示，喷口详情随后异步补齐；旧请求只允许写 cache，不能回写当前激活项。
 3. `PreviewPane` 已支持主星 / 副星切换；首次切到副星时按 target 发请求，失败时继续保留主星画面并显示明确错误。
 4. `PreviewCanvas` / `PreviewPane` 已通过容器内锚点 + Ant Design `Popover` 的受控浮层，在喷口点位附近展示温度、喷发率、平均总产出、喷发期和活跃期。
-5. 当前 Space Out 主星的喷口参数与主星 world report 已恢复到旧实现等价结果；副星参数弹窗仍会显示 fail-closed 错误。
+5. 当前主星 / 副星喷口参数都通过同一套 summary offset 计算，预览详情与 world report 不再分裂出单独的 offset 推断路径。
 6. 副星只做展示，不参与批量筛选，也不允许从副星态触发报告导出。

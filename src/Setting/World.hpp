@@ -109,6 +109,7 @@ struct World {
     std::vector<const TemplateSpawnRules *> worldTemplateRules2;
     std::vector<WeightedSubworldName> mixingSubworlds;
 
+    void ApplayWorldMixing(const WorldMixing &mixing);
     void ApplayMixings(std::vector<MixingConfig *> &mixings);
     void ApplayTraits(const WorldTrait &traits, const SettingsCache &settings);
     void ClearMixingsAndTraits();

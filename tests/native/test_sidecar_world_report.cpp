@@ -128,7 +128,7 @@ int RunAllTests()
             ParseJsonObject(firstLine, &failures, "M-FLIP-C world_report json should be valid");
 
         Expect(root["event"].asString() == "world_report",
-               "M-FLIP-C primary world_report should recover to legacy-equivalent success",
+               "M-FLIP-C primary world_report should succeed with generated summary offset",
                &failures);
         const Json::Value &geyserDetails = root["report"]["geyserDetails"];
         int hotSteamIndex = -1;

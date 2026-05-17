@@ -34,7 +34,11 @@ fn configure_portable_webview_fixed_runtime() {
             .join("resources")
             .join("Microsoft.WebView2.FixedVersionRuntime");
         if fixed_runtime_dir.is_dir() {
-            std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", fixed_runtime_dir);
+            // 这里在进程启动早期、任何 worker 线程创建前设置环境变量，
+            // 用于让 portable/offline 形态优先使用随包固定版 WebView2 runtime。
+            unsafe {
+                std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", fixed_runtime_dir);
+            }
         }
     }
 }

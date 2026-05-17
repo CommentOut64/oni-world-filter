@@ -321,6 +321,7 @@ export interface PreviewPolygon {
 
 export interface PreviewSummary {
   seed: number;
+  geyserSeed: number;
   worldType: number;
   worldPlacementIndex: number;
   worldAssetId?: string;
@@ -328,6 +329,8 @@ export interface PreviewSummary {
   hasSecondaryPreview: boolean;
   start: Point;
   worldSize: WorldSize;
+  worldOffsetX: number;
+  worldOffsetY: number;
   traits: number[];
   geysers: GeyserSummary[];
 }

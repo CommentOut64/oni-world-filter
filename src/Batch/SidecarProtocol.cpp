@@ -352,6 +352,7 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
 {
     Json::Value root(Json::objectValue);
     root["summary"]["seed"] = preview.summary.seed;
+    root["summary"]["geyserSeed"] = preview.summary.geyserSeed;
     root["summary"]["worldType"] = preview.summary.worldType;
     root["summary"]["worldPlacementIndex"] = preview.summary.worldPlacementIndex;
     root["summary"]["worldAssetId"] = preview.summary.worldAssetId;
@@ -361,6 +362,8 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
     root["summary"]["start"]["y"] = preview.summary.start.y;
     root["summary"]["worldSize"]["w"] = preview.summary.worldSize.x;
     root["summary"]["worldSize"]["h"] = preview.summary.worldSize.y;
+    root["summary"]["worldOffsetX"] = preview.summary.worldOffsetX;
+    root["summary"]["worldOffsetY"] = preview.summary.worldOffsetY;
 
     Json::Value traits(Json::arrayValue);
     for (const auto &item : preview.summary.traits) {
