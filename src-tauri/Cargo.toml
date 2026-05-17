@@ -1,6 +1,6 @@
 [package]
 name = "oni-world-filter"
-version = "1.0.0"
+version = "1.0.1"
 description = "oni-world-filter desktop host"
 authors = ["CommentOut64"]
 license = "MIT"
