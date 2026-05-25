@@ -7,6 +7,9 @@ struct Cell {
     SimHashes element{};
     float mass{};
     float temperature{};
+    SimHashes backwallElement{};
+    float backwallTemperature{};
+    float backwallMass{};
     std::string diseaseName;
     int diseaseCount{};
     int location_x{};
@@ -32,6 +35,7 @@ struct StorageItem {
 struct TemplateAmountValue {
     std::string id;
     float value{};
+    bool hasValue{};
 };
 
 struct Prefab {
@@ -47,6 +51,8 @@ struct Prefab {
     std::vector<StorageItem> storage;
     Type type{};
     std::string facadeId;
+    std::string loreUnlockId;
+    std::string loreDisplayText;
     int connections{};
     Rottable rottable;
     std::vector<TemplateAmountValue> amounts;

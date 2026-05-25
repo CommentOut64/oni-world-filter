@@ -121,7 +121,7 @@ static ActiveSearchState g_activeSearch;
 struct PreviewWorldSession {
     int worldType{};
     int seed{};
-    int mixing{};
+    uint64_t mixing{};
     std::string coord;
     int primaryPlacementIndex{-1};
     std::optional<int> secondaryPlacementIndex;
@@ -253,7 +253,7 @@ void ShutdownSearchWorker()
     }
 }
 
-bool BuildWorldCode(int worldType, int seed, int mixing, std::string *code)
+bool BuildWorldCode(int worldType, int seed, uint64_t mixing, std::string *code)
 {
     if (code == nullptr) {
         return false;
@@ -435,7 +435,7 @@ struct GeyserSeedContext {
 
 bool ResolveGeyserSeedContext(int worldType,
                               int seed,
-                              int mixing,
+                              uint64_t mixing,
                               Batch::PreviewTarget target,
                               GeyserSeedContext *context,
                               std::string *errorMessage)
@@ -543,7 +543,7 @@ private:
 bool PreviewSessionMatches(const PreviewWorldSession &session,
                            int worldType,
                            int seed,
-                           int mixing)
+                           uint64_t mixing)
 {
     return session.worldType == worldType &&
            session.seed == seed &&
@@ -926,7 +926,7 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
     if (!NativeCoordinate::ResolveNativeCoordinate(request.coord, &resolved)) {
         EmitLine(Batch::SerializeFailedEvent(
             request.jobId,
-            "invalid native coord; trailing mixing code must be 1 to 5-char base36 within mixing range"));
+            "invalid native coord; trailing mixing code must be non-empty uppercase base36 within mixing range"));
         return;
     }
 
@@ -1157,14 +1157,17 @@ void RunAnalyzeSearchCommand(const Batch::SidecarAnalyzeSearchRequest &request)
                                 !request.constraints.forbiddenTraits.empty() ||
                                 !request.constraints.distance.empty() ||
                                 !request.constraints.count.empty();
+    std::string worldProfileError;
     const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(*settings,
                                                                      request.worldType,
                                                                      request.mixing,
                                                                      SearchAnalysis::WorldEnvelopeCompileOptions{
                                                                          .includeSpatialEnvelopes =
                                                                              hasConstraints,
-                                                                     });
-    const auto result = SearchAnalysis::RunSearchAnalysis(analysisRequest, catalog, &profile);
+                                                                     },
+                                                                     &worldProfileError);
+    const auto result = SearchAnalysis::RunSearchAnalysis(
+        analysisRequest, catalog, &profile, worldProfileError);
     EmitLine(Batch::SerializeSearchAnalysisEvent(request.jobId, result));
 }
 

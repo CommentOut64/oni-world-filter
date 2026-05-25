@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <ranges>
 
+#include "Setting/ContentActivation.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "Utils/KRandom.hpp"
 #include "Utils/PointGenerator.hpp"
@@ -187,10 +188,17 @@ bool InitializeWorldEffectiveStates(const SettingsCache &settings,
     }
     states->clear();
     states->reserve(placements.size());
+    const ActiveContentSet activeContent = settings.BuildActiveContentSet();
     for (const auto &placement : placements) {
         if (placement.placement == nullptr || placement.sourceWorld == nullptr) {
             if (errorMessage != nullptr) {
                 *errorMessage = "resolved world placement is incomplete";
+            }
+            return false;
+        }
+        if (!IsWorldAllowed(*placement.sourceWorld, settings.cluster, activeContent)) {
+            if (errorMessage != nullptr) {
+                *errorMessage = "world content is not active: " + placement.worldAssetId;
             }
             return false;
         }
@@ -199,6 +207,7 @@ bool InitializeWorldEffectiveStates(const SettingsCache &settings,
         WorldEffectiveState state;
         state.placementIndex = placement.placementIndex;
         state.worldAssetId = placement.worldAssetId;
+        state.activeContentIds = activeContent.ids;
         state.world = *placement.sourceWorld;
         state.world.locationType = locationType;
         state.world.ClearMixingsAndTraits();

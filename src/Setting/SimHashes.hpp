@@ -188,6 +188,14 @@ enum class SimHashes {
     Gunk = -230085045,
     NickelOre = 1387581016,
     Nickel = -1774383478,
+    MurkyBrine = -2044124200,
+    SiltStone = -328791769,
+    ZincOre = -1921520130,
+    Corallium = -1705953114,
+    Coquina = -487705524,
+    Basalt = 1347222069,
+    Galena = 2071292326,
+    Mucus = 1618409177,
     Iridium = -198894563,
     Vacuum = 758759285,
     Void = -1456075980,
@@ -255,7 +263,11 @@ enum class ZoneType {
     SugarWoods,
     PrehistoricGarden,
     PrehistoricRaptor,
-    PrehistoricWetlands
+    PrehistoricWetlands,
+    Beach,
+    Reef,
+    KelpForest,
+    Abyss
 };
 
 enum class LocationType {
@@ -313,7 +325,9 @@ enum class Location {
     AnyFloor,
     LiquidCeiling,
     Liquid,
-    EntombedFloorPeek
+    EntombedFloorPeek,
+    LiquidFloorCavityNoRequired,
+    AnchoredToBackWall
 };
 
 enum class Shape {
@@ -353,7 +367,8 @@ enum class Range {
     HumanHot,
     Hot,
     VeryHot,
-    ExtremelyHot
+    ExtremelyHot,
+    SomewhatHot
 };
 
 enum class Type {

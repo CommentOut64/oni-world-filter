@@ -48,6 +48,7 @@ struct ClusterAudioSettings {
 struct ClusterLayout {
     std::vector<WorldPlacement> worldPlacements;
     std::vector<SpaceMapPOIPlacement> poiPlacements;
+    std::vector<std::string> startingMinions;
     std::string name;
     std::string description;
     std::string welcomeMessage;

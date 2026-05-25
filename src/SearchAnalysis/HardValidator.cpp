@@ -130,6 +130,7 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
                     const NormalizedSearchRequest &request,
                     const SearchCatalog &catalog,
                     const WorldEnvelopeProfile *worldProfile,
+                    std::string_view worldProfileErrorMessage,
                     std::vector<ValidationIssue> *errors,
                     std::vector<ValidationIssue> *warnings)
 {
@@ -177,7 +178,19 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
         }
     }
 
-    if (worldProfile == nullptr || !worldProfile->valid) {
+    if (worldProfile == nullptr) {
+        return;
+    }
+
+    if (!worldProfile->valid) {
+        AddIssue(errors,
+                 "layer2",
+                 "world.profile_compile_failed",
+                 "worldType/mixing",
+                 worldProfileErrorMessage.empty()
+                     ? "当前 worldType + mixing 的统一 world state 构建失败"
+                     : "当前 worldType + mixing 的统一 world state 构建失败: " +
+                           std::string(worldProfileErrorMessage));
         return;
     }
 
@@ -424,7 +437,8 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
 
 SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
                                        const SearchCatalog &catalog,
-                                       const WorldEnvelopeProfile *worldProfile)
+                                       const WorldEnvelopeProfile *worldProfile,
+                                       std::string_view worldProfileErrorMessage)
 {
     SearchAnalysisResult result;
     std::vector<ValidationIssue> layer2Warnings;
@@ -437,6 +451,7 @@ SearchAnalysisResult RunSearchAnalysis(const SearchAnalysisRequest &request,
                    result.normalizedRequest,
                    catalog,
                    worldProfile,
+                   worldProfileErrorMessage,
                    &result.errors,
                    &layer2Warnings);
     ValidateLayer3(result.normalizedRequest, catalog, &result.errors);

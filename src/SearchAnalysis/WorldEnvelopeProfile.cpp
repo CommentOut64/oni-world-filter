@@ -11,9 +11,11 @@
 #include <vector>
 
 #include "Batch/FilterConfig.hpp"
+#include "Geyser/GeyserCatalog.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "Setting/ContentActivation.hpp"
 #include "Setting/SettingsCache.hpp"
+#include "Setting/WorldTraitConflict.hpp"
 #include "Setting/WorldEffectiveState.hpp"
 #include "WorldGen.hpp"
 
@@ -177,18 +179,24 @@ int ComputePossibleTraitCountUpper(const SettingsCache &settings, const World &w
     }
 
     const auto total = BuildTraitSelectionPool(settings);
+    const auto fixedConflictState =
+        BuildFixedTraitConflictState(settings.traits, world.fixedTraits);
     int upper = 0;
     for (const auto &rule : world.worldTraitRules) {
         int specificCount = 0;
         for (const auto &specificTrait : rule.specificTraits) {
-            if (FindTraitByPath(total, specificTrait) != nullptr) {
+            const auto *trait = FindTraitByPath(total, specificTrait);
+            if (trait != nullptr &&
+                !TraitConflictsWithFixedTraits(*trait, fixedConflictState)) {
                 ++specificCount;
             }
         }
 
         int allowedCount = 0;
         for (const auto *trait : total) {
-            if (trait == nullptr || !RuleAllowsTrait(rule, *trait, world)) {
+            if (trait == nullptr ||
+                TraitConflictsWithFixedTraits(*trait, fixedConflictState) ||
+                !RuleAllowsTrait(rule, *trait, world)) {
                 continue;
             }
             ++allowedCount;
@@ -209,6 +217,8 @@ std::vector<const WorldTrait *> CollectPotentialEnvelopeTraits(const SettingsCac
     }
 
     const auto total = BuildTraitSelectionPool(settings);
+    const auto fixedConflictState =
+        BuildFixedTraitConflictState(settings.traits, world.fixedTraits);
     std::set<std::string> dedup;
     auto tryAppend = [&](const WorldTrait *trait) {
         if (trait == nullptr || !TraitAffectsEnvelope(*trait)) {
@@ -222,7 +232,11 @@ std::vector<const WorldTrait *> CollectPotentialEnvelopeTraits(const SettingsCac
 
     for (const auto &rule : world.worldTraitRules) {
         for (const auto &specificTrait : rule.specificTraits) {
-            tryAppend(FindTraitByPath(total, specificTrait));
+            const auto *trait = FindTraitByPath(total, specificTrait);
+            if (trait != nullptr &&
+                !TraitConflictsWithFixedTraits(*trait, fixedConflictState)) {
+                tryAppend(trait);
+            }
         }
 
         if (rule.min <= 0 && rule.max <= 0) {
@@ -230,7 +244,9 @@ std::vector<const WorldTrait *> CollectPotentialEnvelopeTraits(const SettingsCac
         }
 
         for (const auto *trait : total) {
-            if (trait == nullptr || !RuleAllowsTrait(rule, *trait, world)) {
+            if (trait == nullptr ||
+                TraitConflictsWithFixedTraits(*trait, fixedConflictState) ||
+                !RuleAllowsTrait(rule, *trait, world)) {
                 continue;
             }
             tryAppend(trait);
@@ -248,6 +264,8 @@ std::vector<const WorldTrait *> CollectPotentialSelectableTraits(const SettingsC
     }
 
     const auto total = BuildTraitSelectionPool(settings);
+    const auto fixedConflictState =
+        BuildFixedTraitConflictState(settings.traits, world.fixedTraits);
     std::set<std::string> dedup;
     auto tryAppend = [&](const WorldTrait *trait) {
         if (trait == nullptr) {
@@ -261,7 +279,11 @@ std::vector<const WorldTrait *> CollectPotentialSelectableTraits(const SettingsC
 
     for (const auto &rule : world.worldTraitRules) {
         for (const auto &specificTrait : rule.specificTraits) {
-            tryAppend(FindTraitByPath(total, specificTrait));
+            const auto *trait = FindTraitByPath(total, specificTrait);
+            if (trait != nullptr &&
+                !TraitConflictsWithFixedTraits(*trait, fixedConflictState)) {
+                tryAppend(trait);
+            }
         }
 
         if (rule.min <= 0 && rule.max <= 0) {
@@ -269,7 +291,9 @@ std::vector<const WorldTrait *> CollectPotentialSelectableTraits(const SettingsC
         }
 
         for (const auto *trait : total) {
-            if (trait == nullptr || !RuleAllowsTrait(rule, *trait, world)) {
+            if (trait == nullptr ||
+                TraitConflictsWithFixedTraits(*trait, fixedConflictState) ||
+                !RuleAllowsTrait(rule, *trait, world)) {
                 continue;
             }
             tryAppend(trait);
@@ -537,16 +561,19 @@ std::vector<std::string> ExtractTemplateGeyserIds(const SettingsCache &settings,
 
     std::set<std::string> dedup;
     for (const auto &entity : templateItr->second.otherEntities) {
-        constexpr const char *prefix = "GeyserGeneric_";
-        if (entity.id.rfind(prefix, 0) != 0) {
+        const Geyser::CatalogEntry *entry = Geyser::FindByTemplateEntityId(entity.id);
+        if (entry == nullptr) {
+            constexpr std::string_view kGenericPrefix = "GeyserGeneric_";
+            if (!std::string_view(entity.id).starts_with(kGenericPrefix)) {
+                continue;
+            }
+            entry = Geyser::FindByKey(std::string_view(entity.id).substr(kGenericPrefix.size()));
+        }
+        if (entry == nullptr) {
             continue;
         }
-        const std::string geyser = entity.id.substr(14);
-        if (Batch::GeyserIdToIndex(geyser) < 0) {
-            continue;
-        }
-        if (dedup.insert(geyser).second) {
-            result.push_back(geyser);
+        if (dedup.insert(std::string(entry->key)).second) {
+            result.emplace_back(entry->key);
         }
     }
     return result;
@@ -564,20 +591,17 @@ void BuildGenericTypeUpperById(const SettingsCache &settings,
         (*out)[id] = 0.0;
     }
 
-    if (settings.IsSpaceOutEnabled()) {
-        const double upper = 1.0 / 23.0;
-        for (int i = 0; i <= 22 && i < static_cast<int>(ids.size()); ++i) {
-            (*out)[ids[static_cast<size_t>(i)]] = upper;
-        }
+    const auto &genericPoolIds = Geyser::GetGenericRandomPoolIds(settings.IsSpaceOutEnabled());
+    if (genericPoolIds.empty()) {
         return;
     }
 
-    const double upper = 1.0 / 20.0;
-    for (int i = 0; i <= 18 && i < static_cast<int>(ids.size()); ++i) {
-        (*out)[ids[static_cast<size_t>(i)]] = upper;
-    }
-    if (21 < static_cast<int>(ids.size())) {
-        (*out)[ids[21]] = upper;
+    const double upper = 1.0 / static_cast<double>(genericPoolIds.size());
+    for (const int geyserId : genericPoolIds) {
+        if (geyserId < 0 || geyserId >= static_cast<int>(ids.size())) {
+            continue;
+        }
+        (*out)[ids[static_cast<size_t>(geyserId)]] = upper;
     }
 }
 

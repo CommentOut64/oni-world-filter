@@ -12,6 +12,109 @@ struct Feature {
     bool operator<(const Feature &rhs) const { return type < rhs.type; }
 };
 
+struct NoiseNodeRef {
+    std::string type;
+    std::string name;
+};
+
+struct NoiseLink {
+    NoiseNodeRef target;
+    std::optional<NoiseNodeRef> source0;
+    std::optional<NoiseNodeRef> source1;
+    std::optional<NoiseNodeRef> source2;
+};
+
+struct NoiseGraphSettings {
+    float zoom = 1.0f;
+    bool normalise{};
+    bool seamless{};
+    Vector2f lowerBound = {2.0f, 2.0f};
+    Vector2f upperBound = {4.0f, 4.0f};
+    std::string name;
+    Vector2f pos;
+};
+
+struct NoisePrimitive {
+    std::string primative;
+    std::string quality;
+    int seed{};
+    float offset{};
+    std::string name;
+    Vector2f pos;
+};
+
+struct NoiseFilter {
+    std::string filter;
+    float frequency = 1.0f;
+    float lacunarity = 1.0f;
+    int octaves = 1;
+    float offset{};
+    float gain = 1.0f;
+    float exponent = 1.0f;
+    float scale = 1.0f;
+    float bias{};
+    std::string name;
+    Vector2f pos;
+};
+
+struct NoiseModifier {
+    std::string modifyType;
+    float lower = -1.0f;
+    float upper = 1.0f;
+    float exponent = 1.0f;
+    float scale = 1.0f;
+    float bias{};
+    Vector2f scale2d = {1.0f, 1.0f};
+    std::string name;
+    Vector2f pos;
+};
+
+struct NoiseTransformer {
+    std::string transformerType;
+    float power = 1.0f;
+    Vector2f vector;
+    std::string name;
+    Vector2f pos;
+};
+
+struct NoiseSelector {
+    std::string selectType;
+    float lower{};
+    float upper{};
+    float edge{};
+    std::string name;
+    Vector2f pos;
+};
+
+struct NoiseCombiner {
+    std::string combineType;
+    std::string name;
+    Vector2f pos;
+};
+
+struct NoiseControlPoint {
+    float input{};
+    float output{};
+};
+
+struct NoiseControlPoints {
+    std::vector<NoiseControlPoint> points;
+    std::string name;
+};
+
+struct NoiseTree {
+    NoiseGraphSettings settings;
+    std::vector<NoiseLink> links;
+    std::map<std::string, NoisePrimitive> primitives;
+    std::map<std::string, NoiseFilter> filters;
+    std::map<std::string, NoiseTransformer> transformers;
+    std::map<std::string, NoiseSelector> selectors;
+    std::map<std::string, NoiseModifier> modifiers;
+    std::map<std::string, NoiseCombiner> combiners;
+    std::map<std::string, float> floats;
+    std::map<std::string, NoiseControlPoints> controlpoints;
+};
+
 struct WeightedBiome {
     std::string name;
     float weight{};

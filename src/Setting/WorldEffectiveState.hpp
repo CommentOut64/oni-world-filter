@@ -19,6 +19,7 @@ struct ResolvedWorldPlacement {
 struct WorldEffectiveState {
     int placementIndex{-1};
     std::string worldAssetId;
+    std::vector<std::string> activeContentIds;
     std::vector<std::string> fixedTraitIds;
     std::vector<const WorldTrait *> fixedWorldTraits;
     std::vector<const WorldTrait *> randomTraits;

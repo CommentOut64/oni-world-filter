@@ -16,6 +16,7 @@ struct SubWorld {
     std::string descriptionKey;
     std::string utilityKey;
     std::string biomeNoise;
+    std::string backwallNoise;
     std::string overrideNoise;
     std::string densityNoise;
     std::string borderOverride;
