@@ -1,4 +1,5 @@
 #include "SearchAnalysis/WorldEnvelopeProfile.hpp"
+#include "SearchAnalysis/SearchCatalog.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
 
@@ -53,6 +54,16 @@ bool Contains(const std::vector<std::string> &items, const char *value)
     return std::find(items.begin(), items.end(), value) != items.end();
 }
 
+int FindWorldTypeByPrefix(const std::string &prefixWithDash)
+{
+    const auto &prefixes = SearchAnalysis::GetWorldPrefixes();
+    const auto itr = std::find(prefixes.begin(), prefixes.end(), prefixWithDash);
+    if (itr == prefixes.end()) {
+        return -1;
+    }
+    return static_cast<int>(std::distance(prefixes.begin(), itr));
+}
+
 } // namespace
 
 int RunAllTests()
@@ -102,6 +113,100 @@ int RunAllTests()
         Expect(!hasRuleIndexFallback,
                "exact source ruleId should not use unstable rule-index fallback",
                failures);
+    }
+
+    {
+        SettingsCache isolated;
+        isolated.seed = 246810;
+        isolated.traits["traits/FixedCore"] = WorldTrait{
+            .filePath = "traits/FixedCore",
+            .name = "Fixed Core",
+            .exclusiveWith = {"traits/Candidate"},
+        };
+        isolated.traits["traits/Candidate"] = WorldTrait{
+            .filePath = "traits/Candidate",
+            .name = "Candidate",
+        };
+
+        World world;
+        world.name = "Synthetic Fixed Trait Conflict";
+        world.fixedTraits = {"traits/FixedCore"};
+        world.worldTraitRules.push_back(TraitRule{
+            .min = 1,
+            .max = 1,
+        });
+
+        const auto traits = isolated.GetRandomTraits(world);
+        Expect(traits.empty(),
+               "fixed traits should exclude mutually exclusive random traits",
+               failures);
+    }
+
+    {
+        SettingsCache profileSettings = settings;
+        constexpr const char *kClassicPrefix = "V-SNDST-C-";
+        const int worldType = FindWorldTypeByPrefix(kClassicPrefix);
+        Expect(worldType >= 0,
+               "fixed-trait profile test should resolve classic world prefix",
+               failures);
+
+        auto clusterItr = std::ranges::find_if(
+            profileSettings.clusters,
+            [](const auto &entry) { return entry.second.coordinatePrefix == "V-SNDST-C"; });
+        Expect(clusterItr != profileSettings.clusters.end(),
+               "fixed-trait profile test should find classic cluster by prefix",
+               failures);
+
+        if (worldType >= 0 && clusterItr != profileSettings.clusters.end() &&
+            !clusterItr->second.worldPlacements.empty()) {
+            auto &cluster = clusterItr->second;
+            const std::string originalWorldId = cluster.worldPlacements.front().world;
+            auto worldItr = profileSettings.worlds.find(originalWorldId);
+            Expect(worldItr != profileSettings.worlds.end(),
+                   "fixed-trait profile test should find original cluster world",
+                   failures);
+
+            if (worldItr != profileSettings.worlds.end()) {
+                auto syntheticWorld = worldItr->second;
+                syntheticWorld.name = "Synthetic Profile Fixed Trait Conflict";
+                syntheticWorld.fixedTraits = {"traits/FixedCore"};
+                syntheticWorld.worldTraitRules.clear();
+                syntheticWorld.worldTraitRules.push_back(TraitRule{
+                    .min = 1,
+                    .max = 1,
+                });
+                profileSettings.worlds["synthetic/worlds/FixedTraitConflictProfile"] =
+                    syntheticWorld;
+                cluster.worldPlacements.front().world =
+                    "synthetic/worlds/FixedTraitConflictProfile";
+
+                profileSettings.traits["traits/FixedCore"] = WorldTrait{
+                    .filePath = "traits/FixedCore",
+                    .name = "Fixed Core",
+                    .exclusiveWith = {"traits/Candidate"},
+                };
+                profileSettings.traits["traits/Candidate"] = WorldTrait{
+                    .filePath = "traits/Candidate",
+                    .name = "Candidate",
+                };
+
+                std::string error;
+                const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(
+                    profileSettings, worldType, 0, &error);
+                Expect(error.empty(),
+                       "fixed-trait profile compile should not return error",
+                       failures);
+                Expect(profile.valid,
+                       "fixed-trait profile compile should stay valid",
+                       failures);
+                Expect(!Contains(profile.possibleTraitIds, "traits/Candidate"),
+                       "profile possibleTraitIds should exclude traits blocked by fixed traits",
+                       failures);
+                Expect(Contains(profile.impossibleTraitIds, "traits/Candidate"),
+                       "profile impossibleTraitIds should include traits blocked by fixed traits",
+                       failures);
+            }
+        }
     }
 
     {
@@ -175,6 +280,20 @@ int RunAllTests()
                failures);
         Expect(Contains(profile.impossibleGeyserTypes, "molten_iron"),
                "M-FRZ-C profile should still keep generic metals impossible",
+               failures);
+    }
+
+    {
+        const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 38, 0);
+        Expect(profile.valid, "AQU-A profile should be valid", failures);
+        Expect(Contains(profile.possibleGeyserTypes, "murky_brine"),
+               "AQU-A profile should expose murky_brine in possible geyser types",
+               failures);
+        Expect(Contains(profile.possibleGeyserTypes, "small_reef_geyser"),
+               "AQU-A profile should expose small_reef_geyser in possible geyser types",
+               failures);
+        Expect(Contains(profile.possibleGeyserTypes, "underwater_vent"),
+               "AQU-A profile should expose underwater_vent in possible geyser types",
                failures);
     }
 

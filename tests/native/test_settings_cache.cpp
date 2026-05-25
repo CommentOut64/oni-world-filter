@@ -6,6 +6,7 @@
 #include "config.h"
 
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <fstream>
@@ -72,14 +73,14 @@ bool LoadFreshSettings(SettingsCache &settings, std::string *error)
     return true;
 }
 
-std::string BuildCoordinateCode(const std::string &prefix, int seed, int mixing)
+std::string BuildCoordinateCode(const std::string &prefix, int seed, uint64_t mixing)
 {
     std::ostringstream builder;
     builder << prefix;
     if (!prefix.empty() && prefix.back() != '-') {
         builder << '-';
     }
-    builder << seed << "-0-D3-" << SettingsCache::BinaryToBase36(static_cast<uint32_t>(mixing));
+    builder << seed << "-0-D3-" << SettingsCache::BinaryToBase36(mixing);
     return builder.str();
 }
 
@@ -223,6 +224,39 @@ bool WorldRuntimeBasePointersBindToLocalCopy(const World &world)
     }
 
     return world.globalFeatures2.empty() && world.mixingSubworlds.empty();
+}
+
+std::string FindAssignedBiomeName(const Site &site, const SubWorld &subworld)
+{
+    std::string assigned;
+    for (const auto &biome : subworld.biomes) {
+        if (!site.tags.contains(biome.name)) {
+            continue;
+        }
+        if (!assigned.empty()) {
+            return {};
+        }
+        assigned = biome.name;
+    }
+    return assigned;
+}
+
+std::vector<std::string> CollectAssignedBiomeSequence(const std::vector<Site> &sites,
+                                                      const SubWorld &subworld)
+{
+    std::vector<std::string> result;
+    for (const auto &site : sites) {
+        if (site.children == nullptr) {
+            continue;
+        }
+        for (const auto &child : *site.children) {
+            const std::string assigned = FindAssignedBiomeName(child, subworld);
+            if (!assigned.empty()) {
+                result.push_back(assigned);
+            }
+        }
+    }
+    return result;
 }
 
 bool CopiedWorldRuntimePointersBindToLocalCopy(const SettingsCache &settings)
@@ -447,6 +481,238 @@ int RunAllTests()
         SettingsCache settings;
         std::string error;
         Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for dlc5 reef biome noise checks",
+               failures);
+
+        if (error.empty()) {
+            const auto subworldItr = settings.subworlds.find("dlc5::subworlds/reef/ReefBasic");
+            Expect(subworldItr != settings.subworlds.end(),
+                   "dlc5 reef biome noise fixture should find ReefBasic subworld",
+                   failures);
+
+            if (subworldItr != settings.subworlds.end()) {
+                const auto &subworld = subworldItr->second;
+                Expect(subworld.biomes.size() == 2,
+                       "ReefBasic should expose two weighted biomes for noise selection",
+                       failures);
+                Expect(subworld.biomeNoise == "dlc5::noise/reefNoise",
+                       "ReefBasic should reference reefNoise as biomeNoise",
+                       failures);
+                Expect(settings.noise.contains("dlc5::noise/reefNoise"),
+                       "settings cache should load dlc5 reefNoise resource",
+                       failures);
+                Expect(settings.FindNoise("noise/reefNoise", subworld.name) != nullptr,
+                       "FindNoise should resolve owner-relative DLC5 noise paths",
+                       failures);
+
+                if (subworld.biomes.size() == 2 &&
+                    settings.FindNoise("noise/reefNoise", subworld.name) != nullptr) {
+                    settings.seed = 424242;
+                    auto buildSyntheticWorld = [&settings, &subworld](std::string_view biomeNoisePath) {
+                        World world;
+                        world.name = "Synthetic Reef Noise World";
+                        world.worldsize = {256.0f, 256.0f};
+                        world.layoutMethod = LayoutMethod::VoronoiTree;
+                        world.startSubworldName = "dlc5::subworlds/beach/BeachStart";
+                        world.startingBaseTemplate = "dlc5::bases/beachBaseVista";
+                        world.startingBasePositionHorizontal = {0.5f, 0.5f};
+                        world.startingBasePositionVertical = {0.5f, 0.5f};
+                        world.worldTemplateRules.push_back(TemplateSpawnRules{
+                            .ruleId = "synthetic/noop-template-rule",
+                            .times = 0,
+                        });
+                        world.subworldFiles.push_back(WeightedSubworldName{
+                            .name = "dlc5::subworlds/beach/BeachStart",
+                            .weight = 1.0f,
+                            .minCount = 1,
+                        });
+                        world.subworldFiles.push_back(WeightedSubworldName{
+                            .name = subworld.name,
+                            .weight = 1.0f,
+                            .minCount = 6,
+                        });
+
+                        AllowedCellsFilter filter;
+                        filter.tagcommand = TagCommand::Default;
+                        filter.command = Command::Replace;
+                        filter.subworldNames.push_back(subworld.name);
+                        world.unknownCellsAllowedSubworlds.push_back(filter);
+                        world.globalFeatures2.clear();
+                        if (const auto beachItr = settings.subworlds.find(world.startSubworldName);
+                            beachItr != settings.subworlds.end()) {
+                            const auto &beachStart = beachItr->second;
+                            for (const auto &feature : beachStart.features) {
+                                if (feature.type == "features/generic/StartLocation") {
+                                    world.globalFeatures2.push_back(&feature);
+                                    break;
+                                }
+                            }
+                        }
+                        world.ClearMixingsAndTraits();
+
+                        auto *mutableSubworld = const_cast<SubWorld *>(&subworld);
+                        mutableSubworld->biomeNoise = std::string(biomeNoisePath);
+                        return world;
+                    };
+
+                    std::string originalBiomeNoise = subworld.biomeNoise;
+                    World reefWorld = buildSyntheticWorld("dlc5::noise/reefNoise");
+                    std::vector<Site> reefSites;
+                    WorldGen reefWorldGen(reefWorld, settings);
+                    const bool reefGenerated = reefWorldGen.GenerateOverworld(reefSites);
+
+                    auto *mutableSubworld = const_cast<SubWorld *>(&subworld);
+                    mutableSubworld->biomeNoise = originalBiomeNoise;
+                    Expect(reefGenerated,
+                           "synthetic ReefBasic world should generate with reefNoise",
+                           failures);
+
+                    if (reefGenerated) {
+                        const auto reefAssignments =
+                            CollectAssignedBiomeSequence(reefSites, subworld);
+                        Expect(!reefAssignments.empty(),
+                               "synthetic ReefBasic world should assign biome tags to generated children",
+                               failures);
+                        const bool reefOnlyKnownBiomes = std::all_of(
+                            reefAssignments.begin(), reefAssignments.end(),
+                            [](const std::string &name) {
+                                return name == "dlc5::biomes/Reef/Basic" ||
+                                       name == "dlc5::biomes/Reef/Corals";
+                            });
+                        Expect(reefOnlyKnownBiomes,
+                               "synthetic ReefBasic world should only stamp known ReefBasic biome names",
+                               failures);
+
+                        World kelpWorld = buildSyntheticWorld("dlc5::noise/kelpForestNoise");
+                        std::vector<Site> kelpSites;
+                        WorldGen kelpWorldGen(kelpWorld, settings);
+                        const bool kelpGenerated = kelpWorldGen.GenerateOverworld(kelpSites);
+                        mutableSubworld->biomeNoise = originalBiomeNoise;
+                        Expect(kelpGenerated,
+                               "synthetic ReefBasic world should generate with alternate kelpForestNoise",
+                               failures);
+
+                        if (kelpGenerated) {
+                            const auto kelpAssignments =
+                                CollectAssignedBiomeSequence(kelpSites, subworld);
+                            const bool kelpOnlyKnownBiomes = std::all_of(
+                                kelpAssignments.begin(), kelpAssignments.end(),
+                                [](const std::string &name) {
+                                    return name == "dlc5::biomes/Reef/Basic" ||
+                                           name == "dlc5::biomes/Reef/Corals";
+                                });
+                            Expect(kelpOnlyKnownBiomes,
+                                   "alternate-noise ReefBasic world should still stamp only known ReefBasic biomes",
+                                   failures);
+                            Expect(reefAssignments.size() == kelpAssignments.size(),
+                                   "changing only biome noise should keep generated child count stable",
+                                   failures);
+                            Expect(reefAssignments != kelpAssignments,
+                                   "changing only biome noise should change ReefBasic biome assignment sequence",
+                                   failures);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for world content gating regression test",
+               failures);
+        if (error.empty()) {
+            auto clusterItr = settings.clusters.find("expansion1::clusters/VanillaSandstoneCluster");
+            auto worldItr = settings.worlds.find("dlc5::worlds/AquaticClassicAsteroid");
+            Expect(clusterItr != settings.clusters.end(),
+                   "content-gating regression test should find VanillaSandstoneCluster",
+                   failures);
+            Expect(worldItr != settings.worlds.end(),
+                   "content-gating regression test should find AquaticClassicAsteroid",
+                   failures);
+
+            if (clusterItr != settings.clusters.end() && worldItr != settings.worlds.end() &&
+                !clusterItr->second.worldPlacements.empty()) {
+                auto &cluster = clusterItr->second;
+                cluster.worldPlacements.front().world = worldItr->first;
+                settings.cluster = &cluster;
+
+                std::vector<ResolvedWorldPlacement> placements;
+                Expect(BuildResolvedWorldPlacements(settings, &placements, &error),
+                       "real placements should still resolve before effective-state content gating",
+                       failures);
+
+                std::vector<WorldEffectiveState> states;
+                Expect(!InitializeWorldEffectiveStates(settings, placements, &states, &error),
+                       "world effective state should reject worlds whose required DLC is not active",
+                       failures);
+            }
+        }
+    }
+
+    {
+        SettingsCache settings;
+        settings.seed = 246810;
+        auto &cluster = settings.clusters["synthetic/fixed-trait-cluster"];
+        cluster.coordinatePrefix = "SYN-FIXED";
+        cluster.worldPlacements.push_back(WorldPlacement{
+            .world = "synthetic/worlds/FixedTraitConflict",
+            .locationType = LocationType::StartWorld,
+        });
+        settings.cluster = &cluster;
+
+        settings.traits["traits/FixedCore"] = WorldTrait{
+            .filePath = "traits/FixedCore",
+            .name = "Fixed Core",
+            .exclusiveWith = {"traits/Candidate"},
+        };
+        settings.traits["traits/Candidate"] = WorldTrait{
+            .filePath = "traits/Candidate",
+            .name = "Candidate",
+        };
+
+        auto &world = settings.worlds["synthetic/worlds/FixedTraitConflict"];
+        world.name = "Synthetic Fixed Trait Conflict";
+        world.fixedTraits = {"traits/FixedCore"};
+        world.worldTraitRules.push_back(TraitRule{
+            .min = 1,
+            .max = 1,
+        });
+
+        std::vector<ResolvedWorldPlacement> placements;
+        std::string error;
+        Expect(BuildResolvedWorldPlacements(settings, &placements, &error),
+               "fixed-trait conflict fixture should resolve placements",
+               failures);
+
+        std::vector<WorldEffectiveState> states;
+        Expect(InitializeWorldEffectiveStates(settings, placements, &states, &error),
+               "fixed-trait conflict fixture should initialize effective states",
+               failures);
+        Expect(states.size() == 1,
+               "fixed-trait conflict fixture should produce exactly one effective state",
+               failures);
+
+        if (states.size() == 1) {
+            Expect(states.front().fixedTraitIds.size() == 1,
+                   "fixed-trait conflict fixture should preserve raw fixed trait ids",
+                   failures);
+            Expect(states.front().fixedWorldTraits.size() == 1,
+                   "fixed-trait conflict fixture should resolve mapped fixed world traits",
+                   failures);
+            const auto traits = settings.GetRandomTraits(states.front().world);
+            Expect(traits.empty(),
+                   "random trait selection should exclude traits blocked by fixed traits",
+                   failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
                "fresh settings cache should load for mixing sanitization checks",
                failures);
 
@@ -622,6 +888,67 @@ int RunAllTests()
         SettingsCache settings;
         std::string error;
         Expect(LoadFreshSettings(settings, &error),
+               "fresh settings cache should load for DLC5 mixing registration regression test",
+               failures);
+
+        if (error.empty()) {
+            const auto hasMixConfigPath = [&settings](std::string_view path, int expectedType) {
+                return std::ranges::any_of(
+                    settings.mixConfigs,
+                    [path, expectedType](const MixingConfig &config) {
+                        return config.path == path && config.type == expectedType;
+                    });
+            };
+
+            Expect(hasMixConfigPath("DLC5_ID", 0),
+                   "mix configs should register DLC5 dlc mixing slot",
+                   failures);
+            Expect(hasMixConfigPath("dlc5::worldMixing/AquaticMixingSettings", 1),
+                   "mix configs should register DLC5 aquatic world mixing setting",
+                   failures);
+            Expect(hasMixConfigPath("dlc5::subworldMixing/BeachMixingSettings", 2),
+                   "mix configs should register DLC5 beach subworld mixing setting",
+                   failures);
+            Expect(hasMixConfigPath("dlc5::subworldMixing/ReefMixingSettings", 2),
+                   "mix configs should register DLC5 reef subworld mixing setting",
+                   failures);
+            Expect(hasMixConfigPath("dlc5::subworldMixing/KelpForestMixingSettings", 2),
+                   "mix configs should register DLC5 kelp forest subworld mixing setting",
+                   failures);
+            Expect(hasMixConfigPath("dlc5::subworldMixing/AbyssMixingSettings", 2),
+                   "mix configs should register DLC5 abyss subworld mixing setting",
+                   failures);
+
+            const std::string code = BuildCoordinateCode("AQU-A-", 100123, 0);
+            Expect(settings.CoordinateChanged(code, settings),
+                   "AQU-A coordinate should resolve for DLC5 mixing registration regression test",
+                   failures);
+
+            std::vector<WorldEffectiveState> states;
+            Expect(BuildEffectiveStates(settings, states),
+                   "AQU-A effective states should build for DLC5 mixing registration regression test",
+                   failures);
+
+            bool validatedAquaticStartWorld = false;
+            for (const auto &state : states) {
+                if (state.world.locationType != LocationType::StartWorld) {
+                    continue;
+                }
+                validatedAquaticStartWorld = true;
+                Expect(!WorldRuntimeHasMixingProxyNames(state.world),
+                       "AQU-A start world should not retain unresolved DLC5 mixing proxy names after effective-state mixing",
+                       failures);
+            }
+            Expect(validatedAquaticStartWorld,
+                   "AQU-A effective states should include a start world for DLC5 mixing registration regression test",
+                   failures);
+        }
+    }
+
+    {
+        SettingsCache settings;
+        std::string error;
+        Expect(LoadFreshSettings(settings, &error),
                "fresh settings cache should load for copy isolation test",
                failures);
 
@@ -720,22 +1047,25 @@ int RunAllTests()
                                                          &nativeCoord),
                "short non-zero trailing mixing code should resolve",
                failures);
-        Expect(nativeCoord.mixing == static_cast<int>(SettingsCache::Base36ToBinary("HD")),
+        Expect(nativeCoord.mixing == SettingsCache::Base36ToBinary("HD"),
                "short non-zero trailing mixing code should decode mixing value",
                failures);
     }
 
     {
-        NativeCoordinate::NativeCoordinateResolution invalidCoord;
-        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ABCDE1",
-                                                          &invalidCoord),
-               "non-zero trailing mixing code longer than five chars should be rejected",
+        NativeCoordinate::NativeCoordinateResolution nativeCoord;
+        Expect(NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-231293028-0-39-MPJ2Q7Y1",
+                                                         &nativeCoord),
+               "long native coord trailing mixing code should resolve",
+               failures);
+        Expect(nativeCoord.mixing == 152841815626ULL,
+               "long native coord trailing mixing code should decode to 64-bit mixing value",
                failures);
     }
 
     {
         NativeCoordinate::NativeCoordinateResolution invalidCoord;
-        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ZZZZZ",
+        Expect(!NativeCoordinate::ResolveNativeCoordinate("V-SNDST-C-123456-0-D3-ZZZZZZZZ",
                                                           &invalidCoord),
                "non-zero trailing mixing code outside mixing range should be rejected",
                failures);

@@ -47,6 +47,18 @@ int RunAllTests()
     std::filesystem::create_directories(tempDir);
 
     {
+        Expect(Batch::GeyserIdToIndex("murky_brine") >= 0,
+               "murky_brine should be registered in geyser id catalog",
+               failures);
+        Expect(Batch::GeyserIdToIndex("small_reef_geyser") >= 0,
+               "small_reef_geyser should be registered in geyser id catalog",
+               failures);
+        Expect(Batch::GeyserIdToIndex("underwater_vent") >= 0,
+               "underwater_vent should be registered in geyser id catalog",
+               failures);
+    }
+
+    {
         const auto file = tempDir / "legacy-threads-ignored.json";
         const std::string json = R"({
   "worldType": 0,

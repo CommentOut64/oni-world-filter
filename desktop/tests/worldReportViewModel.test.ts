@@ -17,7 +17,7 @@ const REPORT: WorldReportData = {
       worldSize: { w: 256, h: 384 },
       traits: [],
       geysers: [
-        { type: 0, x: 70, y: 90, id: "steam" },
+        { type: 0, x: 70, y: 90, worldX: 70, worldY: 294, id: "steam" },
       ],
     },
     polygons: [],
@@ -25,7 +25,7 @@ const REPORT: WorldReportData = {
   geyserDetails: [
     {
       index: 0,
-      summary: { type: 0, x: 70, y: 90, id: "steam" },
+      summary: { type: 0, x: 70, y: 90, worldX: 70, worldY: 294, id: "steam" },
       hasParameters: true,
       parameterKind: "geyser",
       native: {
@@ -85,6 +85,14 @@ test("buildWorldReportViewModel uses preview worldAssetId for secondary world na
   assert.equal(viewModel.worldName, "迷你翻转副星");
 });
 
+test("fallback search catalog already includes dlc5 aquatic world prefixes", () => {
+  const worldCodes = FALLBACK_SEARCH_CATALOG.worlds.map((item) => item.code);
+
+  assert.ok(worldCodes.includes("AQU-A-"));
+  assert.ok(worldCodes.includes("V-AQU-C-"));
+  assert.ok(worldCodes.includes("AQU-C-"));
+});
+
 test("buildWorldReportViewModel decodes mixing summary with formal slot names", () => {
   const viewModel = buildWorldReportViewModel(REPORT, FALLBACK_SEARCH_CATALOG);
 
@@ -114,7 +122,7 @@ test("buildWorldReportViewModel renders non-parameter geyser values as dash plac
       geyserDetails: [
         {
           ...REPORT.geyserDetails[0],
-          summary: { type: 26, x: 88, y: 99, id: "printing_pod" },
+          summary: { type: 26, x: 88, y: 99, worldX: 88, worldY: 285, id: "printing_pod" },
           hasParameters: false,
           parameterKind: "facility",
         },
@@ -140,22 +148,22 @@ test("buildWorldReportViewModel sorts geyser rows with the same ordering as prev
         {
           ...REPORT.geyserDetails[0],
           index: 0,
-          summary: { type: 9, x: 10, y: 20, id: "small_volcano" },
+          summary: { type: 9, x: 10, y: 20, worldX: 10, worldY: 364, id: "small_volcano" },
         },
         {
           ...REPORT.geyserDetails[0],
           index: 1,
-          summary: { type: 27, x: 30, y: 40, id: "steam" },
+          summary: { type: 27, x: 30, y: 40, worldX: 30, worldY: 344, id: "steam" },
         },
         {
           ...REPORT.geyserDetails[0],
           index: 2,
-          summary: { type: 1, x: 50, y: 60, id: "hot_water" },
+          summary: { type: 1, x: 50, y: 60, worldX: 50, worldY: 324, id: "hot_water" },
         },
         {
           ...REPORT.geyserDetails[0],
           index: 3,
-          summary: { type: 18, x: 70, y: 80, id: "molten_gold" },
+          summary: { type: 18, x: 70, y: 80, worldX: 70, worldY: 304, id: "molten_gold" },
         },
       ],
     },

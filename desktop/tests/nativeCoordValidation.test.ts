@@ -14,23 +14,30 @@ test("validateNativeCoordInput accepts short non-zero trailing mixing code", () 
   assert.equal(validateNativeCoordInput("V-SNDST-C-123456-0-D3-HD", WORLD_CODES), null);
 });
 
-test("validateNativeCoordInput rejects trailing mixing code longer than five chars", () => {
+test("validateNativeCoordInput accepts long trailing mixing code used by newer native coords", () => {
   assert.equal(
-    validateNativeCoordInput("V-SNDST-C-123456-0-D3-ABCDE1", WORLD_CODES),
-    "坐标无效：请输入完整原生坐标，且最后一段需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。"
+    validateNativeCoordInput("V-SNDST-C-231293028-0-39-MPJ2Q7Y1", WORLD_CODES),
+    null
   );
 });
 
-test("validateNativeCoordInput rejects trailing mixing code outside mixing range", () => {
+test("validateNativeCoordInput rejects trailing mixing code outside current mixing slot range", () => {
   assert.equal(
-    validateNativeCoordInput("V-SNDST-C-123456-0-D3-ZZZZZ", WORLD_CODES),
-    "坐标无效：请输入完整原生坐标，且最后一段需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。"
+    validateNativeCoordInput("V-SNDST-C-123456-0-D3-ZZZZZZZZ", WORLD_CODES),
+    "坐标无效：请输入完整原生坐标，且最后一段需为非空大写 base36，且不能超出 mixing 有效范围。"
+  );
+});
+
+test("validateNativeCoordInput rejects lowercase trailing mixing code", () => {
+  assert.equal(
+    validateNativeCoordInput("V-SNDST-C-123456-0-D3-mpj2q7y1", WORLD_CODES),
+    "坐标无效：请输入完整原生坐标，且最后一段需为非空大写 base36，且不能超出 mixing 有效范围。"
   );
 });
 
 test("validateNativeCoordInput rejects unknown world prefix", () => {
   assert.equal(
     validateNativeCoordInput("BAD-123456-0-3A-0", WORLD_CODES),
-    "坐标无效：请输入完整原生坐标，且最后一段需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。"
+    "坐标无效：请输入完整原生坐标，且最后一段需为非空大写 base36，且不能超出 mixing 有效范围。"
   );
 });

@@ -17,7 +17,7 @@ const REPORT: WorldReportData = {
       worldSize: { w: 256, h: 384 },
       traits: [],
       geysers: [
-        { type: 0, x: 70, y: 90, id: "steam" },
+        { type: 0, x: 70, y: 90, worldX: 70, worldY: 294, id: "steam" },
       ],
     },
     polygons: [],
@@ -25,7 +25,7 @@ const REPORT: WorldReportData = {
   geyserDetails: [
     {
       index: 0,
-      summary: { type: 0, x: 70, y: 90, id: "steam" },
+      summary: { type: 0, x: 70, y: 90, worldX: 70, worldY: 294, id: "steam" },
       hasParameters: true,
       parameterKind: "geyser",
       native: {

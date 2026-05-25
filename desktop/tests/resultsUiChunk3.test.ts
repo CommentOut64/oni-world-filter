@@ -38,8 +38,8 @@ const BASE_STATE = {
       start: { x: 10, y: 20 },
       worldSize: { w: 256, h: 384 },
       geysers: [
-        { type: 0, x: 11, y: 21 },
-        { type: 6, x: 15, y: 25 },
+        { type: 0, x: 11, y: 21, worldX: 11, worldY: 363 },
+        { type: 6, x: 15, y: 25, worldX: 15, worldY: 359 },
       ],
       nearestDistance: 12.5,
     },
@@ -127,9 +127,9 @@ test("ResultsTable does not render antd selection control column", () => {
 test("geyser summary prioritizes constrained geysers before other overview items", () => {
   const summary = formatGeyserCountSummary(
     [
-      { type: 0, x: 11, y: 21 },
-      { type: 6, x: 15, y: 25 },
-      { type: 0, x: 17, y: 27 },
+      { type: 0, x: 11, y: 21, worldX: 11, worldY: 363 },
+      { type: 6, x: 15, y: 25, worldX: 15, worldY: 359 },
+      { type: 0, x: 17, y: 27, worldX: 17, worldY: 357 },
     ],
     BASE_STATE.geysers,
     4,

@@ -1,4 +1,5 @@
 #include "Geyser/GeyserParameterCalculator.hpp"
+#include "Batch/FilterConfig.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -42,8 +43,8 @@ int RunAllTests()
 
     {
         const std::vector<GeyserSummary> geysers = {
-            {6, 205, 250},
-            {17, 162, 216},
+            {6, 205, 250, 205, 130},
+            {17, 162, 216, 162, 164},
         };
         const auto details = GeyserCalc::BuildGeyserDetails(geyserSeed, worldHeight, geysers);
 
@@ -53,6 +54,9 @@ int RunAllTests()
             Expect(saltWater.index == 0, "salt water index mismatch", failures);
             Expect(saltWater.hasParameters, "salt water should have parameters", failures);
             Expect(saltWater.parameterKind == "geyser", "salt water parameter kind mismatch", failures);
+            Expect(saltWater.parameterSource == "generic_config",
+                   "salt water parameter source mismatch",
+                   failures);
             ExpectNear(saltWater.derived.temperatureCelsius, 95.0f, 0.05f,
                        "salt water temperature mismatch", failures);
             ExpectNear(saltWater.derived.eruptionRateKgPerSecond, 12.4f, 0.15f,
@@ -72,6 +76,9 @@ int RunAllTests()
             Expect(moltenIron.index == 1, "molten iron index mismatch", failures);
             Expect(moltenIron.hasParameters, "molten iron should have parameters", failures);
             Expect(moltenIron.parameterKind == "geyser", "molten iron parameter kind mismatch", failures);
+            Expect(moltenIron.parameterSource == "generic_config",
+                   "molten iron parameter source mismatch",
+                   failures);
             ExpectNear(moltenIron.derived.temperatureCelsius, 2526.9f, 0.1f,
                        "molten iron temperature mismatch", failures);
             ExpectNear(moltenIron.derived.eruptionRateKgPerSecond, 7.3f, 0.15f,
@@ -91,16 +98,17 @@ int RunAllTests()
 
     {
         const std::vector<GeyserSummary> geysers = {
-            {6, 205, 250},
+            {6, 205, 250, 205, 130},
         };
         const auto details = GeyserCalc::BuildGeyserDetails(geyserSeed, worldHeight, geysers);
-        const auto wrongYDetails = GeyserCalc::BuildGeyserDetails(geyserSeed, worldHeight, {{6, 205, 130}});
+        const auto wrongDisplayYDetails =
+            GeyserCalc::BuildGeyserDetails(geyserSeed, worldHeight, {{6, 205, 130, 205, 130}});
 
         Expect(details.size() == 1, "single sample should produce one detail", failures);
-        Expect(wrongYDetails.size() == 1, "wrong y sample should produce one detail", failures);
-        if (details.size() == 1 && wrongYDetails.size() == 1) {
+        Expect(wrongDisplayYDetails.size() == 1, "wrong display y sample should produce one detail", failures);
+        if (details.size() == 1 && wrongDisplayYDetails.size() == 1) {
             const auto &detail = details[0];
-            const auto &wrongYDetail = wrongYDetails[0];
+            const auto &wrongDisplayYDetail = wrongDisplayYDetails[0];
             const float expectedRate = detail.native.averageActiveYieldKgPerCycle /
                                        (600.0f / detail.native.eruptionPeriodSeconds) /
                                        detail.derived.eruptionSeconds;
@@ -111,8 +119,11 @@ int RunAllTests()
                        "derived eruption rate formula mismatch", failures);
             ExpectNear(detail.derived.averageOverallYieldGPerSecond, expectedAverage, 0.1f,
                        "derived average overall yield formula mismatch", failures);
-            Expect(std::fabs(detail.derived.eruptionRateKgPerSecond - wrongYDetail.derived.eruptionRateKgPerSecond) > 0.5f,
-                   "display y should not be treated as internal y", failures);
+            ExpectNear(detail.derived.eruptionRateKgPerSecond,
+                       wrongDisplayYDetail.derived.eruptionRateKgPerSecond,
+                       0.001f,
+                       "display y should not influence generic geyser parameter seed",
+                       failures);
         }
     }
 
@@ -128,10 +139,83 @@ int RunAllTests()
     }
 
     {
+        const int murkyBrine = Batch::GeyserIdToIndex("murky_brine");
+        const int smallReefGeyser = Batch::GeyserIdToIndex("small_reef_geyser");
+        const int underwaterVent = Batch::GeyserIdToIndex("underwater_vent");
+        Expect(murkyBrine >= 0, "murky_brine geyser id should exist", failures);
+        Expect(smallReefGeyser >= 0, "small_reef_geyser id should exist", failures);
+        Expect(underwaterVent >= 0, "underwater_vent id should exist", failures);
+
+        if (murkyBrine >= 0) {
+            const auto details = GeyserCalc::BuildGeyserDetails(geyserSeed,
+                                                                worldHeight,
+                                                                {{murkyBrine, 205, 250, 205, 130}});
+            Expect(details.size() == 1, "murky_brine sample should produce one detail", failures);
+            if (details.size() == 1) {
+                const auto &detail = details[0];
+                Expect(detail.hasParameters,
+                       "murky_brine should expose parameter preview",
+                       failures);
+                Expect(detail.parameterKind == "aquatic_geyser",
+                       "murky_brine should be traced as aquatic_geyser instead of legacy geyser",
+                       failures);
+                Expect(detail.parameterSource == "generic_config",
+                       "murky_brine parameter source mismatch",
+                       failures);
+                ExpectNear(detail.derived.temperatureCelsius,
+                           95.0f,
+                           0.05f,
+                           "murky_brine temperature mismatch",
+                           failures);
+            }
+        }
+
+        if (smallReefGeyser >= 0) {
+            const auto details = GeyserCalc::BuildGeyserDetails(geyserSeed,
+                                                                worldHeight,
+                                                                {{smallReefGeyser, 180, 220, 180, 160}});
+            Expect(details.size() == 1,
+                   "small_reef_geyser sample should produce one detail",
+                   failures);
+            if (details.size() == 1) {
+                Expect(!details[0].hasParameters,
+                       "small_reef_geyser should not pretend to use generic geyser parameters",
+                       failures);
+                Expect(details[0].parameterKind == "aquatic_vent",
+                       "small_reef_geyser should be classified as aquatic_vent",
+                       failures);
+                Expect(details[0].parameterSource == "small_reef_geyser_runtime",
+                       "small_reef_geyser parameter source mismatch",
+                       failures);
+            }
+        }
+
+        if (underwaterVent >= 0) {
+            const auto details = GeyserCalc::BuildGeyserDetails(geyserSeed,
+                                                                worldHeight,
+                                                                {{underwaterVent, 190, 210, 190, 170}});
+            Expect(details.size() == 1,
+                   "underwater_vent sample should produce one detail",
+                   failures);
+            if (details.size() == 1) {
+                Expect(!details[0].hasParameters,
+                       "underwater_vent should not pretend to use generic geyser parameters",
+                       failures);
+                Expect(details[0].parameterKind == "aquatic_vent",
+                       "underwater_vent should be classified as aquatic_vent",
+                       failures);
+                Expect(details[0].parameterSource == "underwater_vent_runtime",
+                       "underwater_vent parameter source mismatch",
+                       failures);
+            }
+        }
+    }
+
+    {
         GeneratedWorldPreview preview;
         preview.summary.seed = worldSeed;
         preview.summary.worldSize = {256, worldHeight};
-        preview.summary.geysers = {{6, 205, 250}};
+        preview.summary.geysers = {{6, 205, 250, 205, 130}};
 
         const auto report = GeyserCalc::BuildWorldReportData(preview, geyserSeed, 130, sampleCoord);
         Expect(report.geyserDetails.size() == 1,
@@ -147,7 +231,7 @@ int RunAllTests()
         const int miniClusterSeed = 644400493 + 11 - 1;
         const auto details = GeyserCalc::BuildGeyserDetails(miniClusterSeed,
                                                             153,
-                                                            {{1, 37, 106}},
+                                                            {{1, 37, 106, 37, 47}},
                                                             212,
                                                             0);
         Expect(details.size() == 1, "M-FLIP-C sample should produce one hot steam detail", failures);

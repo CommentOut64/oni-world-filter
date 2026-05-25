@@ -53,13 +53,14 @@ std::string ReadFirstNonEmptyLine(const std::string &text)
 int RunAllTests()
 {
     std::vector<std::string> failures;
+    constexpr uint64_t kLongMixing = 152841815626ULL;
 
     {
         Batch::SidecarWorldReportRequest request;
         request.jobId = "job-world-report-001";
         request.worldType = 0;
         request.seed = 100123;
-        request.mixing = 0;
+        request.mixing = kLongMixing;
 
         std::string expectedCoord;
         Expect(BuildWorldCode(request.worldType, request.seed, request.mixing, &expectedCoord),
@@ -90,7 +91,7 @@ int RunAllTests()
         Expect(root["report"]["coord"].asString() == expectedCoord,
                "world_report command coord mismatch",
                &failures);
-        Expect(root["report"]["mixing"].asInt() == request.mixing,
+        Expect(root["report"]["mixing"].asUInt64() == request.mixing,
                "world_report command mixing mismatch",
                &failures);
         Expect(root["report"]["preview"]["summary"]["seed"].asInt() == request.seed,

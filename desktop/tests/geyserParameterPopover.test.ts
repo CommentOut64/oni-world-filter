@@ -26,6 +26,7 @@ const GEYSER_DETAIL = {
   summary: GEYSER,
   hasParameters: true,
   parameterKind: "geyser",
+  parameterSource: "generic_config",
   native: {
     averageActiveYieldKgPerCycle: 10,
     eruptionPeriodSeconds: 805,
@@ -80,6 +81,7 @@ test("GeyserParameterPopover source keeps loading and ready parameter content", 
   void GEYSER_DETAIL;
   assert.match(GEYSER_POPOVER_SOURCE, /参数计算中\.\.\./);
   assert.match(GEYSER_POPOVER_SOURCE, /<Descriptions/);
+  assert.match(GEYSER_POPOVER_SOURCE, /formatGeyserParameterSource\(detail\)/);
   assert.match(GEYSER_POPOVER_SOURCE, /formatGeyserDetailTemperature\(detail\)/);
   assert.match(GEYSER_POPOVER_SOURCE, /formatGeyserDetailEruptionRate\(detail\)/);
   assert.match(GEYSER_POPOVER_SOURCE, /formatGeyserDetailAverageYield\(detail\)/);
@@ -88,6 +90,7 @@ test("GeyserParameterPopover source keeps loading and ready parameter content", 
 });
 
 test("GeyserParameterPopover source keeps non-parameter fallback message branch", () => {
+  assert.match(GEYSER_POPOVER_SOURCE, /参数来源：/);
   assert.match(GEYSER_POPOVER_SOURCE, /formatGeyserDetailMissingMessage\(detail\.parameterKind\)/);
   assert.match(GEYSER_POPOVER_SOURCE, /当前喷口详情暂不可用。/);
 });

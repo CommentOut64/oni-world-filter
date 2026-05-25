@@ -43,6 +43,9 @@ test("world display names follow the legacy frontend mapping for major world and
     ["M-FLIP-C-", { zh: "卫星星群 - 倒置", en: "Moonlet Cluster - Flipped" }],
     ["M-RAD-C-", { zh: "卫星星群 - 放射性海洋", en: "Moonlet Cluster - Radioactive Ocean" }],
     ["M-CERS-C-", { zh: "卫星星群 - 谷神星地幔", en: "Moonlet Cluster - Ceres Mantle" }],
+    ["AQU-A-", { zh: "汪洋星", en: "Marinea" }],
+    ["V-AQU-C-", { zh: "汪洋星星群", en: "Marinea Cluster" }],
+    ["AQU-C-", { zh: "小汪洋星星群", en: "Marinea Minor Cluster" }],
   ]);
 
   for (const [code, displayName] of expected) {
@@ -54,5 +57,17 @@ test("geyser display names keep the legacy frontend spelling", () => {
   assert.deepEqual(GEYSER_DISPLAY_NAMES.slimy_po2, {
     zh: "含菌污氧喷孔",
     en: "InFectious Polluted Oxygen Vent",
+  });
+  assert.deepEqual(GEYSER_DISPLAY_NAMES.murky_brine, {
+    zh: "污浊盐水喷口",
+    en: "Polluted Brine Vent",
+  });
+  assert.deepEqual(GEYSER_DISPLAY_NAMES.small_reef_geyser, {
+    zh: "潮汐泉",
+    en: "Tidal Spring",
+  });
+  assert.deepEqual(GEYSER_DISPLAY_NAMES.underwater_vent, {
+    zh: "热气裂隙",
+    en: "Thermal Gas Fissure",
   });
 });

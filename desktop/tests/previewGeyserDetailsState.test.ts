@@ -75,8 +75,8 @@ function createMatch(seed = 123456, mixing = 625): SearchMatchSummary {
     start: { x: 10, y: 20 },
     worldSize: { w: 256, h: 384 },
     geysers: [
-      { type: 0, x: 11, y: 21, id: "steam" },
-      { type: 6, x: 15, y: 25, id: "salt_water" },
+      { type: 0, x: 11, y: 21, worldX: 11, worldY: 363, id: "steam" },
+      { type: 6, x: 15, y: 25, worldX: 15, worldY: 359, id: "salt_water" },
     ],
     nearestDistance: 1.4,
   };
@@ -91,8 +91,8 @@ function createPreview(seed = 123456): PreviewPayload {
       worldSize: { w: 256, h: 384 },
       traits: [1, 2],
       geysers: [
-        { type: 0, x: 11, y: 21, id: "steam" },
-        { type: 6, x: 15, y: 25, id: "salt_water" },
+        { type: 0, x: 11, y: 21, worldX: 11, worldY: 363, id: "steam" },
+        { type: 6, x: 15, y: 25, worldX: 15, worldY: 359, id: "salt_water" },
       ],
     },
     polygons: [],
@@ -109,7 +109,7 @@ function createDetailsEvent(seed: number) {
     geyserDetails: [
       {
         index: 0,
-        summary: { type: 0, x: 11, y: 21, id: "steam" },
+        summary: { type: 0, x: 11, y: 21, worldX: 11, worldY: 363, id: "steam" },
         hasParameters: true,
         parameterKind: "geyser",
         native: {

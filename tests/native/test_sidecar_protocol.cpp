@@ -59,6 +59,7 @@ Json::Value ParseJsonObject(const std::string &jsonText, int &failures, const ch
 int RunAllTests()
 {
     int failures = 0;
+    constexpr uint64_t kLongMixing = 152841815626ULL;
 
     {
         const auto path = FixturePath("search-request.json");
@@ -121,6 +122,15 @@ int RunAllTests()
 
     {
         const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"preview","jobId":"job-preview-long-mixing","worldType":13,"seed":100123,"mixing":152841815626})");
+        Expect(result.Ok(), "preview request with 64-bit mixing should parse", failures);
+        Expect(result.request.preview.mixing == kLongMixing,
+               "preview request should preserve 64-bit mixing",
+               failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
             R"({"command":"preview","jobId":"job-preview-invalid-target","worldType":13,"seed":100123,"mixing":625,"target":"tertiary"})");
         Expect(!result.Ok(), "preview request with invalid target should fail", failures);
         Expect(!result.error.empty(), "preview invalid target should report error", failures);
@@ -158,6 +168,15 @@ int RunAllTests()
 
     {
         const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"preview_geyser_details","jobId":"job-preview-geyser-details-long","worldType":13,"seed":100123,"mixing":152841815626})");
+        Expect(result.Ok(), "preview_geyser_details request with 64-bit mixing should parse", failures);
+        Expect(result.request.previewGeyserDetails.mixing == kLongMixing,
+               "preview_geyser_details request should preserve 64-bit mixing",
+               failures);
+    }
+
+    {
+        const auto result = Batch::ParseSidecarRequest(
             R"({"command":"preview_coord","jobId":"job-preview-coord-001","coord":"V-SNDST-C-123456-0-D3-HD"})");
         Expect(result.Ok(), "preview_coord request should parse", failures);
         Expect(result.request.command == Batch::SidecarCommandType::PreviewCoord,
@@ -173,7 +192,7 @@ int RunAllTests()
 
     {
         const auto result = Batch::ParseSidecarRequest(
-            R"({"command":"world_report","jobId":"job-world-report-001","worldType":13,"seed":100123,"mixing":625})");
+            R"({"command":"world_report","jobId":"job-world-report-001","worldType":13,"seed":100123,"mixing":152841815626})");
         Expect(result.Ok(), "world_report request should parse", failures);
         Expect(result.request.command == Batch::SidecarCommandType::WorldReport,
                "world_report request command mismatch",
@@ -187,7 +206,7 @@ int RunAllTests()
         Expect(result.request.worldReport.seed == 100123,
                "world_report request seed mismatch",
                failures);
-        Expect(result.request.worldReport.mixing == 625,
+        Expect(result.request.worldReport.mixing == kLongMixing,
                "world_report request mixing mismatch",
                failures);
     }
@@ -426,14 +445,17 @@ int RunAllTests()
         previewRequest.jobId = "job-preview-001";
         previewRequest.worldType = 13;
         previewRequest.seed = 100123;
-        previewRequest.mixing = 625;
+        previewRequest.mixing = kLongMixing;
         Batch::SidecarPreviewGeyserDetailsRequest previewGeyserDetailsRequest;
         previewGeyserDetailsRequest.jobId = "job-preview-geyser-details-001";
         previewGeyserDetailsRequest.worldType = 13;
         previewGeyserDetailsRequest.seed = 100123;
-        previewGeyserDetailsRequest.mixing = 625;
+        previewGeyserDetailsRequest.mixing = kLongMixing;
         previewGeyserDetailsRequest.worldHeight = 384;
-        previewGeyserDetailsRequest.geysers = {{steam, 70, 90}, {27, 75, 120}};
+        previewGeyserDetailsRequest.geysers = {
+            {steam, 70, 90, 70, 294},
+            {27, 75, 120, 75, 264},
+        };
         const std::string previewCoord = "V-SNDST-C-100123-0-D3-HD";
         Batch::SidecarWorldReportRequest worldReportRequest;
         worldReportRequest.jobId = "job-world-report-001";
@@ -454,7 +476,7 @@ int RunAllTests()
         preview.summary.worldOffsetX = 212;
         preview.summary.worldOffsetY = 0;
         preview.summary.traits.push_back({2});
-        preview.summary.geysers.push_back({steam, 70, 90});
+        preview.summary.geysers.push_back({steam, 70, 90, 70, 294});
         PolygonSummary polygon;
         polygon.hasHole = false;
         polygon.zoneType = 3;
@@ -464,9 +486,10 @@ int RunAllTests()
 
         GeyserDetail geyserDetail;
         geyserDetail.index = 0;
-        geyserDetail.summary = {steam, 70, 90};
+        geyserDetail.summary = {steam, 70, 90, 70, 294};
         geyserDetail.hasParameters = true;
         geyserDetail.parameterKind = "geyser";
+        geyserDetail.parameterSource = "generic_config";
         geyserDetail.native.averageActiveYieldKgPerCycle = 1234.5f;
         geyserDetail.native.eruptionPeriodSeconds = 800.0f;
         geyserDetail.native.eruptionRatio = 0.4f;
@@ -482,19 +505,28 @@ int RunAllTests()
 
         GeyserDetail reservoirDetail;
         reservoirDetail.index = 1;
-        reservoirDetail.summary = {27, 75, 120};
+        reservoirDetail.summary = {27, 75, 120, 75, 264};
         reservoirDetail.hasParameters = false;
         reservoirDetail.parameterKind = "reservoir";
+        reservoirDetail.parameterSource = "oil_reservoir";
         const std::vector<GeyserDetail> geyserDetails = {geyserDetail, reservoirDetail};
         WorldReportData worldReport;
         worldReport.preview = preview;
         worldReport.geyserDetails = geyserDetails;
-        worldReport.mixing = 625;
+        worldReport.mixing = kLongMixing;
         worldReport.coord = previewCoord;
 
         SearchAnalysis::SearchCatalog catalog;
         catalog.worlds.push_back({.id = 13, .code = "V-SNDST-C-"});
-        catalog.geysers.push_back({.id = 2, .key = "hot_water"});
+        catalog.geysers.push_back({
+            .id = 2,
+            .key = "hot_water",
+            .name = "Water Geyser",
+            .kind = "generic_geyser",
+            .parameterSource = "generic_config",
+            .supportsDynamicParameters = true,
+            .supportsCoordinateParameters = true,
+        });
         catalog.traits.push_back(SearchAnalysis::TraitMeta{
             .id = "traits/SunnySpeed",
             .name = "Sunny Speed",
@@ -661,6 +693,12 @@ int RunAllTests()
         Expect(matchJson["summary"]["geysers"][0]["id"].asString() == "steam",
                "match event geyser id mismatch",
                failures);
+        Expect(matchJson["summary"]["geysers"][0]["worldX"].asInt() == 60,
+               "match event geyser worldX mismatch",
+               failures);
+        Expect(matchJson["summary"]["geysers"][0]["worldY"].asInt() == 80,
+               "match event geyser worldY mismatch",
+               failures);
         Expect(completedJson["throughput"]["valid"].asBool(), "completed throughput valid mismatch", failures);
         Expect(previewJson["preview"]["polygons"].size() == 1, "preview polygon size mismatch", failures);
         Expect(previewJson["coord"].asString() == previewCoord, "preview coord mismatch", failures);
@@ -689,11 +727,26 @@ int RunAllTests()
         Expect(previewJson["preview"]["summary"]["worldOffsetY"].asInt() == 0,
                "preview summary worldOffsetY mismatch",
                failures);
+        Expect(previewJson["preview"]["summary"]["geysers"][0]["worldX"].asInt() == 70,
+               "preview summary geyser worldX mismatch",
+               failures);
+        Expect(previewJson["preview"]["summary"]["geysers"][0]["worldY"].asInt() == 294,
+               "preview summary geyser worldY mismatch",
+               failures);
         Expect(previewGeyserDetailsJson["geyserDetails"].size() == 2,
                "preview_geyser_details size mismatch",
                failures);
         Expect(previewGeyserDetailsJson["geyserDetails"][0]["summary"]["id"].asString() == "steam",
                "preview_geyser_details first id mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][0]["summary"]["worldX"].asInt() == 70,
+               "preview_geyser_details first worldX mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][0]["summary"]["worldY"].asInt() == 294,
+               "preview_geyser_details first worldY mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["geyserDetails"][0]["parameterSource"].asString() == "generic_config",
+               "preview_geyser_details parameter source mismatch",
                failures);
         Expect(previewGeyserDetailsJson["geyserDetails"][0]["native"]["eruptionPeriodSeconds"].asFloat() == 800.0f,
                "preview_geyser_details native field mismatch",
@@ -707,7 +760,13 @@ int RunAllTests()
         Expect(worldReportJson["report"]["coord"].asString() == previewCoord,
                "world_report coord mismatch",
                failures);
-        Expect(worldReportJson["report"]["mixing"].asInt() == 625,
+        Expect(previewJson["mixing"].asUInt64() == kLongMixing,
+               "preview event mixing mismatch",
+               failures);
+        Expect(previewGeyserDetailsJson["mixing"].asUInt64() == kLongMixing,
+               "preview_geyser_details event mixing mismatch",
+               failures);
+        Expect(worldReportJson["report"]["mixing"].asUInt64() == kLongMixing,
                "world_report mixing mismatch",
                failures);
         Expect(worldReportJson["report"]["preview"]["summary"]["seed"].asInt() == 100123,
@@ -716,11 +775,26 @@ int RunAllTests()
         Expect(worldReportJson["report"]["preview"]["summary"]["worldOffsetX"].asInt() == 212,
                "world_report preview worldOffsetX mismatch",
                failures);
+        Expect(worldReportJson["report"]["preview"]["summary"]["geysers"][0]["worldX"].asInt() == 70,
+               "world_report preview geyser worldX mismatch",
+               failures);
+        Expect(worldReportJson["report"]["preview"]["summary"]["geysers"][0]["worldY"].asInt() == 294,
+               "world_report preview geyser worldY mismatch",
+               failures);
         Expect(worldReportJson["report"]["geyserDetails"].size() == 2,
                "world_report geyserDetails size mismatch",
                failures);
         Expect(worldReportJson["report"]["geyserDetails"][0]["summary"]["id"].asString() == "steam",
                "world_report first geyser id mismatch",
+               failures);
+        Expect(worldReportJson["report"]["geyserDetails"][0]["summary"]["worldX"].asInt() == 70,
+               "world_report first geyser worldX mismatch",
+               failures);
+        Expect(worldReportJson["report"]["geyserDetails"][0]["summary"]["worldY"].asInt() == 294,
+               "world_report first geyser worldY mismatch",
+               failures);
+        Expect(worldReportJson["report"]["geyserDetails"][1]["parameterSource"].asString() == "oil_reservoir",
+               "world_report reservoir parameter source mismatch",
                failures);
         Expect(searchCatalogJson["event"].asString() == "search_catalog",
                "search catalog event type mismatch",
@@ -730,6 +804,21 @@ int RunAllTests()
                failures);
         Expect(searchCatalogJson["catalog"]["mixingSlots"].size() == 1,
                "search catalog mixingSlots size mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["geysers"][0]["name"].asString() == "Water Geyser",
+               "search catalog geyser name mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["geysers"][0]["kind"].asString() == "generic_geyser",
+               "search catalog geyser kind mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["geysers"][0]["parameterSource"].asString() == "generic_config",
+               "search catalog geyser parameter source mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["geysers"][0]["supportsDynamicParameters"].asBool(),
+               "search catalog geyser dynamic flag mismatch",
+               failures);
+        Expect(searchCatalogJson["catalog"]["geysers"][0]["supportsCoordinateParameters"].asBool(),
+               "search catalog geyser coordinate flag mismatch",
                failures);
         Expect(searchCatalogJson["catalog"]["parameterSpecs"][0]["supportsDynamicRange"].asBool(),
                "search catalog parameter spec dynamic flag mismatch",

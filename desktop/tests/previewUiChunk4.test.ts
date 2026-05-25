@@ -36,8 +36,8 @@ const PREVIEW = {
     worldSize: { w: 256, h: 384 },
     traits: [1, 2],
     geysers: [
-      { type: 0, x: 11, y: 21 },
-      { type: 6, x: 15, y: 25 },
+      { type: 0, x: 11, y: 21, worldX: 11, worldY: 363 },
+      { type: 6, x: 15, y: 25, worldX: 15, worldY: 359 },
     ],
   },
   polygons: [],
@@ -271,6 +271,10 @@ test("Preview model uses player biome names for visible region labels", () => {
       polygons: [
         { zoneType: 16, vertices: [[0, 0], [4, 0], [4, 4], [0, 4]] },
         { zoneType: 1, vertices: [[10, 10], [14, 10], [14, 14], [10, 14]] },
+        { zoneType: 24, vertices: [[20, 20], [24, 20], [24, 24], [20, 24]] },
+        { zoneType: 25, vertices: [[30, 30], [34, 30], [34, 34], [30, 34]] },
+        { zoneType: 26, vertices: [[40, 40], [44, 40], [44, 44], [40, 44]] },
+        { zoneType: 27, vertices: [[50, 50], [54, 50], [54, 54], [50, 54]] },
       ],
     },
     []
@@ -278,7 +282,40 @@ test("Preview model uses player biome names for visible region labels", () => {
 
   const texts = model.labelCandidates.filter((item) => item.kind === "region").map((item) => item.text);
   assert.match(texts.join(","), /浮土生态/);
+  assert.match(texts.join(","), /沙滩生态/);
+  assert.match(texts.join(","), /珊瑚生态/);
+  assert.match(texts.join(","), /藻林生态/);
+  assert.match(texts.join(","), /深渊生态/);
   assert.doesNotMatch(texts.join(","), /水晶洞穴|Crystal Caverns/);
+});
+
+test("PreviewDetails uses DLC5 player biome names for new region labels", () => {
+  useSearchStore.setState({
+    geysers: [],
+    selectedSeed: 100001,
+  });
+
+  const reefMarkup = renderToStaticMarkup(
+    createElement(PreviewDetails, {
+      preview: PREVIEW,
+      hoveredRegion: { id: "region-25", zoneType: 25 },
+      selectedRegion: null,
+      hoverGeyserIndex: null,
+      selectedGeyserIndex: null,
+    })
+  );
+  assert.match(reefMarkup, /珊瑚生态/);
+
+  const kelpMarkup = renderToStaticMarkup(
+    createElement(PreviewDetails, {
+      preview: PREVIEW,
+      hoveredRegion: { id: "region-26", zoneType: 26 },
+      selectedRegion: null,
+      hoverGeyserIndex: null,
+      selectedGeyserIndex: null,
+    })
+  );
+  assert.match(kelpMarkup, /藻林生态/);
 });
 
 test("PreviewDetails focus values use unified detail text styling", () => {

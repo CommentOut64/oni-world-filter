@@ -13,8 +13,8 @@ const PREVIEW: PreviewPayload = {
     worldSize: { w: 256, h: 384 },
     traits: [1, 2],
     geysers: [
-      { type: 0, x: 11, y: 21 },
-      { type: 6, x: 15, y: 25 },
+      { type: 0, x: 11, y: 21, worldX: 11, worldY: 363 },
+      { type: 6, x: 15, y: 25, worldX: 15, worldY: 359 },
     ],
   },
   polygons: [],
@@ -27,6 +27,8 @@ test("tauri exports loadPreviewByCoord for direct coord preview flow", () => {
 test("runCoordPreviewFlow loads preview by coord and opens single direct result", async () => {
   const calls: string[] = [];
   const capturedMatches: SearchMatchSummary[] = [];
+  const longCoord = "V-SNDST-C-231293028-0-39-MPJ2Q7Y1";
+  const longMixing = 152841815626;
 
   await runCoordPreviewFlow(
     {
@@ -36,7 +38,7 @@ test("runCoordPreviewFlow loads preview by coord and opens single direct result"
           coord,
           worldType: 13,
           seed: 123456,
-          mixing: 625,
+          mixing: longMixing,
           preview: PREVIEW,
         };
       },
@@ -54,20 +56,20 @@ test("runCoordPreviewFlow loads preview by coord and opens single direct result"
         calls.push("view-results");
       },
     },
-    "V-SNDST-C-1927980015-0-3A-0"
+    longCoord
   );
 
   assert.equal(capturedMatches.length, 1);
   assert.deepEqual(calls, [
-    "load:V-SNDST-C-1927980015-0-3A-0",
-    "open:V-SNDST-C-1927980015-0-3A-0",
-    "prime:V-SNDST-C-1927980015-0-3A-0:123456",
+    `load:${longCoord}`,
+    `open:${longCoord}`,
+    `prime:${longCoord}:123456`,
     "view-results",
   ]);
   assert.equal(capturedMatches[0]?.seed, 123456);
   assert.equal(capturedMatches[0]?.worldType, 13);
-  assert.equal(capturedMatches[0]?.mixing, 625);
-  assert.equal(capturedMatches[0]?.coord, "V-SNDST-C-1927980015-0-3A-0");
+  assert.equal(capturedMatches[0]?.mixing, longMixing);
+  assert.equal(capturedMatches[0]?.coord, longCoord);
   assert.deepEqual(capturedMatches[0]?.traits, [1, 2]);
   assert.deepEqual(capturedMatches[0]?.start, { x: 10, y: 20 });
   assert.deepEqual(capturedMatches[0]?.worldSize, { w: 256, h: 384 });
@@ -104,7 +106,7 @@ test("runCoordPreviewFlow only sets error when coord preview fails", async () =>
 
 test("formatNativeDisplayMessage maps relaxed native coord validation error", () => {
   assert.equal(
-    formatNativeDisplayMessage("invalid native coord; trailing mixing code must be 1 to 5-char base36 within mixing range"),
-    "坐标格式无效，尾部混搭编码需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。"
+    formatNativeDisplayMessage("invalid native coord; trailing mixing code must be non-empty uppercase base36 within mixing range"),
+    "坐标格式无效，尾部混搭编码需为非空大写 base36，且不能超出 mixing 有效范围。"
   );
 });

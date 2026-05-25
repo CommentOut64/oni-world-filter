@@ -16,7 +16,7 @@ const MATCH: SearchMatchSummary = {
   traits: [],
   start: { x: 12, y: 34 },
   worldSize: { w: 256, h: 384 },
-  geysers: [{ type: 0, x: 70, y: 90, id: "steam" }],
+  geysers: [{ type: 0, x: 70, y: 90, worldX: 70, worldY: 294, id: "steam" }],
   nearestDistance: null,
 };
 
@@ -31,7 +31,7 @@ const REPORT_EVENT: WorldReportEvent = {
         start: { x: 12, y: 34 },
         worldSize: { w: 256, h: 384 },
         traits: [],
-        geysers: [{ type: 0, x: 70, y: 90, id: "steam" }],
+        geysers: [{ type: 0, x: 70, y: 90, worldX: 70, worldY: 294, id: "steam" }],
       },
       polygons: [],
     },

@@ -501,6 +501,26 @@ int RunAllTests()
     {
         SearchAnalysis::SearchAnalysisRequest request;
         request.worldType = 1;
+        request.seedStart = 10;
+        request.seedEnd = 20;
+
+        SearchAnalysis::WorldEnvelopeProfile invalidProfile;
+        invalidProfile.valid = false;
+        invalidProfile.worldType = 1;
+
+        const auto result = SearchAnalysis::RunSearchAnalysis(
+            request,
+            BuildMockCatalog(),
+            &invalidProfile,
+            "world effective state output is null");
+        Expect(HasIssue(result.errors, "world.profile_compile_failed"),
+               "invalid world profile with error message should surface a layer2 issue",
+               failures);
+    }
+
+    {
+        SearchAnalysis::SearchAnalysisRequest request;
+        request.worldType = 1;
         request.seedStart = 100;
         request.seedEnd = 200;
         request.constraints.count = {

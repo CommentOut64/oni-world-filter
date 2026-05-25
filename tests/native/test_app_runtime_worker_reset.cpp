@@ -444,7 +444,8 @@ std::string FingerprintSummary(const GeneratedWorldSummary &summary)
     }
     builder << '|';
     for (const auto &geyser : summary.geysers) {
-        builder << geyser.type << ':' << geyser.x << ':' << geyser.y << ',';
+        builder << geyser.type << ':' << geyser.x << ':' << geyser.y << ':'
+                << geyser.worldX << ':' << geyser.worldY << ',';
     }
     return builder.str();
 }

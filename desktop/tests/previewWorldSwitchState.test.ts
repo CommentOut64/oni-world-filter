@@ -75,8 +75,8 @@ function createMatch(seed = 123456): SearchMatchSummary {
     start: { x: 10, y: 20 },
     worldSize: { w: 256, h: 384 },
     geysers: [
-      { type: 0, x: 11, y: 21, id: "steam" },
-      { type: 6, x: 15, y: 25, id: "salt_water" },
+      { type: 0, x: 11, y: 21, worldX: 11, worldY: 363, id: "steam" },
+      { type: 6, x: 15, y: 25, worldX: 15, worldY: 359, id: "salt_water" },
     ],
     nearestDistance: 1.4,
   };
@@ -99,10 +99,10 @@ function createPreview(
       geysers:
         target === "primary"
           ? [
-              { type: 0, x: 11, y: 21, id: "steam" },
-              { type: 6, x: 15, y: 25, id: "salt_water" },
+              { type: 0, x: 11, y: 21, worldX: 11, worldY: 363, id: "steam" },
+              { type: 6, x: 15, y: 25, worldX: 15, worldY: 359, id: "salt_water" },
             ]
-          : [{ type: 27, x: 101, y: 121, id: "chlorine_gas" }],
+          : [{ type: 27, x: 101, y: 121, worldX: 101, worldY: 263, id: "chlorine_gas" }],
     },
     polygons: [],
   };
@@ -120,8 +120,8 @@ function createDetailsEvent(seed: number, target: "primary" | "secondary") {
         index: 0,
         summary:
           target === "primary"
-            ? { type: 0, x: 11, y: 21, id: "steam" }
-            : { type: 27, x: 101, y: 121, id: "chlorine_gas" },
+            ? { type: 0, x: 11, y: 21, worldX: 11, worldY: 363, id: "steam" }
+            : { type: 27, x: 101, y: 121, worldX: 101, worldY: 263, id: "chlorine_gas" },
         hasParameters: true,
         parameterKind: "geyser",
         native: {

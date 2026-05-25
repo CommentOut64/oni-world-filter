@@ -23,6 +23,9 @@ const worlds: WorldOption[] = [
   { id: 12, code: "PRES-A-" },
   { id: 13, code: "V-SNDST-C-" },
   { id: 26, code: "V-PRES-C-" },
+  { id: 38, code: "AQU-A-" },
+  { id: 39, code: "V-AQU-C-" },
+  { id: 40, code: "AQU-C-" },
   { id: 32, code: "M-SWMP-C-" },
 ];
 
@@ -51,6 +54,42 @@ const mixingSlots: MixingSlotMeta[] = [
     name: "Relica Fragment",
     description: "",
   },
+  { slot: 11, path: "DLC5_ID", type: "dlc", name: "The Aquatic Planet Pack", description: "" },
+  {
+    slot: 12,
+    path: "dlc5::subworldMixing/BeachMixingSettings",
+    type: "subworld",
+    name: "Beach Biome",
+    description: "",
+  },
+  {
+    slot: 13,
+    path: "dlc5::subworldMixing/ReefMixingSettings",
+    type: "subworld",
+    name: "Reef Biome",
+    description: "",
+  },
+  {
+    slot: 14,
+    path: "dlc5::subworldMixing/KelpForestMixingSettings",
+    type: "subworld",
+    name: "Kelp Forest Biome",
+    description: "",
+  },
+  {
+    slot: 15,
+    path: "dlc5::subworldMixing/AbyssMixingSettings",
+    type: "subworld",
+    name: "Abyss Biome",
+    description: "",
+  },
+  {
+    slot: 16,
+    path: "dlc5::worldMixing/AquaticMixingSettings",
+    type: "world",
+    name: "Marinea Fragment",
+    description: "",
+  },
 ];
 
 test("classifyWorld and getCategoryForWorld map current world codes to UI categories", () => {
@@ -58,22 +97,25 @@ test("classifyWorld and getCategoryForWorld map current world codes to UI catego
   assert.equal(classifyWorld("S-FRZ-"), "baseAsteroid");
   assert.equal(classifyWorld("VOLCA-"), "baseAsteroid");
   assert.equal(classifyWorld("PRES-A-"), "baseAsteroid");
+  assert.equal(classifyWorld("AQU-A-"), "baseAsteroid");
   assert.equal(classifyWorld("V-SNDST-C-"), "classicCluster");
   assert.equal(classifyWorld("V-PRES-C-"), "classicCluster");
+  assert.equal(classifyWorld("V-AQU-C-"), "classicCluster");
+  assert.equal(classifyWorld("AQU-C-"), "moonletCluster");
   assert.equal(classifyWorld("M-SWMP-C-"), "moonletCluster");
 
   const grouped = groupWorldsByCategory(worlds);
   assert.deepEqual(
     grouped.baseAsteroid.map((item) => item.id),
-    [0, 2, 5]
+    [0, 2, 5, 38]
   );
   assert.deepEqual(
     grouped.classicCluster.map((item) => item.id),
-    [13]
+    [13, 39]
   );
   assert.deepEqual(
     grouped.moonletCluster.map((item) => item.id),
-    [32]
+    [40, 32]
   );
 
   assert.equal(
@@ -102,7 +144,7 @@ test("world selector helpers only sync category from valid selection and clear c
 test("groupMixingSlots groups package slots with child world/subworld slots", () => {
   const groups = groupMixingSlots(mixingSlots);
 
-  assert.equal(groups.length, 3);
+  assert.equal(groups.length, 4);
   assert.equal(groups[0].packageSlot.path, "DLC2_ID");
   assert.deepEqual(
     groups[0].children.map((item) => item.slot),
@@ -114,6 +156,11 @@ test("groupMixingSlots groups package slots with child world/subworld slots", ()
   assert.deepEqual(
     groups[2].children.map((item) => item.slot),
     [7]
+  );
+  assert.equal(groups[3].packageSlot.path, "DLC5_ID");
+  assert.deepEqual(
+    groups[3].children.map((item) => item.slot),
+    [12, 13, 14, 15, 16]
   );
 });
 

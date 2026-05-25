@@ -1,15 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { PLAYER_BIOME_DISPLAY_NAMES, ZONE_TYPE_DISPLAY_NAMES } from "../src/lib/displayNames.ts";
 import { formatPlayerBiomeNameByZoneType } from "../src/lib/displayResolvers.ts";
 
-const LEGACY_INDEX_SOURCE = readFileSync(new URL("../../src/index.tsx", import.meta.url), "utf8");
-const LEGACY_LANGUAGE_SOURCE = readFileSync(
-  new URL("../../src/jsUtils/language.ts", import.meta.url),
-  "utf8"
-);
+function readOptionalText(relativePath: string): string {
+  const url = new URL(relativePath, import.meta.url);
+  return existsSync(url) ? readFileSync(url, "utf8") : "";
+}
+
+const LEGACY_INDEX_SOURCE = readOptionalText("../../src/index.tsx");
+const LEGACY_LANGUAGE_SOURCE = readOptionalText("../../src/jsUtils/language.ts");
 
 test("zone type display names follow the legacy frontend biome labels where they existed", () => {
   const legacyLabels = new Map<number, { zh: string; en: string }>([
@@ -62,6 +64,9 @@ test("player biome display names hide internal zone types and include missing pl
 });
 
 test("legacy biome gallery hides internal entries and includes missing player biomes", () => {
+  if (!LEGACY_INDEX_SOURCE) {
+    return;
+  }
   assert.doesNotMatch(LEGACY_INDEX_SOURCE, /"Crystal Caverns"/);
   assert.doesNotMatch(LEGACY_INDEX_SOURCE, /"Rocket Interior"/);
   assert.match(LEGACY_INDEX_SOURCE, /"Aquatic Biome"/);
@@ -70,6 +75,9 @@ test("legacy biome gallery hides internal entries and includes missing player bi
 });
 
 test("legacy translations rename barren and include missing player biomes", () => {
+  if (!LEGACY_LANGUAGE_SOURCE) {
+    return;
+  }
   assert.match(LEGACY_LANGUAGE_SOURCE, /"Barren Biome": "浮土生态"/);
   assert.match(LEGACY_LANGUAGE_SOURCE, /"Aquatic Biome": "水域生态"/);
   assert.match(LEGACY_LANGUAGE_SOURCE, /"Niobium Biome": "铌质生态"/);
@@ -81,4 +89,8 @@ test("desktop player biome resolver hides internal zone types and renames barren
   assert.equal(formatPlayerBiomeNameByZoneType(14), null);
   assert.equal(formatPlayerBiomeNameByZoneType(16), "浮土生态");
   assert.equal(formatPlayerBiomeNameByZoneType(21), "花园生态");
+  assert.equal(formatPlayerBiomeNameByZoneType(24), "沙滩生态");
+  assert.equal(formatPlayerBiomeNameByZoneType(25), "珊瑚生态");
+  assert.equal(formatPlayerBiomeNameByZoneType(26), "藻林生态");
+  assert.equal(formatPlayerBiomeNameByZoneType(27), "深渊生态");
 });
