@@ -1,0 +1,11 @@
+{
+  "name": "oni-world-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import:dlc5": "node ./import-dlc5-assets.mjs"
+  },
+  "dependencies": {
+    "yaml": "2.9.0"
+  }
+}

@@ -42,6 +42,7 @@ Desktop.ini
 /llmdoc
 /devdoc
 /desktop/node_modules/
+/scripts/node_modules/
 /desktop/dist/
 /src-tauri/target/
 /src-tauri/gen/
@@ -59,3 +60,5 @@ Desktop.ini
 # Local temporary reverse-engineering workspace
 .tmp_ilspy/
 .tmp_ilspy_current/
+.codex_tmp/
+
