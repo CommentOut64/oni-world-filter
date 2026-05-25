@@ -442,7 +442,19 @@ bool TemplateSpawning::ApplyTemplateRules(const TemplateSpawnRules &rule,
         }
     }
     if (minCount > 0) {
-        LogE("can not place all templates");
+        std::string joinedNames;
+        for (size_t index = 0; index < rule.names.size(); ++index) {
+            if (index > 0) {
+                joinedNames += ",";
+            }
+            joinedNames += rule.names[index];
+        }
+        LogE("can not place all templates, listRule=%d remainingMin=%d allowNearStart=%d useRelaxedFiltering=%d names=%s",
+             static_cast<int>(rule.listRule),
+             minCount,
+             rule.allowNearStart ? 1 : 0,
+             rule.useRelaxedFiltering ? 1 : 0,
+             joinedNames.c_str());
         return false;
     }
     return true;

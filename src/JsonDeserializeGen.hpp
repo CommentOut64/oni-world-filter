@@ -83,6 +83,8 @@ struct Deserializer<ClusterLayout>
             count += Setting::deserialize(*ptr, obj.worldPlacements) ? 1 : 0;
         if ((ptr = value.find("poiPlacements")) != nullptr)
             count += Setting::deserialize(*ptr, obj.poiPlacements) ? 1 : 0;
+        if ((ptr = value.find("startingMinions")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.startingMinions) ? 1 : 0;
         if ((ptr = value.find("name")) != nullptr)
             count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
         if ((ptr = value.find("description")) != nullptr)
@@ -714,6 +716,14 @@ struct Deserializer<SimHashes>
             { "Gunk", SimHashes::Gunk },
             { "NickelOre", SimHashes::NickelOre },
             { "Nickel", SimHashes::Nickel },
+            { "MurkyBrine", SimHashes::MurkyBrine },
+            { "SiltStone", SimHashes::SiltStone },
+            { "ZincOre", SimHashes::ZincOre },
+            { "Corallium", SimHashes::Corallium },
+            { "Coquina", SimHashes::Coquina },
+            { "Basalt", SimHashes::Basalt },
+            { "Galena", SimHashes::Galena },
+            { "Mucus", SimHashes::Mucus },
             { "Iridium", SimHashes::Iridium },
             { "Vacuum", SimHashes::Vacuum },
             { "Void", SimHashes::Void },
@@ -876,7 +886,11 @@ struct Deserializer<ZoneType>
             { "SugarWoods", ZoneType::SugarWoods },
             { "PrehistoricGarden", ZoneType::PrehistoricGarden },
             { "PrehistoricRaptor", ZoneType::PrehistoricRaptor },
-            { "PrehistoricWetlands", ZoneType::PrehistoricWetlands }
+            { "PrehistoricWetlands", ZoneType::PrehistoricWetlands },
+            { "Beach", ZoneType::Beach },
+            { "Reef", ZoneType::Reef },
+            { "KelpForest", ZoneType::KelpForest },
+            { "Abyss", ZoneType::Abyss }
         };
         auto itr = dict.find(name);
         if (itr == dict.end()) {
@@ -1067,7 +1081,9 @@ struct Deserializer<Location>
             { "AnyFloor", Location::AnyFloor },
             { "LiquidCeiling", Location::LiquidCeiling },
             { "Liquid", Location::Liquid },
-            { "EntombedFloorPeek", Location::EntombedFloorPeek }
+            { "EntombedFloorPeek", Location::EntombedFloorPeek },
+            { "LiquidFloorCavityNoRequired", Location::LiquidFloorCavityNoRequired },
+            { "AnchoredToBackWall", Location::AnchoredToBackWall }
         };
         auto itr = dict.find(name);
         if (itr == dict.end()) {
@@ -1164,7 +1180,8 @@ struct Deserializer<Range>
             { "HumanHot", Range::HumanHot },
             { "Hot", Range::Hot },
             { "VeryHot", Range::VeryHot },
-            { "ExtremelyHot", Range::ExtremelyHot }
+            { "ExtremelyHot", Range::ExtremelyHot },
+            { "SomewhatHot", Range::SomewhatHot }
         };
         auto itr = dict.find(name);
         if (itr == dict.end()) {
@@ -1270,6 +1287,12 @@ struct Deserializer<Cell>
             count += Setting::deserialize(*ptr, obj.mass) ? 1 : 0;
         if ((ptr = value.find("temperature")) != nullptr)
             count += Setting::deserialize(*ptr, obj.temperature) ? 1 : 0;
+        if ((ptr = value.find("backwallElement")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.backwallElement) ? 1 : 0;
+        if ((ptr = value.find("backwallTemperature")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.backwallTemperature) ? 1 : 0;
+        if ((ptr = value.find("backwallMass")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.backwallMass) ? 1 : 0;
         if ((ptr = value.find("diseaseName")) != nullptr)
             count += Setting::deserialize(*ptr, obj.diseaseName) ? 1 : 0;
         if ((ptr = value.find("diseaseCount")) != nullptr)
@@ -1348,8 +1371,10 @@ struct Deserializer<TemplateAmountValue>
         int count = 0;
         if ((ptr = value.find("id")) != nullptr)
             count += Setting::deserialize(*ptr, obj.id) ? 1 : 0;
-        if ((ptr = value.find("value")) != nullptr)
+        if ((ptr = value.find("value")) != nullptr) {
             count += Setting::deserialize(*ptr, obj.value) ? 1 : 0;
+            obj.hasValue = true;
+        }
 
         if ((int)value.size() != count) {
             LogE("object TemplateAmountValue parse failed.");
@@ -1390,6 +1415,10 @@ struct Deserializer<Prefab>
             count += Setting::deserialize(*ptr, obj.type) ? 1 : 0;
         if ((ptr = value.find("facadeId")) != nullptr)
             count += Setting::deserialize(*ptr, obj.facadeId) ? 1 : 0;
+        if ((ptr = value.find("loreUnlockId")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.loreUnlockId) ? 1 : 0;
+        if ((ptr = value.find("loreDisplayText")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.loreDisplayText) ? 1 : 0;
         if ((ptr = value.find("connections")) != nullptr)
             count += Setting::deserialize(*ptr, obj.connections) ? 1 : 0;
         if ((ptr = value.find("rottable")) != nullptr)
@@ -1492,6 +1521,8 @@ struct Deserializer<SubWorld>
             count += Setting::deserialize(*ptr, obj.utilityKey) ? 1 : 0;
         if ((ptr = value.find("biomeNoise")) != nullptr)
             count += Setting::deserialize(*ptr, obj.biomeNoise) ? 1 : 0;
+        if ((ptr = value.find("backwallNoise")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.backwallNoise) ? 1 : 0;
         if ((ptr = value.find("overrideNoise")) != nullptr)
             count += Setting::deserialize(*ptr, obj.overrideNoise) ? 1 : 0;
         if ((ptr = value.find("densityNoise")) != nullptr)
@@ -1689,6 +1720,332 @@ struct Deserializer<Feature>
 
         if ((int)value.size() != count) {
             LogE("object Feature parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseNodeRef>
+{
+    static bool deserialize(const Json::Value &value, NoiseNodeRef &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("type")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.type) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseNodeRef parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseLink>
+{
+    static bool deserialize(const Json::Value &value, NoiseLink &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("target")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.target) ? 1 : 0;
+        if ((ptr = value.find("source0")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.source0) ? 1 : 0;
+        if ((ptr = value.find("source1")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.source1) ? 1 : 0;
+        if ((ptr = value.find("source2")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.source2) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseLink parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseGraphSettings>
+{
+    static bool deserialize(const Json::Value &value, NoiseGraphSettings &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("zoom")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.zoom) ? 1 : 0;
+        if ((ptr = value.find("normalise")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.normalise) ? 1 : 0;
+        if ((ptr = value.find("seamless")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.seamless) ? 1 : 0;
+        if ((ptr = value.find("lowerBound")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.lowerBound) ? 1 : 0;
+        if ((ptr = value.find("upperBound")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.upperBound) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+        if ((ptr = value.find("pos")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.pos) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseGraphSettings parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoisePrimitive>
+{
+    static bool deserialize(const Json::Value &value, NoisePrimitive &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("primative")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.primative) ? 1 : 0;
+        if ((ptr = value.find("quality")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.quality) ? 1 : 0;
+        if ((ptr = value.find("seed")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.seed) ? 1 : 0;
+        if ((ptr = value.find("offset")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.offset) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+        if ((ptr = value.find("pos")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.pos) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoisePrimitive parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseFilter>
+{
+    static bool deserialize(const Json::Value &value, NoiseFilter &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("filter")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.filter) ? 1 : 0;
+        if ((ptr = value.find("frequency")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.frequency) ? 1 : 0;
+        if ((ptr = value.find("lacunarity")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.lacunarity) ? 1 : 0;
+        if ((ptr = value.find("octaves")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.octaves) ? 1 : 0;
+        if ((ptr = value.find("offset")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.offset) ? 1 : 0;
+        if ((ptr = value.find("gain")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.gain) ? 1 : 0;
+        if ((ptr = value.find("exponent")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.exponent) ? 1 : 0;
+        if ((ptr = value.find("scale")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.scale) ? 1 : 0;
+        if ((ptr = value.find("bias")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.bias) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+        if ((ptr = value.find("pos")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.pos) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseFilter parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseModifier>
+{
+    static bool deserialize(const Json::Value &value, NoiseModifier &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("modifyType")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.modifyType) ? 1 : 0;
+        if ((ptr = value.find("lower")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.lower) ? 1 : 0;
+        if ((ptr = value.find("upper")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.upper) ? 1 : 0;
+        if ((ptr = value.find("exponent")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.exponent) ? 1 : 0;
+        if ((ptr = value.find("scale")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.scale) ? 1 : 0;
+        if ((ptr = value.find("bias")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.bias) ? 1 : 0;
+        if ((ptr = value.find("scale2d")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.scale2d) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+        if ((ptr = value.find("pos")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.pos) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseModifier parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseTransformer>
+{
+    static bool deserialize(const Json::Value &value, NoiseTransformer &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("transformerType")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.transformerType) ? 1 : 0;
+        if ((ptr = value.find("power")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.power) ? 1 : 0;
+        if ((ptr = value.find("vector")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.vector) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+        if ((ptr = value.find("pos")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.pos) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseTransformer parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseSelector>
+{
+    static bool deserialize(const Json::Value &value, NoiseSelector &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("selectType")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.selectType) ? 1 : 0;
+        if ((ptr = value.find("lower")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.lower) ? 1 : 0;
+        if ((ptr = value.find("upper")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.upper) ? 1 : 0;
+        if ((ptr = value.find("edge")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.edge) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+        if ((ptr = value.find("pos")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.pos) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseSelector parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseCombiner>
+{
+    static bool deserialize(const Json::Value &value, NoiseCombiner &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("combineType")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.combineType) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+        if ((ptr = value.find("pos")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.pos) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseCombiner parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseControlPoint>
+{
+    static bool deserialize(const Json::Value &value, NoiseControlPoint &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("input")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.input) ? 1 : 0;
+        if ((ptr = value.find("output")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.output) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseControlPoint parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseControlPoints>
+{
+    static bool deserialize(const Json::Value &value, NoiseControlPoints &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("points")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.points) ? 1 : 0;
+        if ((ptr = value.find("name")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.name) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseControlPoints parse failed.");
+            return false;
+        }
+        return true;
+    }
+};
+
+template<>
+struct Deserializer<NoiseTree>
+{
+    static bool deserialize(const Json::Value &value, NoiseTree &obj)
+    {
+        const Json::Value *ptr = nullptr;
+        int count = 0;
+        if ((ptr = value.find("settings")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.settings) ? 1 : 0;
+        if ((ptr = value.find("links")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.links) ? 1 : 0;
+        if ((ptr = value.find("primitives")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.primitives) ? 1 : 0;
+        if ((ptr = value.find("filters")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.filters) ? 1 : 0;
+        if ((ptr = value.find("transformers")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.transformers) ? 1 : 0;
+        if ((ptr = value.find("selectors")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.selectors) ? 1 : 0;
+        if ((ptr = value.find("modifiers")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.modifiers) ? 1 : 0;
+        if ((ptr = value.find("combiners")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.combiners) ? 1 : 0;
+        if ((ptr = value.find("floats")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.floats) ? 1 : 0;
+        if ((ptr = value.find("controlpoints")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.controlpoints) ? 1 : 0;
+
+        if ((int)value.size() != count) {
+            LogE("object NoiseTree parse failed.");
             return false;
         }
         return true;

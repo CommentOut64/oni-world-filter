@@ -28,6 +28,11 @@ public:
 #endif
 
 private:
+    struct SpawnedTemplateEntity {
+        std::string_view entityId;
+        Vector2<int> position;
+    };
+
     int m_seed;
     const SettingsCache &m_settings;
     const World &m_world;
@@ -61,6 +66,7 @@ private:
     void ConvertUnknownCells(std::vector<Site> &allSites, KRandom &random);
     bool GenerateChildren(Site &site, KRandom &random, int seed, bool usePD);
     void SetFeatureBiome(Site &site, KRandom &random, const Feature *feature);
+    std::vector<SpawnedTemplateEntity> ExpandTemplateEntities(const TemplateSpawner &spawner) const;
     bool DetermineTemplates(std::vector<Site *> &sites, KRandom &random);
 };
 
@@ -74,7 +80,7 @@ inline std::string ZoneTypeToString(ZoneType zone)
         "Swamp",        "Wasteland",         "RocketInterior", "Metallic",
         "Barren",       "Moo",               "IceCaves",       "CarrotQuarry",
         "SugarWoods",   "PrehistoricGarden", "PrehistoricRaptor",
-        "PrehistoricWetlands"};
+        "PrehistoricWetlands", "Beach", "Reef", "KelpForest", "Abyss"};
     return dict[(int)zone];
 }
 // clang-format on
@@ -84,6 +90,6 @@ inline std::string TempRangeToString(Range range)
     const char *dict[] = {
         "ExtremelyCold", "VeryVeryCold", "VeryCold",    "Cold",      "Chilly",
         "Cool",          "Mild",         "Room",        "HumanWarm", "HumanHot",
-        "Hot",           "VeryHot",      "ExtremelyHot"};
+        "Hot",           "VeryHot",      "ExtremelyHot", "SomewhatHot"};
     return dict[(int)range];
 }

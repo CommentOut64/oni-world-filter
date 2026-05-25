@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
 #include <vector>
 #include "Utils/Vector2f.hpp"
 
@@ -12,6 +13,10 @@ struct GeyserSummary {
     int type{};
     int x{};
     int y{};
+    // `x/y` 是给预览链和文案展示使用的显示坐标；`worldX/worldY`
+    // 保留 worldgen 原始坐标，供喷口参数链按游戏语义复算。
+    int worldX{};
+    int worldY{};
 };
 
 struct GeyserNativeParameters {
@@ -37,6 +42,7 @@ struct GeyserDetail {
     GeyserSummary summary{};
     bool hasParameters{false};
     std::string parameterKind;
+    std::string parameterSource;
     GeyserNativeParameters native{};
     GeyserDerivedParameters derived{};
 };
@@ -71,7 +77,7 @@ struct GeneratedWorldPreview {
 struct WorldReportData {
     GeneratedWorldPreview preview;
     std::vector<GeyserDetail> geyserDetails;
-    int mixing{};
+    uint64_t mixing{};
     std::string coord;
 };
 

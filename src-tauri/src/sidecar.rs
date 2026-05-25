@@ -7,6 +7,7 @@ use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::atomic::Ordering;
+use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -42,81 +43,44 @@ static RUNTIME_SIDECAR_PREPARE_LOCK: Mutex<()> = Mutex::new(());
 #[cfg(windows)]
 const WINDOWS_CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-const WORLD_CODES: [&str; 38] = [
-    "SNDST-A-",
-    "OCAN-A-",
-    "S-FRZ-",
-    "LUSH-A-",
-    "FRST-A-",
-    "VOLCA-",
-    "BAD-A-",
-    "HTFST-A-",
-    "OASIS-A-",
-    "CER-A-",
-    "CERS-A-",
-    "PRE-A-",
-    "PRES-A-",
-    "V-SNDST-C-",
-    "V-OCAN-C-",
-    "V-SWMP-C-",
-    "V-SFRZ-C-",
-    "V-LUSH-C-",
-    "V-FRST-C-",
-    "V-VOLCA-C-",
-    "V-BAD-C-",
-    "V-HTFST-C-",
-    "V-OASIS-C-",
-    "V-CER-C-",
-    "V-CERS-C-",
-    "V-PRE-C-",
-    "V-PRES-C-",
-    "SNDST-C-",
-    "PRE-C-",
-    "CER-C-",
-    "FRST-C-",
-    "SWMP-C-",
-    "M-SWMP-C-",
-    "M-BAD-C-",
-    "M-FRZ-C-",
-    "M-FLIP-C-",
-    "M-RAD-C-",
-    "M-CERS-C-",
-];
+#[derive(Debug, Clone, Deserialize)]
+struct FallbackWorldEntry {
+    code: String,
+}
 
-const GEYSER_IDS: [&str; 32] = [
-    "steam",
-    "hot_steam",
-    "hot_water",
-    "slush_water",
-    "filthy_water",
-    "slush_salt_water",
-    "salt_water",
-    "small_volcano",
-    "big_volcano",
-    "liquid_co2",
-    "hot_co2",
-    "hot_hydrogen",
-    "hot_po2",
-    "slimy_po2",
-    "chlorine_gas",
-    "methane",
-    "molten_copper",
-    "molten_iron",
-    "molten_gold",
-    "molten_aluminum",
-    "molten_cobalt",
-    "oil_drip",
-    "liquid_sulfur",
-    "chlorine_gas_cool",
-    "molten_tungsten",
-    "molten_niobium",
-    "printing_pod",
-    "oil_reservoir",
-    "warp_sender",
-    "warp_receiver",
-    "warp_portal",
-    "cryo_tank",
-];
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FallbackGeyserEntry {
+    key: String,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    parameter_source: Option<String>,
+    #[serde(default)]
+    supports_dynamic_parameters: Option<bool>,
+    #[serde(default)]
+    supports_coordinate_parameters: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct FallbackCatalogData {
+    worlds: Vec<FallbackWorldEntry>,
+    geysers: Vec<FallbackGeyserEntry>,
+}
+
+static FALLBACK_CATALOG_DATA: OnceLock<FallbackCatalogData> = OnceLock::new();
+
+fn fallback_catalog_data() -> &'static FallbackCatalogData {
+    FALLBACK_CATALOG_DATA.get_or_init(|| {
+        serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../desktop/src/lib/searchCatalogFallbackData.json"
+        )))
+        .expect("fallback search catalog data should be valid json")
+    })
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -206,7 +170,7 @@ pub struct PreviewRequestPayload {
     pub world_type: i32,
     pub seed: i32,
     #[serde(default)]
-    pub mixing: i32,
+    pub mixing: u64,
     #[serde(default)]
     pub target: PreviewTargetPayload,
 }
@@ -229,7 +193,7 @@ pub struct PreviewGeyserDetailsRequestPayload {
     pub world_type: i32,
     pub seed: i32,
     #[serde(default)]
-    pub mixing: i32,
+    pub mixing: u64,
     #[serde(default)]
     pub target: PreviewTargetPayload,
 }
@@ -248,7 +212,7 @@ pub struct WorldReportRequestPayload {
     pub world_type: i32,
     pub seed: i32,
     #[serde(default)]
-    pub mixing: i32,
+    pub mixing: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -280,6 +244,8 @@ pub struct GeyserDetailPayload {
     pub summary: GeyserSummaryPayload,
     pub has_parameters: bool,
     pub parameter_kind: String,
+    #[serde(default)]
+    pub parameter_source: Option<String>,
     pub native: GeyserNativeParametersPayload,
     pub derived: GeyserDerivedParametersPayload,
 }
@@ -291,7 +257,7 @@ pub struct PreviewGeyserDetailsEventPayload {
     pub job_id: String,
     pub world_type: i32,
     pub seed: i32,
-    pub mixing: i32,
+    pub mixing: u64,
     pub geyser_details: Vec<GeyserDetailPayload>,
 }
 
@@ -307,6 +273,16 @@ pub struct WorldOption {
 pub struct GeyserOption {
     pub id: i32,
     pub key: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub parameter_source: Option<String>,
+    #[serde(default)]
+    pub supports_dynamic_parameters: Option<bool>,
+    #[serde(default)]
+    pub supports_coordinate_parameters: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -458,23 +434,30 @@ pub struct SourcePoolPayload {
 }
 
 pub fn list_world_options() -> Vec<WorldOption> {
-    WORLD_CODES
+    fallback_catalog_data()
+        .worlds
         .iter()
         .enumerate()
-        .map(|(index, code)| WorldOption {
+        .map(|(index, world)| WorldOption {
             id: index as i32,
-            code: (*code).to_string(),
+            code: world.code.clone(),
         })
         .collect()
 }
 
 pub fn list_geyser_options() -> Vec<GeyserOption> {
-    GEYSER_IDS
+    fallback_catalog_data()
+        .geysers
         .iter()
         .enumerate()
-        .map(|(index, key)| GeyserOption {
+        .map(|(index, geyser)| GeyserOption {
             id: index as i32,
-            key: (*key).to_string(),
+            key: geyser.key.clone(),
+            name: geyser.name.clone(),
+            kind: geyser.kind.clone(),
+            parameter_source: geyser.parameter_source.clone(),
+            supports_dynamic_parameters: geyser.supports_dynamic_parameters,
+            supports_coordinate_parameters: geyser.supports_coordinate_parameters,
         })
         .collect()
 }
@@ -492,7 +475,7 @@ pub fn start_search_streaming(
             "seedStart 必须 <= seedEnd".to_string(),
         ));
     }
-    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+    if request.world_type < 0 || request.world_type >= fallback_catalog_data().worlds.len() as i32 {
         return Err(HostError::InvalidRequest(
             "worldType 超出有效范围".to_string(),
         ));
@@ -1347,7 +1330,7 @@ pub(crate) fn validate_preview_request(request: &PreviewRequestPayload) -> Resul
     if request.job_id.trim().is_empty() {
         return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
     }
-    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+    if request.world_type < 0 || request.world_type >= fallback_catalog_data().worlds.len() as i32 {
         return Err(HostError::InvalidRequest(
             "worldType 超出有效范围".to_string(),
         ));
@@ -1373,7 +1356,7 @@ pub(crate) fn validate_preview_geyser_details_request(
     if request.job_id.trim().is_empty() {
         return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
     }
-    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+    if request.world_type < 0 || request.world_type >= fallback_catalog_data().worlds.len() as i32 {
         return Err(HostError::InvalidRequest(
             "worldType 超出有效范围".to_string(),
         ));
@@ -1387,7 +1370,7 @@ pub(crate) fn validate_world_report_request(
     if request.job_id.trim().is_empty() {
         return Err(HostError::InvalidRequest("jobId 不能为空".to_string()));
     }
-    if request.world_type < 0 || request.world_type >= WORLD_CODES.len() as i32 {
+    if request.world_type < 0 || request.world_type >= fallback_catalog_data().worlds.len() as i32 {
         return Err(HostError::InvalidRequest(
             "worldType 超出有效范围".to_string(),
         ));
@@ -1968,6 +1951,16 @@ mod tests {
         let geysers = list_geyser_options();
         assert!(worlds.len() >= 30);
         assert!(geysers.len() >= 30);
+    }
+
+    #[test]
+    fn world_list_should_include_dlc5_aquatic_prefixes() {
+        let worlds = list_world_options();
+        let codes = worlds.iter().map(|item| item.code.as_str()).collect::<Vec<_>>();
+
+        assert!(codes.contains(&"AQU-A-"));
+        assert!(codes.contains(&"V-AQU-C-"));
+        assert!(codes.contains(&"AQU-C-"));
     }
 
     #[test]
@@ -2695,11 +2688,12 @@ mod tests {
 
     #[test]
     fn build_preview_geyser_details_command_should_emit_target_only_payload() {
+        let long_mixing = 152_841_815_626_u64;
         let command = build_preview_geyser_details_command(&PreviewGeyserDetailsRequestPayload {
             job_id: "preview-geyser-details-001".to_string(),
             world_type: 13,
             seed: 100123,
-            mixing: 625,
+            mixing: long_mixing,
             target: PreviewTargetPayload::Secondary,
         });
 
@@ -2707,7 +2701,7 @@ mod tests {
         assert_eq!(command["jobId"].as_str(), Some("preview-geyser-details-001"));
         assert_eq!(command["worldType"].as_i64(), Some(13));
         assert_eq!(command["seed"].as_i64(), Some(100123));
-        assert_eq!(command["mixing"].as_i64(), Some(625));
+        assert_eq!(command["mixing"].as_u64(), Some(long_mixing));
         assert_eq!(command["target"].as_str(), Some("secondary"));
         assert!(command.get("worldHeight").is_none());
         assert!(command.get("geysers").is_none());
@@ -2719,7 +2713,7 @@ mod tests {
             job_id: "preview-geyser-details-002".to_string(),
             world_type: 13,
             seed: 100123,
-            mixing: 625,
+            mixing: 152_841_815_626_u64,
             target: PreviewTargetPayload::Primary,
         })
         .expect("target-only payload should be accepted");
@@ -2732,7 +2726,7 @@ mod tests {
             "jobId": "preview-geyser-details-001",
             "worldType": 13,
             "seed": 100123,
-            "mixing": 625,
+            "mixing": 152841815626_u64,
             "geyserDetails": [
                 {
                     "index": 0,
@@ -2763,6 +2757,7 @@ mod tests {
             .expect("event payload should deserialize");
         assert_eq!(payload.event, "preview_geyser_details");
         assert_eq!(payload.job_id, "preview-geyser-details-001");
+        assert_eq!(payload.mixing, 152_841_815_626_u64);
         assert_eq!(payload.geyser_details.len(), 1);
         assert_eq!(payload.geyser_details[0].summary.id.as_deref(), Some("steam"));
         assert!(payload.geyser_details[0].has_parameters);
@@ -2792,18 +2787,19 @@ mod tests {
 
     #[test]
     fn build_world_report_command_should_emit_full_payload() {
+        let long_mixing = 152_841_815_626_u64;
         let command = build_world_report_command(&WorldReportRequestPayload {
             job_id: "world-report-001".to_string(),
             world_type: 13,
             seed: 100123,
-            mixing: 625,
+            mixing: long_mixing,
         });
 
         assert_eq!(command["command"].as_str(), Some("world_report"));
         assert_eq!(command["jobId"].as_str(), Some("world-report-001"));
         assert_eq!(command["worldType"].as_i64(), Some(13));
         assert_eq!(command["seed"].as_i64(), Some(100123));
-        assert_eq!(command["mixing"].as_i64(), Some(625));
+        assert_eq!(command["mixing"].as_u64(), Some(long_mixing));
     }
 
     #[test]

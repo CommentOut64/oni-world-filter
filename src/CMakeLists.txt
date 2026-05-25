@@ -8,10 +8,22 @@ set(SETTING_HEADER_FILES
     "Setting/WorldGenClasses.hpp"
 )
 
-if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/data.bin")
-execute_process(COMMAND ${CMAKE_COMMAND} -E echo_append "keep"
-    OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/keep.txt"
+file(GLOB_RECURSE SETTING_ASSET_FILES
+    CONFIGURE_DEPENDS
+    LIST_DIRECTORIES false
+    RELATIVE "${CMAKE_SOURCE_DIR}/asset"
+    "${CMAKE_SOURCE_DIR}/asset/dlc/*"
+    "${CMAKE_SOURCE_DIR}/asset/templates/*"
+    "${CMAKE_SOURCE_DIR}/asset/worldgen/*"
 )
+list(PREPEND SETTING_ASSET_FILES "Asubworlds.json")
+set(SETTING_ASSET_DEPENDENCIES)
+foreach(SETTING_ASSET_FILE IN LISTS SETTING_ASSET_FILES)
+    list(APPEND SETTING_ASSET_DEPENDENCIES "${CMAKE_SOURCE_DIR}/asset/${SETTING_ASSET_FILE}")
+endforeach()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${SETTING_ASSET_DEPENDENCIES})
+
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/keep.txt" "keep")
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E tar cf "${CMAKE_CURRENT_BINARY_DIR}/data.zip"
                 --format=zip dlc templates worldgen Asubworlds.json
@@ -21,7 +33,6 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E cat "keep.txt" "data.zip"
     OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/data.bin"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
-endif()
 
 file(SIZE "${CMAKE_CURRENT_BINARY_DIR}/data.zip" SETTING_ASSET_FILESIZE)
 
@@ -72,8 +83,12 @@ set(ONI_BASE_SOURCES
     "Setting/ComposableDictionary.hpp"
     "Setting/ContentActivation.hpp"
     "Setting/ContentActivation.cpp"
+    "Setting/DlcRegistry.hpp"
+    "Setting/DlcRegistry.cpp"
     "Setting/NativeCoordinate.hpp"
     "Setting/NativeCoordinate.cpp"
+    "Setting/WorldTraitConflict.hpp"
+    "Setting/WorldTraitConflict.cpp"
     "Setting/JsonDeserialize.hpp"
     "Setting/SettingsCache.hpp"
     "Setting/WorldEffectiveState.hpp"
@@ -110,6 +125,12 @@ set(ONI_BASE_SOURCES
     "BatchCpu/SearchCpuGovernor.cpp"
     "BatchCpu/CpuOptimization.hpp"
     "BatchCpu/CpuOptimization.cpp"
+    "Geyser/GeyserKind.hpp"
+    "Geyser/GeyserKind.cpp"
+    "Geyser/GeyserCatalog.hpp"
+    "Geyser/GeyserCatalog.cpp"
+    "Geyser/GeyserParameterProvider.hpp"
+    "Geyser/GeyserParameterProvider.cpp"
     "Geyser/GeyserParameterCalculator.hpp"
     "Geyser/GeyserParameterCalculator.cpp"
 )
@@ -142,6 +163,8 @@ add_executable(test_filter_config
     "../tests/native/test_main.cpp"
     "../tests/native/test_filter_config.cpp"
     "Batch/FilterConfig.cpp"
+    "Geyser/GeyserCatalog.cpp"
+    "Geyser/GeyserKind.cpp"
 )
 target_include_directories(test_filter_config
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -154,6 +177,8 @@ add_executable(test_batch_matcher
     "../tests/native/test_batch_matcher.cpp"
     "Batch/BatchMatcher.cpp"
     "Batch/FilterConfig.cpp"
+    "Geyser/GeyserCatalog.cpp"
+    "Geyser/GeyserKind.cpp"
 )
 target_include_directories(test_batch_matcher
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -268,6 +293,24 @@ target_link_libraries(test_settings_cache PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_settings_cache COMMAND test_settings_cache)
 
+add_executable(test_dlc5_mixing_registration
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_dlc5_mixing_registration.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_dlc5_mixing_registration
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_dlc5_mixing_registration PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_dlc5_mixing_registration PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_dlc5_mixing_registration COMMAND test_dlc5_mixing_registration)
+
 add_executable(test_app_runtime_worker_reset
     "../tests/native/test_main.cpp"
     "../tests/native/test_app_runtime_worker_reset.cpp"
@@ -291,6 +334,8 @@ add_executable(test_sidecar_protocol
     "../tests/native/test_sidecar_protocol.cpp"
     "Batch/SidecarProtocol.cpp"
     "Batch/FilterConfig.cpp"
+    "Geyser/GeyserCatalog.cpp"
+    "Geyser/GeyserKind.cpp"
     "SearchAnalysis/TraitCatalog.cpp"
 )
 target_include_directories(test_sidecar_protocol
@@ -303,6 +348,9 @@ add_executable(test_geyser_parameter_calculator
     "../tests/native/test_main.cpp"
     "../tests/native/test_geyser_parameter_calculator.cpp"
     "Geyser/GeyserParameterCalculator.cpp"
+    "Geyser/GeyserParameterProvider.cpp"
+    "Geyser/GeyserCatalog.cpp"
+    "Geyser/GeyserKind.cpp"
     "Batch/FilterConfig.cpp"
     "Utils/KRandom.cpp"
 )
@@ -329,6 +377,24 @@ if(TARGET Threads::Threads)
 target_link_libraries(test_preview_world_session PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_preview_world_session COMMAND test_preview_world_session)
+
+add_executable(test_dlc5_preview_generation
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_dlc5_preview_generation.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_dlc5_preview_generation
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_dlc5_preview_generation PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_dlc5_preview_generation PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_dlc5_preview_generation COMMAND test_dlc5_preview_generation)
 
 add_executable(test_sidecar_shutdown
     "../tests/native/test_main.cpp"
@@ -384,6 +450,8 @@ add_executable(test_search_analysis
     "SearchAnalysis/ExplainabilityBuilder.cpp"
     "SearchAnalysis/BottleneckSelectivityPredictor.cpp"
     "Batch/FilterConfig.cpp"
+    "Geyser/GeyserCatalog.cpp"
+    "Geyser/GeyserKind.cpp"
 )
 target_include_directories(test_search_analysis
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"

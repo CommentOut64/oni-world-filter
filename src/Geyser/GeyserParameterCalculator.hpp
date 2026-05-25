@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -15,7 +16,7 @@ std::vector<GeyserDetail> BuildGeyserDetails(int geyserSeed,
 
 WorldReportData BuildWorldReportData(const GeneratedWorldPreview &preview,
                                      int geyserSeed,
-                                     int mixing,
+                                     uint64_t mixing,
                                      const std::string &coord,
                                      int worldOffsetX = 0,
                                      int worldOffsetY = 0);

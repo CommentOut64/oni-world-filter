@@ -16,6 +16,7 @@ import {
   formatGeyserDetailMissingMessage,
   formatGeyserDetailTemperature,
   formatGeyserDetailTitle,
+  formatGeyserParameterSource,
 } from "./geyserDetailFormatters.ts";
 
 export interface GeyserParameterAnchor {
@@ -110,6 +111,11 @@ export default function GeyserParameterPopover({
           column={1}
           items={[
             {
+              key: "parameter-source",
+              label: "参数来源",
+              children: formatGeyserParameterSource(detail),
+            },
+            {
               key: "temperature",
               label: "温度",
               children: formatGeyserDetailTemperature(detail),
@@ -139,9 +145,14 @@ export default function GeyserParameterPopover({
       ) : null}
 
       {geyserDetailsStatus === "ready" && detail && !detail.hasParameters ? (
-        <Typography.Paragraph className="geyser-parameter-message">
-          {formatGeyserDetailMissingMessage(detail.parameterKind)}
-        </Typography.Paragraph>
+        <>
+          <Typography.Text className="geyser-parameter-coords">
+            参数来源：{formatGeyserParameterSource(detail)}
+          </Typography.Text>
+          <Typography.Paragraph className="geyser-parameter-message">
+            {formatGeyserDetailMissingMessage(detail.parameterKind)}
+          </Typography.Paragraph>
+        </>
       ) : null}
 
       {geyserDetailsStatus === "ready" && !detail ? (

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -74,7 +75,7 @@ struct SidecarPreviewRequest {
     std::string jobId;
     int worldType = 0;
     int seed = 0;
-    int mixing = 0;
+    uint64_t mixing = 0;
     PreviewTarget target = PreviewTarget::Primary;
 };
 
@@ -82,7 +83,7 @@ struct SidecarPreviewGeyserDetailsRequest {
     std::string jobId;
     int worldType = 0;
     int seed = 0;
-    int mixing = 0;
+    uint64_t mixing = 0;
     int worldHeight = 0;
     std::vector<GeyserSummary> geysers;
     PreviewTarget target = PreviewTarget::Primary;
@@ -97,7 +98,7 @@ struct SidecarWorldReportRequest {
     std::string jobId;
     int worldType = 0;
     int seed = 0;
-    int mixing = 0;
+    uint64_t mixing = 0;
 };
 
 struct SidecarCancelRequest {

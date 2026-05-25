@@ -53,6 +53,31 @@ bool RequireInt(const Json::Value &obj,
     return true;
 }
 
+bool RequireUInt64(const Json::Value &obj,
+                   const char *field,
+                   uint64_t *out,
+                   std::string *error)
+{
+    if (!obj.isMember(field)) {
+        *error = std::string("missing field: ") + field;
+        return false;
+    }
+    if (!obj[field].isUInt64() && !obj[field].isUInt() && !obj[field].isInt64() && !obj[field].isInt()) {
+        *error = std::string("field must be uint64: ") + field;
+        return false;
+    }
+    if (obj[field].isInt64() && obj[field].asInt64() < 0) {
+        *error = std::string("field must be >= 0: ") + field;
+        return false;
+    }
+    if (obj[field].isInt() && obj[field].asInt() < 0) {
+        *error = std::string("field must be >= 0: ") + field;
+        return false;
+    }
+    *out = obj[field].asUInt64();
+    return true;
+}
+
 bool RequireNumber(const Json::Value &obj,
                    const char *field,
                    float *out,
@@ -121,6 +146,16 @@ bool ParseGeyserSummaries(const Json::Value &array,
             return false;
         }
         if (!RequireInt(item, "y", &summary.y, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        summary.worldX = summary.x;
+        summary.worldY = summary.y;
+        if (item.isMember("worldX") && !RequireInt(item, "worldX", &summary.worldX, error)) {
+            *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
+            return false;
+        }
+        if (item.isMember("worldY") && !RequireInt(item, "worldY", &summary.worldY, error)) {
             *error = std::string(field) + "[" + std::to_string(index) + "]: " + *error;
             return false;
         }
@@ -339,6 +374,8 @@ Json::Value BuildCaptureSummaryJson(const BatchCaptureRecord &capture)
         geyser["type"] = item.type;
         geyser["x"] = item.x;
         geyser["y"] = item.y;
+        geyser["worldX"] = item.worldX;
+        geyser["worldY"] = item.worldY;
         if (item.type >= 0 && item.type < static_cast<int>(ids.size())) {
             geyser["id"] = ids[static_cast<size_t>(item.type)];
         }
@@ -378,6 +415,8 @@ Json::Value BuildPreviewJson(const GeneratedWorldPreview &preview)
         geyser["type"] = item.type;
         geyser["x"] = item.x;
         geyser["y"] = item.y;
+        geyser["worldX"] = item.worldX;
+        geyser["worldY"] = item.worldY;
         if (item.type >= 0 && item.type < static_cast<int>(ids.size())) {
             geyser["id"] = ids[static_cast<size_t>(item.type)];
         }
@@ -410,6 +449,8 @@ Json::Value BuildGeyserSummaryJson(const GeyserSummary &summary)
     geyser["type"] = summary.type;
     geyser["x"] = summary.x;
     geyser["y"] = summary.y;
+    geyser["worldX"] = summary.worldX;
+    geyser["worldY"] = summary.worldY;
     const auto &ids = GetGeyserIds();
     if (summary.type >= 0 && summary.type < static_cast<int>(ids.size())) {
         geyser["id"] = ids[static_cast<size_t>(summary.type)];
@@ -424,6 +465,7 @@ Json::Value BuildGeyserDetailJson(const GeyserDetail &detail)
     root["summary"] = BuildGeyserSummaryJson(detail.summary);
     root["hasParameters"] = detail.hasParameters;
     root["parameterKind"] = detail.parameterKind;
+    root["parameterSource"] = detail.parameterSource;
 
     Json::Value native(Json::objectValue);
     native["averageActiveYieldKgPerCycle"] = detail.native.averageActiveYieldKgPerCycle;
@@ -455,7 +497,7 @@ Json::Value BuildWorldReportJson(const WorldReportData &report)
         geyserDetails.append(BuildGeyserDetailJson(detail));
     }
     root["geyserDetails"] = geyserDetails;
-    root["mixing"] = report.mixing;
+    root["mixing"] = Json::UInt64(report.mixing);
     root["coord"] = report.coord;
     return root;
 }
@@ -478,6 +520,11 @@ Json::Value BuildSearchCatalogJson(const SearchAnalysis::SearchCatalog &catalog)
         Json::Value geyser(Json::objectValue);
         geyser["id"] = item.id;
         geyser["key"] = item.key;
+        geyser["name"] = item.name;
+        geyser["kind"] = item.kind;
+        geyser["parameterSource"] = item.parameterSource;
+        geyser["supportsDynamicParameters"] = item.supportsDynamicParameters;
+        geyser["supportsCoordinateParameters"] = item.supportsCoordinateParameters;
         geysers.append(geyser);
     }
     root["geysers"] = geysers;
@@ -789,7 +836,10 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         if (!RequireInt(root, "seed", &request.seed, &result.error)) {
             return result;
         }
-        request.mixing = root.get("mixing", request.mixing).asInt();
+        if (root.isMember("mixing") &&
+            !RequireUInt64(root, "mixing", &request.mixing, &result.error)) {
+            return result;
+        }
         if (!ParsePreviewTarget(root, &request.target, &result.error)) {
             return result;
         }
@@ -808,7 +858,10 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         if (!RequireInt(root, "seed", &request.seed, &result.error)) {
             return result;
         }
-        request.mixing = root.get("mixing", request.mixing).asInt();
+        if (root.isMember("mixing") &&
+            !RequireUInt64(root, "mixing", &request.mixing, &result.error)) {
+            return result;
+        }
         if (!ParsePreviewTarget(root, &request.target, &result.error)) {
             return result;
         }
@@ -839,7 +892,10 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         if (!RequireInt(root, "seed", &request.seed, &result.error)) {
             return result;
         }
-        request.mixing = root.get("mixing", request.mixing).asInt();
+        if (root.isMember("mixing") &&
+            !RequireUInt64(root, "mixing", &request.mixing, &result.error)) {
+            return result;
+        }
         return result;
     }
 
@@ -1116,7 +1172,7 @@ std::string SerializePreviewEvent(const std::string &jobId,
     Json::Value root = BuildBaseEventJson("preview", jobId);
     root["worldType"] = request.worldType;
     root["seed"] = request.seed;
-    root["mixing"] = request.mixing;
+    root["mixing"] = Json::UInt64(request.mixing);
     if (coordOverride != nullptr) {
         root["coord"] = *coordOverride;
     }
@@ -1132,7 +1188,7 @@ std::string SerializePreviewGeyserDetailsEvent(
     Json::Value root = BuildBaseEventJson("preview_geyser_details", jobId);
     root["worldType"] = request.worldType;
     root["seed"] = request.seed;
-    root["mixing"] = request.mixing;
+    root["mixing"] = Json::UInt64(request.mixing);
     Json::Value details(Json::arrayValue);
     for (const auto &detail : geyserDetails) {
         details.append(BuildGeyserDetailJson(detail));
@@ -1148,7 +1204,7 @@ std::string SerializeWorldReportEvent(const std::string &jobId,
     Json::Value root = BuildBaseEventJson("world_report", jobId);
     root["worldType"] = request.worldType;
     root["seed"] = request.seed;
-    root["mixing"] = request.mixing;
+    root["mixing"] = Json::UInt64(request.mixing);
     root["report"] = BuildWorldReportJson(report);
     return WriteCompactJson(root);
 }

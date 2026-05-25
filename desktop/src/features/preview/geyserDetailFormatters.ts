@@ -1,8 +1,12 @@
 import type { GeyserDetail, GeyserSummary } from "../../lib/contracts.ts";
-import { formatGeyserNameFromSummary } from "../../lib/displayResolvers";
+import {
+  formatGeyserNameFromSummary,
+  formatGeyserParameterSourceLabel,
+} from "../../lib/displayResolvers";
 import type { GeyserOption } from "../../lib/contracts.ts";
 
 const NO_PARAMETER_MESSAGES: Record<string, string> = {
+  aquatic_vent: "该水生喷口使用独立运行时规则，当前版本暂不提供可复算参数。",
   facility: "该对象是固定设施，不生成喷口参数。",
   reservoir: "该对象不适用当前喷口参数算法。",
   unknown: "该对象暂无可展示的参数信息。",
@@ -18,6 +22,10 @@ export function formatGeyserDetailCoords(summary: GeyserSummary): string {
 
 export function formatGeyserDetailMissingMessage(parameterKind: string): string {
   return NO_PARAMETER_MESSAGES[parameterKind] ?? NO_PARAMETER_MESSAGES.unknown;
+}
+
+export function formatGeyserParameterSource(detail: GeyserDetail): string {
+  return formatGeyserParameterSourceLabel(detail.parameterSource) ?? detail.parameterSource ?? "未知";
 }
 
 export function formatGeyserDetailTemperature(detail: GeyserDetail): string {

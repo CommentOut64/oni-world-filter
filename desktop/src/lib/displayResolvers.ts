@@ -2,6 +2,8 @@ import type { GeyserOption, GeyserSummary, MixingSlotMeta, WorldOption } from ".
 import {
   ASTEROID_DISPLAY_NAMES,
   GEYSER_DISPLAY_NAMES,
+  GEYSER_KIND_DISPLAY_NAMES,
+  GEYSER_PARAMETER_SOURCE_DISPLAY_NAMES,
   MIXING_SLOT_DISPLAY_NAMES,
   PLAYER_ZONE_TYPE_DISPLAY_NAMES,
   WORLD_DISPLAY_NAMES,
@@ -36,13 +38,48 @@ export function formatGeyserNameByKey(key: string): string {
   return displayName ? formatDisplayName(displayName) : key;
 }
 
+export function formatGeyserKindLabel(kind: string | null | undefined): string | null {
+  if (!kind) {
+    return null;
+  }
+  const displayName = GEYSER_KIND_DISPLAY_NAMES[kind];
+  return displayName ? formatDisplayName(displayName) : kind;
+}
+
+export function formatGeyserParameterSourceLabel(
+  source: string | null | undefined
+): string | null {
+  if (!source) {
+    return null;
+  }
+  const displayName = GEYSER_PARAMETER_SOURCE_DISPLAY_NAMES[source];
+  return displayName ? formatDisplayName(displayName) : source;
+}
+
+export function formatGeyserOptionName(option: Pick<GeyserOption, "key" | "name">): string {
+  const displayName = GEYSER_DISPLAY_NAMES[option.key];
+  if (displayName) {
+    return formatDisplayName(displayName);
+  }
+  if (option.name?.trim()) {
+    return option.name;
+  }
+  return option.key;
+}
+
+export function formatGeyserOptionLabel(option: GeyserOption): string {
+  const kindLabel = formatGeyserKindLabel(option.kind);
+  const name = formatGeyserOptionName(option);
+  return kindLabel ? `${name}（${kindLabel}）` : name;
+}
+
 export function geyserKeyFromType(type: number, geysers: readonly GeyserOption[]): string | null {
   return geysers.find((item) => item.id === type)?.key ?? null;
 }
 
 export function formatGeyserNameByType(type: number, geysers: readonly GeyserOption[]): string {
-  const key = geyserKeyFromType(type, geysers);
-  return key ? formatGeyserNameByKey(key) : `type#${type}`;
+  const option = geysers.find((item) => item.id === type);
+  return option ? formatGeyserOptionName(option) : `type#${type}`;
 }
 
 export function formatGeyserNameFromSummary(
@@ -50,6 +87,10 @@ export function formatGeyserNameFromSummary(
   geysers: readonly GeyserOption[]
 ): string {
   if (summary.id) {
+    const option = geysers.find((item) => item.key === summary.id);
+    if (option) {
+      return formatGeyserOptionName(option);
+    }
     return formatGeyserNameByKey(summary.id);
   }
   return formatGeyserNameByType(summary.type, geysers);

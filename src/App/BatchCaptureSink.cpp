@@ -66,7 +66,7 @@ void BatchCaptureSink::OnGeneratedWorldSummary(const GeneratedWorldSummary &summ
     m_data.geysers.clear();
     m_data.geysers.reserve(summary.geysers.size());
     for (const auto &item : summary.geysers) {
-        m_data.geysers.push_back({item.type, item.x, item.y});
+        m_data.geysers.push_back({item.type, item.x, item.y, item.worldX, item.worldY});
     }
 }
 

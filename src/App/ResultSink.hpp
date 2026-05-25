@@ -35,6 +35,8 @@ struct BatchCaptureRecord {
         int type{};
         int x{};
         int y{};
+        int worldX{};
+        int worldY{};
     };
 
     std::vector<Geyser> geysers;

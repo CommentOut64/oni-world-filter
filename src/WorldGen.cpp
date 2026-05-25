@@ -11,6 +11,7 @@
 #include "Utils/Diagram.hpp"
 #include "Utils/PointGenerator.hpp"
 #include "Utils/RecoverableDiagnostics.hpp"
+#include "Geyser/GeyserCatalog.hpp"
 
 struct WeightedSubWorld {
     const SubWorld *subWorld;
@@ -35,6 +36,25 @@ struct WeightedSubWorld {
 static std::vector<Site *> ForceLowestToLeaf(std::vector<Site> &sites);
 static void ApplySwapTags(std::vector<Site> &sites, KRandom &random);
 extern void WriteToBinary(const std::vector<Site> &sites);
+
+namespace {
+
+constexpr std::string_view kGenericTemplateName = "geysers/generic";
+
+const Geyser::CatalogEntry *ResolveTemplateEntityGeyser(std::string_view entityId)
+{
+    if (const auto *entry = Geyser::FindByTemplateEntityId(entityId)) {
+        return entry;
+    }
+
+    constexpr std::string_view kGenericPrefix = "GeyserGeneric_";
+    if (!entityId.starts_with(kGenericPrefix)) {
+        return nullptr;
+    }
+    return Geyser::FindByKey(entityId.substr(kGenericPrefix.size()));
+}
+
+} // namespace
 
 static void MoveChildToCentroid(Site &child)
 {
@@ -452,7 +472,7 @@ void WorldGen::ConvertUnknownCells(std::vector<Site> &sites, KRandom &random)
         return;
     }
     std::map<int, std::vector<WeightedSubWorld *>> dict1;
-    for (int i = 0; i <= (int)Range::ExtremelyHot; ++i) {
+    for (int i = 0; i <= (int)Range::SomewhatHot; ++i) {
         auto &list = dict1[i];
         for (auto &subworld : subworldsForWorld) {
             if (subworld.subWorld->temperatureRange == (Range)i) {
@@ -461,7 +481,7 @@ void WorldGen::ConvertUnknownCells(std::vector<Site> &sites, KRandom &random)
         }
     }
     std::map<int, std::vector<WeightedSubWorld *>> dict2;
-    for (int i = 0; i <= (int)ZoneType::SugarWoods; ++i) {
+    for (int i = 0; i <= (int)ZoneType::Abyss; ++i) {
         auto &list = dict2[i];
         for (auto &subworld : subworldsForWorld) {
             if (subworld.subWorld->zoneType == (ZoneType)i) {
@@ -794,57 +814,57 @@ bool WorldGen::GenerateChildren(Site &site,
 
 std::vector<Vector3i> WorldGen::GetGeysers(int globalWorldSeed) const
 {
-    const char *configs[] = {
-        "steam",           "hot_steam",       "hot_water",
-        "slush_water",     "filthy_water",    "slush_salt_water",
-        "salt_water",      "small_volcano",   "big_volcano",
-        "liquid_co2",      "hot_co2",         "hot_hydrogen",
-        "hot_po2",         "slimy_po2",       "chlorine_gas",
-        "methane",         "molten_copper",   "molten_iron",
-        "molten_gold",     "molten_aluminum", "molten_cobalt",
-        "oil_drip",        "liquid_sulfur",   "chlorine_gas_cool",
-        "molten_tungsten", "molten_niobium",
-    };
     std::vector<Vector3i> result;
-    int count = m_settings.IsSpaceOutEnabled() ? 23 : 20;
-    for (auto &templt : m_templates) {
-        const std::string &name = templt.container->name;
-        Vector2<int> pos{templt.position};
-        pos.y = (int)m_world.worldsize.y - pos.y;
-        if (name == "geysers/generic") {
-            int seed = globalWorldSeed + pos.x + (int)templt.position.y;
-            int index = KRandom(seed).Next(0, count);
-            if (!m_settings.IsSpaceOutEnabled() && index == 19) {
-                index = 21;
-            }
-            result.emplace_back(pos.x, pos.y, index);
-        } else if (name.starts_with("poi/oil/")) {
-            result.emplace_back(pos.x, pos.y, std::size(configs) + 1);
-        } else if (name.starts_with("expansion1::poi/warp/receiver")) {
-            result.emplace_back(pos.x, pos.y, std::size(configs) + 3);
-        } else if (name.starts_with("expansion1::poi/warp/sender")) {
-            result.emplace_back(pos.x, pos.y, std::size(configs) + 2);
-        } else if (name.starts_with("expansion1::poi/warp/teleporter")) {
-            result.emplace_back(pos.x, pos.y, std::size(configs) + 4);
-        } else if (name.starts_with("expansion1::poi/traits/cryopod")) {
-            result.emplace_back(pos.x, pos.y, std::size(configs) + 5);
-        } else if (!templt.container->otherEntities.empty()) {
-            for (auto &item : templt.container->otherEntities) {
-                if (item.id.find("GeyserGeneric_") == item.id.npos) {
-                    continue;
+    const auto &genericPoolIds = Geyser::GetGenericRandomPoolIds(m_settings.IsSpaceOutEnabled());
+    for (const auto &templt : m_templates) {
+        const auto entities = ExpandTemplateEntities(templt);
+        for (const auto &entity : entities) {
+            if (entity.entityId == "GeyserGeneric") {
+                int seed = globalWorldSeed + entity.position.x + entity.position.y;
+                int index = KRandom(seed).Next(0, static_cast<int>(genericPoolIds.size()));
+                if (index >= 0 && index < static_cast<int>(genericPoolIds.size())) {
+                    result.emplace_back(entity.position.x,
+                                        entity.position.y,
+                                        genericPoolIds[static_cast<size_t>(index)]);
                 }
-                std::string geyser = item.id.substr(14);
-                for (int index = 0; index < (int)std::size(configs); ++index) {
-                    if (geyser == configs[index]) {
-                        Vector2<int> geyserPos{pos};
-                        geyserPos.x += item.location_x;
-                        geyserPos.y -= item.location_y;
-                        result.emplace_back(geyserPos.x, geyserPos.y, index);
-                        break;
-                    }
-                }
+                continue;
             }
+
+            const auto *entry = ResolveTemplateEntityGeyser(entity.entityId);
+            if (entry == nullptr) {
+                continue;
+            }
+            result.emplace_back(entity.position.x, entity.position.y, entry->id);
         }
+    }
+    return result;
+}
+
+std::vector<WorldGen::SpawnedTemplateEntity> WorldGen::ExpandTemplateEntities(
+    const TemplateSpawner &spawner) const
+{
+    std::vector<SpawnedTemplateEntity> result;
+    const TemplateContainer &container = *spawner.container;
+    const Vector2<int> templatePos{spawner.position};
+
+    if (container.name == kGenericTemplateName) {
+        result.push_back(SpawnedTemplateEntity{
+            .entityId = "GeyserGeneric",
+            .position = templatePos,
+        });
+        return result;
+    }
+
+    result.reserve(container.otherEntities.size());
+
+    for (const auto &item : container.otherEntities) {
+        result.push_back(SpawnedTemplateEntity{
+            .entityId = item.id,
+            .position = Vector2<int>{
+                templatePos.x + item.location_x,
+                templatePos.y + item.location_y,
+            },
+        });
     }
     return result;
 }

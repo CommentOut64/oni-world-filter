@@ -150,6 +150,11 @@ export interface WorldOption {
 export interface GeyserOption {
   id: number;
   key: string;
+  name?: string;
+  kind?: string;
+  parameterSource?: string;
+  supportsDynamicParameters?: boolean;
+  supportsCoordinateParameters?: boolean;
 }
 
 export interface TraitMeta {
@@ -203,6 +208,8 @@ export interface GeyserSummary {
   type: number;
   x: number;
   y: number;
+  worldX: number;
+  worldY: number;
   id?: string;
 }
 
@@ -229,6 +236,7 @@ export interface GeyserDetail {
   summary: GeyserSummary;
   hasParameters: boolean;
   parameterKind: string;
+  parameterSource?: string;
   native: GeyserNativeParameters;
   derived: GeyserDerivedParameters;
 }

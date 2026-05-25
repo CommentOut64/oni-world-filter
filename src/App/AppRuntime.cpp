@@ -171,7 +171,10 @@ bool AppRuntime::Generate(const std::string &code, int traitsFlag)
         LogE("parse seed code %s failed.", code.c_str());
         return false;
     }
-    return GenerateCurrentState(traitsFlag, code.find("M-") == 0);
+    // DLC5 经典/太空风格主世界同样存在唯一 warp 副世界，预览链需要把它纳入。
+    const bool shouldPreviewWarpWorld =
+        code.find("M-") == 0 || m_settings.IsContentEnabled("DLC5_ID");
+    return GenerateCurrentState(traitsFlag, shouldPreviewWarpWorld);
 }
 
 bool AppRuntime::GenerateSelectedPlacements(const std::string &code,
@@ -341,6 +344,7 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlac
                                 ? placementIndex == primaryPlacementIndex
                                 : world->locationType == LocationType::StartWorld;
         summary.worldType = summary.isPrimary ? 0 : 1;
+        summary.hasSecondaryPreview = normalizedPlacementIndexes.size() > 1;
         m_sink->OnGeneratedWorldSummary(summary);
         if (!m_skipPolygons) {
             auto preview = BuildPreview(world, sites, summary);
@@ -435,7 +439,13 @@ GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
     auto geysers = worldGen.GetGeysers(summary.geyserSeed);
     summary.geysers.reserve(geysers.size());
     for (auto &item : geysers) {
-        summary.geysers.push_back({item.z, item.x, item.y});
+        summary.geysers.push_back({
+            item.z,
+            item.x,
+            static_cast<int>(world->worldsize.y - item.y),
+            item.x,
+            item.y,
+        });
     }
 
     return summary;
