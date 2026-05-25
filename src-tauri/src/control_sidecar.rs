@@ -985,6 +985,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
     fn control_sidecar_load_preview_geyser_details_should_return_payload() {
         let root = create_temp_root("preview-geyser-details");
         let manager = create_test_manager(&root, "persistent", true);
+        let long_mixing = 152_841_815_626_u64;
 
         let payload = load_preview_geyser_details(
             None,
@@ -993,7 +994,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 job_id: "preview-geyser-details-001".to_string(),
                 world_type: 13,
                 seed: 100123,
-                mixing: 625,
+                mixing: long_mixing,
                 target: crate::sidecar::PreviewTargetPayload::Secondary,
             },
         )
@@ -1001,6 +1002,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
 
         assert_eq!(payload.event, "preview_geyser_details");
         assert_eq!(payload.job_id, "preview-geyser-details-001");
+        assert_eq!(payload.mixing, long_mixing);
         assert_eq!(payload.geyser_details.len(), 1);
         assert_eq!(payload.geyser_details[0].summary.id.as_deref(), Some("steam"));
     }
@@ -1017,7 +1019,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 job_id: "preview-geyser-details-002".to_string(),
                 world_type: 13,
                 seed: 100123,
-                mixing: 625,
+                mixing: 152_841_815_626_u64,
                 target: crate::sidecar::PreviewTargetPayload::Primary,
             },
         )
@@ -1038,7 +1040,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 job_id: "preview-geyser-details-003".to_string(),
                 world_type: 13,
                 seed: 100123,
-                mixing: 625,
+                mixing: 152_841_815_626_u64,
                 target: crate::sidecar::PreviewTargetPayload::Primary,
             },
         )
@@ -1073,6 +1075,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
     fn control_sidecar_load_world_report_should_return_event() {
         let root = create_temp_root("world-report");
         let manager = create_test_manager(&root, "persistent", true);
+        let long_mixing = 152_841_815_626_u64;
 
         let event = load_world_report(
             None,
@@ -1081,7 +1084,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 job_id: "world-report-001".to_string(),
                 world_type: 13,
                 seed: 100123,
-                mixing: 625,
+                mixing: long_mixing,
             },
         )
         .expect("world_report request should succeed");
@@ -1089,7 +1092,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
         assert_eq!(event["event"].as_str(), Some("world_report"));
         assert_eq!(event["jobId"].as_str(), Some("world-report-001"));
         assert_eq!(event["report"]["coord"].as_str(), Some("V-SNDST-C-100123-0-D3-HD"));
-        assert_eq!(event["report"]["mixing"].as_i64(), Some(625));
+        assert_eq!(event["report"]["mixing"].as_u64(), Some(long_mixing));
     }
 
     #[test]
@@ -1104,7 +1107,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 job_id: "world-report-002".to_string(),
                 world_type: 13,
                 seed: 100123,
-                mixing: 625,
+                mixing: 152_841_815_626_u64,
             },
         )
         .expect_err("failed event should surface as host error");
@@ -1124,7 +1127,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
                 job_id: "world-report-003".to_string(),
                 world_type: 13,
                 seed: 100123,
-                mixing: 625,
+                mixing: 152_841_815_626_u64,
             },
         )
         .expect_err("missing world_report event should be rejected");

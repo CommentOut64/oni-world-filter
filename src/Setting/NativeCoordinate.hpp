@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace NativeCoordinate {
@@ -7,7 +8,7 @@ namespace NativeCoordinate {
 struct NativeCoordinateResolution {
     int worldType = -1;
     int seed = 0;
-    int mixing = 0;
+    uint64_t mixing = 0;
     std::string code;
 };
 

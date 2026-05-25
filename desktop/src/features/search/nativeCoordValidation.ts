@@ -1,13 +1,13 @@
 const NATIVE_COORD_ERROR =
-  "坐标无效：请输入完整原生坐标，且最后一段需为 1 到 5 位大写 base36，且不能超出 mixing 有效范围。";
+  "坐标无效：请输入完整原生坐标，且最后一段需为非空大写 base36，且不能超出 mixing 有效范围。";
 
-const MIXING_MAX = 48_828_124;
+const MIXING_MAX = 762_939_453_124n;
 
-function decodeLittleEndianBase36(input: string): number {
-  let value = 0;
+function decodeLittleEndianBase36(input: string): bigint {
+  let value = 0n;
   for (let index = input.length - 1; index >= 0; index -= 1) {
-    value *= 36;
-    value += Number.parseInt(input[index] ?? "0", 36);
+    value *= 36n;
+    value += BigInt(Number.parseInt(input[index] ?? "0", 36));
   }
   return value;
 }
@@ -45,7 +45,7 @@ export function validateNativeCoordInput(
     return NATIVE_COORD_ERROR;
   }
 
-  if (!/^[0-9A-Z]{1,5}$/.test(mixingPart)) {
+  if (!/^[0-9A-Z]+$/.test(mixingPart)) {
     return NATIVE_COORD_ERROR;
   }
 

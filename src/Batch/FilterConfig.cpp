@@ -1,8 +1,9 @@
 #include "Batch/FilterConfig.hpp"
 
-#include <algorithm>
 #include <fstream>
 #include <sstream>
+
+#include "Geyser/GeyserCatalog.hpp"
 
 #include <json/json.h>
 
@@ -34,32 +35,16 @@ void AddError(FilterConfigLoadResult &result,
     });
 }
 
-const std::vector<std::string> kGeyserIds = {
-    "steam", "hot_steam", "hot_water", "slush_water", "filthy_water",
-    "slush_salt_water", "salt_water", "small_volcano", "big_volcano",
-    "liquid_co2", "hot_co2", "hot_hydrogen", "hot_po2", "slimy_po2",
-    "chlorine_gas", "methane", "molten_copper", "molten_iron",
-    "molten_gold", "molten_aluminum", "molten_cobalt",
-    "oil_drip", "liquid_sulfur", "chlorine_gas_cool",
-    "molten_tungsten", "molten_niobium",
-    "printing_pod", "oil_reservoir", "warp_sender", "warp_receiver",
-    "warp_portal", "cryo_tank",
-};
-
 } // namespace
 
 const std::vector<std::string> &GetGeyserIds()
 {
-    return kGeyserIds;
+    return Geyser::GetCatalogKeys();
 }
 
 int GeyserIdToIndex(const std::string &id)
 {
-    auto itr = std::find(kGeyserIds.begin(), kGeyserIds.end(), id);
-    if (itr == kGeyserIds.end()) {
-        return -1;
-    }
-    return static_cast<int>(std::distance(kGeyserIds.begin(), itr));
+    return Geyser::FindIdByKey(id);
 }
 
 std::string FormatFilterError(const FilterError &error)

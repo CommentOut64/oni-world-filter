@@ -3,7 +3,7 @@ import { Button, Select, Typography } from "antd";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import type { GeyserOption } from "../../lib/contracts";
-import { formatGeyserNameByKey } from "../../lib/displayResolvers";
+import { formatGeyserOptionLabel } from "../../lib/displayResolvers";
 import { sortGeyserOptionsByAvailability } from "../../lib/geyserOrdering.ts";
 import {
   buildSectionGeyserOptionAvailability,
@@ -105,7 +105,7 @@ export default function GeyserConstraintEditor({
                     placeholder="请选择喷口"
                     value={controllerField.value || undefined}
                     options={orderedOptions.map((item) => ({
-                      label: `${formatGeyserNameByKey(item.key)}${
+                      label: `${formatGeyserOptionLabel(item)}${
                         availability[item.key] ? ` (${availability[item.key]})` : ""
                       }`,
                       value: item.key,

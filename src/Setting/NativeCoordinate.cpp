@@ -4,6 +4,7 @@
 #include <array>
 #include <charconv>
 #include <cctype>
+#include <limits>
 #include <ranges>
 #include <string_view>
 #include <utility>
@@ -15,7 +16,7 @@ namespace NativeCoordinate {
 
 namespace {
 
-constexpr uint32_t kMixingMax = 48828124;
+constexpr uint64_t kMaxNativeMixingValue = 762939453124ULL;
 
 bool IsAsciiDigits(std::string_view text)
 {
@@ -28,6 +29,34 @@ bool IsUpperBase36(std::string_view text)
     return !text.empty() && std::ranges::all_of(text, [](unsigned char ch) {
                return std::isdigit(ch) != 0 || (ch >= 'A' && ch <= 'Z');
            });
+}
+
+bool TryDecodeLittleEndianBase36(std::string_view text, uint64_t *value)
+{
+    if (value == nullptr || text.empty()) {
+        return false;
+    }
+
+    uint64_t decoded = 0;
+    for (auto itr = text.rbegin(); itr != text.rend(); ++itr) {
+        const unsigned char ch = static_cast<unsigned char>(*itr);
+        uint64_t digit = 0;
+        if (std::isdigit(ch) != 0) {
+            digit = static_cast<uint64_t>(ch - '0');
+        } else if (ch >= 'A' && ch <= 'Z') {
+            digit = static_cast<uint64_t>(10 + (ch - 'A'));
+        } else {
+            return false;
+        }
+
+        if (decoded > (std::numeric_limits<uint64_t>::max() - digit) / 36ULL) {
+            return false;
+        }
+        decoded = decoded * 36ULL + digit;
+    }
+
+    *value = decoded;
+    return true;
 }
 
 bool SplitCoordSuffix(std::string_view suffix,
@@ -56,10 +85,15 @@ bool SplitCoordSuffix(std::string_view suffix,
 
 bool IsValidNativeMixingPart(std::string_view mixingPart)
 {
-    if (mixingPart.empty() || mixingPart.size() > 5 || !IsUpperBase36(mixingPart)) {
+    if (mixingPart.empty() || !IsUpperBase36(mixingPart)) {
         return false;
     }
-    return SettingsCache::Base36ToBinary(std::string(mixingPart)) <= kMixingMax;
+
+    uint64_t mixingValue = 0;
+    if (!TryDecodeLittleEndianBase36(mixingPart, &mixingValue)) {
+        return false;
+    }
+    return mixingValue <= kMaxNativeMixingValue;
 }
 
 } // namespace
@@ -106,9 +140,15 @@ bool ResolveNativeCoordinate(const std::string &rawCoord,
         return false;
     }
 
+    uint64_t mixingValue = 0;
+    if (!TryDecodeLittleEndianBase36(mixingPart, &mixingValue) ||
+        mixingValue > kMaxNativeMixingValue) {
+        return false;
+    }
+
     result->worldType = matchedWorldType;
     result->seed = parsedSeed;
-    result->mixing = static_cast<int>(SettingsCache::Base36ToBinary(std::string(mixingPart)));
+    result->mixing = mixingValue;
     result->code = rawCoord;
     return true;
 }
