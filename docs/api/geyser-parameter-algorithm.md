@@ -34,7 +34,12 @@ int geyserSeed = baseSeed + static_cast<int>(cluster->worldPlacements.size()) - 
 因此 `BuildGeyserDetails(...)` 必须使用这个 `geyserSeed`，不能直接把 `preview.summary.seed`
 当成喷口参数的随机源。
 
-另外，喷口参数复算不能只看世界内的本地显示坐标。游戏实际使用的是：
+另外，喷口参数复算不能只看世界内的本地显示坐标。当前仓库已经把喷口坐标明确拆成两轨：
+
+- `summary.x / summary.y`：预览显示坐标，其中 `y = worldHeight - worldY`
+- `summary.worldX / summary.worldY`：worldgen 原始坐标，直接进入参数复算
+
+游戏实际使用的是：
 
 ```cpp
 seed = globalWorldSeed + absoluteX + absoluteY;
@@ -42,45 +47,90 @@ seed = globalWorldSeed + absoluteX + absoluteY;
 
 其中：
 
-- `absoluteX = worldOffset.x + localX`
-- `absoluteY = worldOffset.y + internalY`
+- `absoluteX = worldOffset.x + worldX`
+- `absoluteY = worldOffset.y + worldY`
 - `worldOffset` 不是模板坐标的一部分，而是 cluster 初始化阶段通过 `BestFitWorlds` 给 asteroid 分配的全局偏移
+
+也就是说，预览链和参数链现在不再共用同一份 `y` 语义；显示翻转只发生在预览坐标，参数链始终消费原始 world 坐标。
 
 这也是 Space Out / moonlet cluster 上最容易漏掉的一层。
 
+这里还有一个容易把预览点位整体“翻到天上去”的实现细节：
+
+- 游戏模板放置阶段的 `TemplateSpawner.position` 本身就是 worldgen 原始坐标
+- 模板内 `otherEntities[].location_x / location_y` 也是直接相对这个 root cell 相加
+- 游戏不会在“取喷口实体坐标”这一步额外做一次 `worldHeight - y`
+
+也就是说，`WorldGen::GetGeysers()` 的权威语义应该是：
+
+```cpp
+worldX = templateRootX + entityOffsetX;
+worldY = templateRootY + entityOffsetY;
+```
+
+而不是先把模板 root 翻成显示坐标，再去叠加实体偏移。显示翻转只能发生在
+`BuildSummary()` 这种专门给预览链产出 `summary.y` 的地方。
+
 ## 2. 喷口类型确定
+
+当前仓库已经不再把喷口识别限定为单一 `GeyserGeneric_*` 字符串前缀，而是走统一喷口目录：
+
+- `generic geyser`：模板名是 `geysers/generic`，先生成一个绝对实体 `GeyserGeneric`
+- `fixed template geyser`：模板 `otherEntities` 中直接带 `GeyserGeneric_<key>`
+- `reservoir / warp / cryopod`：模板 `otherEntities` 中的实体 id 直接映射到目录项
+- `aquatic vent / aquatic geyser-like`：同样通过实体 id 进入统一目录
+
+权威实现位于：
+
+- `src/WorldGen.cpp` 的 `ExpandTemplateEntities()` / `GetGeysers()`
+- `src/Geyser/GeyserCatalog.cpp`
 
 ### 2.1 通用喷口
 
-`name == "geysers/generic"` 时，类型由世界种子和喷口实例坐标决定：
+`container.name == "geysers/generic"` 时，本地实现会先生成一个位于模板 root 的绝对实体：
 
 ```cpp
-pos.y = worldHeight - template.position.y;
-seed = globalWorldSeed + pos.x + template.position.y;
-index = KRandom(seed).Next(0, count);
+entityId = "GeyserGeneric";
+worldX = templateRootX;
+worldY = templateRootY;
+```
+
+随后再用绝对世界坐标决定类型：
+
+```cpp
+seed = globalWorldSeed + worldX + worldY;
+index = KRandom(seed).Next(0, genericPoolIds.size());
 ```
 
 其中：
 
 - `globalWorldSeed` 是世界坐标里的种子段
-- `template.position.y` 是内部坐标，不能用翻转后的显示 `y`
-- `count = 20`（非 Space Out）或 `23`（Space Out）
-- 非 Space Out 时，`index == 19` 会被改写成 `21`
+- `worldX / worldY` 是 worldgen 原始坐标，不是预览显示坐标
+- `genericPoolIds` 由 `Geyser::GetGenericRandomPoolIds(...)` 提供
+- 非 Space Out 返回 20 个可选 id，Space Out 返回 23 个可选 id
 
-`index` 再映射到喷口类型表：
+也就是说，generic 抽签现在直接绑定“最终绝对喷口实体格子”，而不是绑定某个先翻转过的模板显示坐标。
 
-```text
-steam, hot_steam, hot_water, slush_water, filthy_water,
-slush_salt_water, salt_water, small_volcano, big_volcano,
-liquid_co2, hot_co2, hot_hydrogen, hot_po2, slimy_po2,
-chlorine_gas, methane, molten_copper, molten_iron,
-molten_gold, molten_aluminum, molten_cobalt, oil_drip,
-liquid_sulfur, chlorine_gas_cool, molten_tungsten, molten_niobium
+### 2.2 固定喷口与实体喷口
+
+非 generic 模板不再按模板 root 坐标直接猜喷口位置，而是先展开模板实体：
+
+```cpp
+worldX = templateRootX + entity.location_x;
+worldY = templateRootY + entity.location_y;
 ```
 
-### 2.2 固定喷口
+再按实体 id 识别喷口类型：
 
-模板里直接带 `GeyserGeneric_*` 的，类型固定，不再走通用抽签。
+- `GeyserGeneric_<key>` -> 固定模板喷口
+- `OilWell` -> `oil_reservoir`
+- `WarpPortal` -> `warp_portal`
+- `WarpConduitSender` -> `warp_sender`
+- `WarpConduitReceiver` -> `warp_receiver`
+- `CryoTank` -> `cryo_tank`
+- `GeyserGeneric_murky_brine` / `SmallReefGeyser` / `UnderwaterVent` -> aquatic 类对象
+
+这一步的核心意义是：目录识别和坐标提取已经统一到同一条“模板实体绝对展开链”，预览链与参数链消费的是同一份喷口事实。
 
 ## 3. 原生参数生成
 
