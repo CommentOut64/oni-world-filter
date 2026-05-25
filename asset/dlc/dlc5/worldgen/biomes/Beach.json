@@ -1,0 +1,199 @@
+{
+  "TerrainBiomeLookupTable": {
+    "remove": [],
+    "add": {
+      "Beach": [
+        {
+          "content": "Oxygen",
+          "bandSize": 0.25
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Salt",
+          "bandSize": 0.2
+        },
+        {
+          "content": "SiltStone",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Sulfur",
+          "bandSize": 0.2
+        }
+      ],
+      "Beach_backwall": [
+        {
+          "content": "Salt",
+          "bandSize": 0.25
+        }
+      ],
+      "Basic": [
+        {
+          "content": "Oxygen",
+          "bandSize": 0.5
+        },
+        {
+          "content": "SiltStone",
+          "bandSize": 0.6
+        },
+        {
+          "content": "Salt",
+          "bandSize": 0.3
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Sulfur",
+          "bandSize": 0.2
+        },
+        {
+          "content": "ZincOre",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.3
+        }
+      ],
+      "Basic_backwall": [
+        {
+          "content": "Salt",
+          "bandSize": 0.25
+        }
+      ],
+      "Algae": [
+        {
+          "content": "Oxygen",
+          "bandSize": 0.5
+        },
+        {
+          "content": "Algae",
+          "bandSize": 0.255
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.1566667
+        },
+        {
+          "content": "SiltStone",
+          "bandSize": 0.41
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.3666667
+        },
+        {
+          "content": "ZincOre",
+          "bandSize": 0.2116667
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.3
+        }
+      ],
+      "Algae_backwall": [
+        {
+          "content": "Dirt",
+          "bandSize": 0.75
+        }
+      ],
+      "Metal": [
+        {
+          "content": "CarbonDioxide",
+          "bandSize": 0.5
+        },
+        {
+          "content": "ZincOre",
+          "bandSize": 0.33
+        },
+        {
+          "content": "SiltStone",
+          "bandSize": 0.3233334
+        },
+        {
+          "content": "Salt",
+          "bandSize": 0.2749999
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.1716667
+        },
+        {
+          "content": "Sulfur",
+          "bandSize": 0.155
+        },
+        {
+          "content": "ZincOre",
+          "bandSize": 0.145
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.3
+        }
+      ],
+      "Metal_backwall": [
+        {
+          "content": "Salt",
+          "bandSize": 0.25
+        }
+      ],
+      "Water": [
+        {
+          "content": "Oxygen",
+          "bandSize": 0.5
+        },
+        {
+          "content": "OxyRock",
+          "bandSize": 0.13
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.2583334
+        },
+        {
+          "content": "SiltStone",
+          "bandSize": 0.245
+        },
+        {
+          "content": "Salt",
+          "bandSize": 0.2666667
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Sulfur",
+          "bandSize": 0.105
+        },
+        {
+          "content": "OxyRock",
+          "bandSize": 0.1166667
+        },
+        {
+          "content": "ZincOre",
+          "bandSize": 0.07833333
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.3
+        }
+      ],
+      "Water_backwall": [
+        {
+          "content": "Salt",
+          "bandSize": 0.25
+        }
+      ]
+    }
+  }
+}

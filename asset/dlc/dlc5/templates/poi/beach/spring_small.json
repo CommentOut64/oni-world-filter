@@ -1,0 +1,640 @@
+{
+  "info": {
+    "size": {
+      "X": 9,
+      "Y": 11
+    },
+    "min": {
+      "X": -4,
+      "Y": -4
+    },
+    "area": 78
+  },
+  "cells": [
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.153259,
+      "location_x": -2,
+      "location_y": -3
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.153259,
+      "location_x": -1,
+      "location_y": -3
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.149994,
+      "location_y": -3
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.15152,
+      "location_x": 1,
+      "location_y": -3
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.15152,
+      "location_x": 2,
+      "location_y": -3
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.150482,
+      "location_x": 3,
+      "location_y": -3
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_x": -3,
+      "location_y": -2
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_x": -2,
+      "location_y": -2
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_x": -1,
+      "location_y": -2
+    },
+    {
+      "element": "Water",
+      "mass": 1031.94727,
+      "temperature": 300.167023,
+      "location_y": -2
+    },
+    {
+      "element": "Water",
+      "mass": 1031.93347,
+      "temperature": 300.151733,
+      "location_x": 1,
+      "location_y": -2
+    },
+    {
+      "element": "Water",
+      "mass": 1032.79724,
+      "temperature": 300.151703,
+      "location_x": 2,
+      "location_y": -2
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.149994,
+      "location_x": 3,
+      "location_y": -2
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.153748,
+      "location_x": 4,
+      "location_y": -2
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.144318,
+      "location_x": -4,
+      "location_y": -1
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_x": -3,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_x": -2,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_x": -1,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_y": -1
+    },
+    {
+      "element": "Water",
+      "mass": 1023.23596,
+      "temperature": 300.151703,
+      "location_x": 1,
+      "location_y": -1
+    },
+    {
+      "element": "Water",
+      "mass": 1022.26147,
+      "temperature": 300.151703,
+      "location_x": 2,
+      "location_y": -1
+    },
+    {
+      "element": "Water",
+      "mass": 1022.36926,
+      "temperature": 300.158142,
+      "location_x": 3,
+      "location_y": -1
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150116,
+      "location_x": 4,
+      "location_y": -1
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.145172,
+      "location_x": -4
+    },
+    {
+      "element": "Water",
+      "mass": 1004.8631,
+      "temperature": 300.161285,
+      "location_x": -3
+    },
+    {
+      "element": "Water",
+      "mass": 1007.20703,
+      "temperature": 300.152435,
+      "location_x": -2
+    },
+    {
+      "element": "Water",
+      "mass": 1008.15417,
+      "temperature": 300.151886,
+      "location_x": -1
+    },
+    {
+      "element": "Water",
+      "mass": 1011.63525,
+      "temperature": 300.151703
+    },
+    {
+      "element": "Water",
+      "mass": 1011.66815,
+      "temperature": 300.151703,
+      "location_x": 1
+    },
+    {
+      "element": "Water",
+      "mass": 1013.80151,
+      "temperature": 300.151703,
+      "location_x": 2
+    },
+    {
+      "element": "Water",
+      "mass": 1012.43005,
+      "temperature": 300.158142,
+      "location_x": 3
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150116,
+      "location_x": 4
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.146698,
+      "location_x": -4,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 995.154785,
+      "temperature": 300.161316,
+      "location_x": -3,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 997.497742,
+      "temperature": 300.152435,
+      "location_x": -2,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 999.730591,
+      "temperature": 300.151886,
+      "location_x": -1,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 1000.84039,
+      "temperature": 300.151703,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 1005.12872,
+      "temperature": 300.151703,
+      "location_x": 1,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 1003.92749,
+      "temperature": 300.151703,
+      "location_x": 2,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 1002.65564,
+      "temperature": 300.158142,
+      "location_x": 3,
+      "location_y": 1
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.153748,
+      "location_x": 4,
+      "location_y": 1
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.14032,
+      "location_x": -4,
+      "location_y": 2
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.149994,
+      "location_x": -3,
+      "location_y": 2
+    },
+    {
+      "element": "Water",
+      "mass": 973.689453,
+      "temperature": 300.152435,
+      "location_x": -2,
+      "location_y": 2
+    },
+    {
+      "element": "Water",
+      "mass": 990.210999,
+      "temperature": 300.151886,
+      "location_x": -1,
+      "location_y": 2
+    },
+    {
+      "element": "Water",
+      "mass": 995.678223,
+      "temperature": 300.151703,
+      "location_y": 2
+    },
+    {
+      "element": "Water",
+      "mass": 995.860901,
+      "temperature": 300.151703,
+      "location_x": 1,
+      "location_y": 2
+    },
+    {
+      "element": "Water",
+      "mass": 997.648804,
+      "temperature": 300.151703,
+      "location_x": 2,
+      "location_y": 2
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150116,
+      "location_x": 3,
+      "location_y": 2
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.144897,
+      "location_x": -3,
+      "location_y": 3
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.153259,
+      "location_x": -2,
+      "location_y": 3
+    },
+    {
+      "element": "Water",
+      "mass": 565.264038,
+      "temperature": 300.151886,
+      "location_x": -1,
+      "location_y": 3
+    },
+    {
+      "element": "Water",
+      "mass": 585.828918,
+      "temperature": 300.151703,
+      "location_y": 3
+    },
+    {
+      "element": "Water",
+      "mass": 608.030273,
+      "temperature": 300.151703,
+      "location_x": 1,
+      "location_y": 3
+    },
+    {
+      "element": "Water",
+      "mass": 621.453735,
+      "temperature": 300.151703,
+      "location_x": 2,
+      "location_y": 3
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150116,
+      "location_x": 3,
+      "location_y": 3
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150238,
+      "location_x": -2,
+      "location_y": 4
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150848,
+      "location_x": -1,
+      "location_y": 4
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.155212,
+      "location_y": 4
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.271352291,
+      "temperature": 301.07251,
+      "location_x": 1,
+      "location_y": 4
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.151978,
+      "location_x": 2,
+      "location_y": 4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.148712,
+      "location_x": -1,
+      "location_y": 5
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.151062,
+      "location_y": 5
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.271352172,
+      "temperature": 300.958282,
+      "location_x": 1,
+      "location_y": 5
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150208,
+      "location_x": 2,
+      "location_y": 5
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150238,
+      "location_x": 3,
+      "location_y": 5
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.151917,
+      "location_x": 3,
+      "location_y": 4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.148712,
+      "location_y": 6
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.148346,
+      "location_x": 1,
+      "location_y": 6
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.151093,
+      "location_x": 2,
+      "location_y": 6
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150238,
+      "location_x": -3,
+      "location_y": -4
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.151917,
+      "location_x": -3,
+      "location_y": -3
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150116,
+      "location_x": -2,
+      "location_y": -4
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.150116,
+      "location_x": -1,
+      "location_y": -4
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.15097,
+      "location_y": -4
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.153839,
+      "location_x": -4,
+      "location_y": -2
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.146301,
+      "location_x": 1,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.148682,
+      "location_x": 2,
+      "location_y": -4
+    }
+  ],
+  "pickupables": [
+    {
+      "id": "PufferFish",
+      "location_x": 1,
+      "location_y": 1,
+      "element": "Creature",
+      "temperature": 303.149994,
+      "units": 1,
+      "type": "Pickupable",
+      "rottable": {}
+    }
+  ],
+  "otherEntities": [
+    {
+      "id": "SeaLettuce",
+      "location_x": 1,
+      "location_y": -2,
+      "element": "Creature",
+      "temperature": 308.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "SeaLettuce",
+      "location_x": -3,
+      "element": "Creature",
+      "temperature": 308.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "SeaLettuce",
+      "location_x": 3,
+      "location_y": -1,
+      "element": "Creature",
+      "temperature": 308.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "SmallReefGeyser",
+      "location_x": -1,
+      "element": "Katairite",
+      "temperature": 305.149994,
+      "units": 1,
+      "type": "Other"
+    }
+  ]
+}

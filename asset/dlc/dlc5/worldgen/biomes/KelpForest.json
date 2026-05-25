@@ -1,0 +1,43 @@
+{
+  "TerrainBiomeLookupTable": {
+    "remove": [],
+    "add": {
+      "Basic": [
+        {
+          "content": "IronOre",
+          "bandSize": 0.025
+        },
+        {
+          "content": "Granite",
+          "bandSize": 0.025
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.1
+        },
+        {
+          "content": "ToxicMud",
+          "bandSize": 0.1
+        },
+        {
+          "content": "DirtyWater",
+          "bandSize": 0.6
+        },
+        {
+          "content": "ContaminatedOxygen",
+          "bandSize": 0.2
+        }
+      ],
+      "Basic_backwall": [
+        {
+          "content": "Granite",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Vacuum",
+          "bandSize": 0.8
+        }
+      ]
+    }
+  }
+}

@@ -3,6 +3,7 @@
 #include <ranges>
 
 #include "Setting/ClusterLayout.hpp"
+#include "Setting/DlcRegistry.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "Setting/WorldGenClasses.hpp"
 
@@ -24,19 +25,15 @@ void AddContentId(ActiveContentSet *content, const std::string &id)
         content->dlc3 = true;
     } else if (id == "DLC4_ID") {
         content->dlc4 = true;
+    } else if (id == "DLC5_ID") {
+        content->dlc5 = true;
     }
 }
 
 std::vector<std::string> InferRequiredContentIdsFromPath(const std::string &path)
 {
-    if (path.starts_with("dlc2::")) {
-        return {"DLC2_ID"};
-    }
-    if (path.starts_with("dlc3::")) {
-        return {"DLC3_ID"};
-    }
-    if (path.starts_with("dlc4::")) {
-        return {"DLC4_ID"};
+    if (const auto *dlc = DlcRegistry::FindByResourcePath(path); dlc != nullptr) {
+        return {std::string(dlc->id)};
     }
     return {};
 }
@@ -84,6 +81,31 @@ bool HasAnyClusterTag(const ClusterLayout *cluster,
     return false;
 }
 
+bool IsContentSetAllowed(const std::vector<std::string> &requiredIds,
+                         const std::vector<std::string> &forbiddenIds,
+                         const ActiveContentSet &activeContent)
+{
+    for (const auto &id : requiredIds) {
+        if (!activeContent.HasContent(id)) {
+            return false;
+        }
+    }
+    for (const auto &id : forbiddenIds) {
+        if (activeContent.HasContent(id)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsWorldAllowed(const World &world,
+                    const ClusterLayout *cluster,
+                    const ActiveContentSet &activeContent)
+{
+    (void)cluster;
+    return IsContentSetAllowed(world.requiredDlcIds, world.forbiddenDlcIds, activeContent);
+}
+
 std::vector<std::string> GetRequiredContentIds(const MixingConfig &config,
                                                const WorldMixingSettings *worldSetting,
                                                const SubworldMixingSettings *subworldSetting)
@@ -112,10 +134,9 @@ bool IsMixingConfigAllowed(const MixingConfig &config,
                            const WorldMixingSettings *worldSetting,
                            const SubworldMixingSettings *subworldSetting)
 {
-    for (const auto &id : GetRequiredContentIds(config, worldSetting, subworldSetting)) {
-        if (!activeContent.HasContent(id)) {
-            return false;
-        }
+    if (!IsContentSetAllowed(
+            GetRequiredContentIds(config, worldSetting, subworldSetting), {}, activeContent)) {
+        return false;
     }
 
     if (config.type == 1) {

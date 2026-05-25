@@ -1,0 +1,309 @@
+{
+  "MobLookupTable": {
+    "remove": [],
+    "add": {
+      "PacuTropical": {
+        "location": "Liquid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.01,
+          "max": 0.01
+        },
+        "width": 1,
+        "height": 1
+      },
+      "PlanktonCoral": {
+        "location": "AnchoredToBackWall",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.025,
+          "max": 0.025
+        },
+        "width": 2,
+        "height": 2
+      },
+      "ParrotFish": {
+        "location": "Liquid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.015,
+          "max": 0.015
+        },
+        "width": 1,
+        "height": 1
+      },
+      "PufferFish": {
+        "location": "Liquid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.015,
+          "max": 0.015
+        },
+        "width": 1,
+        "height": 1
+      },
+      "OxyCoral": {
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.75,
+          "max": 0.75
+        },
+        "width": 3,
+        "height": 2
+      },
+      "OxyCoralSeedBuried": {
+        "prefabName": "OxyCoralSeed",
+        "location": "Solid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.005,
+          "max": 0.02860784
+        },
+        "width": 1,
+        "height": 1
+      },
+      "Clam": {
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.75,
+          "max": 0.75
+        },
+        "width": 3,
+        "height": 3
+      },
+      "ReefSeaLettuce": {
+        "prefabName": "SeaLettuce",
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.2,
+          "max": 0.2
+        },
+        "width": 1,
+        "height": 1
+      },
+      "SeaHorse": {
+        "location": "Liquid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.0125,
+          "max": 0.0125
+        },
+        "width": 1,
+        "height": 2
+      },
+      "BeachCrab": {
+        "prefabName": "Crab",
+        "location": "Floor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.15,
+          "max": 0.15
+        },
+        "width": 1,
+        "height": 2
+      },
+      "CrabFreshWater": {
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.04,
+          "max": 0.06
+        },
+        "width": 1,
+        "height": 2
+      },
+      "SeaTree": {
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.2,
+          "max": 0.2
+        },
+        "width": 1,
+        "height": 2
+      },
+      "SeaFairy": {
+        "location": "Liquid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.02,
+          "max": 0.02
+        },
+        "width": 1,
+        "height": 1
+      },
+      "SeaTurtle": {
+        "location": "Liquid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.0125,
+          "max": 0.0125
+        },
+        "width": 2,
+        "height": 2
+      },
+      "KelpForestThimbleReed": {
+        "prefabName": "BasicFabricPlant",
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.15,
+          "max": 0.15
+        },
+        "width": 1,
+        "height": 3
+      },
+      "KelpForestBulbPlant": {
+        "prefabName": "BulbPlant",
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.1,
+          "max": 0.1
+        },
+        "width": 1,
+        "height": 1
+      },
+      "BeachBulbPlant": {
+        "prefabName": "BulbPlant",
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.1,
+          "max": 0.1
+        },
+        "width": 1,
+        "height": 1
+      },
+      "TubeWorm": {
+        "location": "LiquidFloorCavityNoRequired",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.11875,
+          "max": 0.1925
+        },
+        "width": 1,
+        "height": 2
+      },
+      "UrchinPlant": {
+        "location": "AnchoredToBackWall",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.034375,
+          "max": 0.05
+        },
+        "width": 2,
+        "height": 2
+      },
+      "MusselSprout": {
+        "prefabName": "MusselSprout",
+        "location": "Floor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.2,
+          "max": 0.2
+        },
+        "width": 1,
+        "height": 1
+      },
+      "MusselTongueBuried": {
+        "prefabName": "MusselTongue",
+        "location": "Solid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0,
+          "max": 0.04536082
+        },
+        "width": 1,
+        "height": 1
+      },
+      "WaterCups": {
+        "prefabName": "WaterCups",
+        "location": "Floor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.2,
+          "max": 0.2
+        },
+        "width": 1,
+        "height": 2
+      },
+      "SaltySticksPlant": {
+        "prefabName": "SaltySticksPlant",
+        "location": "Floor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.2347619,
+          "max": 0.2767787
+        },
+        "width": 1,
+        "height": 2
+      },
+      "SaltySticksSeedBuried": {
+        "prefabName": "SaltySticksPlantSeed",
+        "location": "Solid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.02060784,
+          "max": 0.02460784
+        },
+        "width": 1,
+        "height": 1
+      },
+      "Squid": {
+        "location": "Liquid",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.005,
+          "max": 0.01
+        },
+        "width": 1,
+        "height": 2
+      },
+      "DewPalm": {
+        "location": "Floor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.5,
+          "max": 0.5
+        },
+        "width": 3,
+        "height": 4
+      },
+      "Bulbloom": {
+        "location": "LiquidFloor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.1008403,
+          "max": 0.1596638
+        },
+        "width": 1,
+        "height": 1
+      },
+      "FilamentPlant": {
+        "location": "LiquidFloor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.1,
+          "max": 0.16
+        },
+        "width": 1,
+        "height": 1
+      },
+      "Snail": {
+        "prefabName": "Snail",
+        "location": "Floor",
+        "selectMethod": "Centroid",
+        "density": {
+          "min": 0.1,
+          "max": 0.2
+        },
+        "width": 1,
+        "height": 1
+      }
+    }
+  }
+}

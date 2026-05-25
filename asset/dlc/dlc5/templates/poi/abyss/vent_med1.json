@@ -1,0 +1,651 @@
+{
+  "info": {
+    "size": {
+      "X": 10,
+      "Y": 9
+    },
+    "min": {
+      "X": -4,
+      "Y": -4
+    },
+    "area": 80
+  },
+  "cells": [
+    {
+      "element": "MurkyBrine",
+      "mass": 696.543701,
+      "temperature": 319.15033,
+      "location_x": -4,
+      "location_y": -3
+    },
+    {
+      "element": "Diamond",
+      "mass": 699.23999,
+      "temperature": 320.143646,
+      "location_x": -3,
+      "location_y": -3
+    },
+    {
+      "element": "Diamond",
+      "mass": 699.23999,
+      "temperature": 320.149994,
+      "location_x": -2,
+      "location_y": -3
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.149994,
+      "location_x": -1,
+      "location_y": -3
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.149994,
+      "location_y": -3
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 320.150177,
+      "location_x": 1,
+      "location_y": -3
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 320.150177,
+      "location_x": 2,
+      "location_y": -3
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 320.150177,
+      "location_x": 3,
+      "location_y": -3
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 320.150299,
+      "location_x": 4,
+      "location_y": -3
+    },
+    {
+      "element": "Diamond",
+      "mass": 699.23999,
+      "temperature": 320.147766,
+      "location_x": -4,
+      "location_y": -2
+    },
+    {
+      "element": "Diamond",
+      "mass": 699.23999,
+      "temperature": 320.149994,
+      "location_x": -3,
+      "location_y": -2
+    },
+    {
+      "element": "Diamond",
+      "mass": 699.23999,
+      "temperature": 320.149994,
+      "location_x": -2,
+      "location_y": -2
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.149994,
+      "location_x": -1,
+      "location_y": -2
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.149994,
+      "location_y": -2
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.148163,
+      "location_x": 1,
+      "location_y": -2
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 320.150146,
+      "location_x": 2,
+      "location_y": -2
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.148163,
+      "location_x": 3,
+      "location_y": -2
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 320.149994,
+      "location_x": 4,
+      "location_y": -2
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 320.150238,
+      "location_x": 5,
+      "location_y": -2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1122.05127,
+      "temperature": 319.150177,
+      "location_x": -4,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_x": -3,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_x": -2,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_x": -1,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1163.98682,
+      "temperature": 319.150085,
+      "location_x": 1,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1164.86731,
+      "temperature": 319.150085,
+      "location_x": 2,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1166.2561,
+      "temperature": 319.150391,
+      "location_x": 3,
+      "location_y": -1
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.146332,
+      "location_x": 4,
+      "location_y": -1
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.148163,
+      "location_x": 5,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1041.0271,
+      "temperature": 319.150177,
+      "location_x": -4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1120.81274,
+      "temperature": 319.150085,
+      "location_x": -3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1147.8623,
+      "temperature": 319.152069,
+      "location_x": -2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1147.65601,
+      "temperature": 319.149994,
+      "location_x": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1118.35669,
+      "temperature": 319.149994
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1056.47729,
+      "temperature": 319.150208,
+      "location_x": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1043.17285,
+      "temperature": 319.150055,
+      "location_x": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1085.08252,
+      "temperature": 319.150848,
+      "location_x": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1131.47864,
+      "temperature": 319.150085,
+      "location_x": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1160.34839,
+      "temperature": 319.150024,
+      "location_x": 5
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 670.745239,
+      "temperature": 319.150116,
+      "location_x": -4,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 929.646729,
+      "temperature": 319.150085,
+      "location_x": -3,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1016.68884,
+      "temperature": 319.151581,
+      "location_x": -2,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1037.50635,
+      "temperature": 319.149994,
+      "location_x": -1,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1030.64551,
+      "temperature": 319.149994,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 982.233459,
+      "temperature": 319.150543,
+      "location_x": 1,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 974.731567,
+      "temperature": 319.150116,
+      "location_x": 2,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 928.050903,
+      "temperature": 319.150848,
+      "location_x": 3,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 989.394775,
+      "temperature": 319.150116,
+      "location_x": 4,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1042.38684,
+      "temperature": 319.150024,
+      "location_x": 5,
+      "location_y": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 924.71106,
+      "temperature": 319.150085,
+      "location_x": -3,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 988.80011,
+      "temperature": 319.151306,
+      "location_x": -2,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 966.441711,
+      "temperature": 319.149994,
+      "location_x": -1,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 918.956177,
+      "temperature": 319.149994,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 927.712524,
+      "temperature": 319.15036,
+      "location_x": 1,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 922.851074,
+      "temperature": 319.15036,
+      "location_x": 2,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 983.361755,
+      "temperature": 319.150574,
+      "location_x": 3,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 964.002747,
+      "temperature": 319.150055,
+      "location_x": 4,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 908.183899,
+      "temperature": 319.150024,
+      "location_x": 5,
+      "location_y": 2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 722.074707,
+      "temperature": 319.150116,
+      "location_x": -3,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 961.448486,
+      "temperature": 319.151154,
+      "location_x": -2,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 977.879395,
+      "temperature": 319.149994,
+      "location_x": -1,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 995.336548,
+      "temperature": 319.149994,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 994.309509,
+      "temperature": 319.150269,
+      "location_x": 1,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 946.660828,
+      "temperature": 319.15036,
+      "location_x": 2,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 989.076355,
+      "temperature": 319.150177,
+      "location_x": 3,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 996.91925,
+      "temperature": 319.150024,
+      "location_x": 4,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 915.618103,
+      "temperature": 319.149994,
+      "location_x": 5,
+      "location_y": 3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 636.124023,
+      "temperature": 319.151154,
+      "location_x": -2,
+      "location_y": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 698.843262,
+      "temperature": 319.149994,
+      "location_x": -1,
+      "location_y": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 929.6745,
+      "temperature": 319.149994,
+      "location_y": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 970.829468,
+      "temperature": 319.150208,
+      "location_x": 1,
+      "location_y": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 911.10321,
+      "temperature": 319.150299,
+      "location_x": 2,
+      "location_y": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 980.60022,
+      "temperature": 319.150116,
+      "location_x": 3,
+      "location_y": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 915.370361,
+      "temperature": 319.150024,
+      "location_x": 4,
+      "location_y": 4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 686.537781,
+      "temperature": 319.149994,
+      "location_x": 5,
+      "location_y": 4
+    },
+    {
+      "element": "Diamond",
+      "mass": 699.23999,
+      "temperature": 320.148102,
+      "location_x": -2,
+      "location_y": -4
+    },
+    {
+      "element": "Diamond",
+      "mass": 699.23999,
+      "temperature": 320.151276,
+      "location_x": -1,
+      "location_y": -4
+    },
+    {
+      "element": "Galena",
+      "mass": 507.040009,
+      "temperature": 320.151459,
+      "location_y": -4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1002.4317,
+      "temperature": 319.150085,
+      "location_x": -4,
+      "location_y": -4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 748.231384,
+      "temperature": 319.150635,
+      "location_x": -3,
+      "location_y": -4
+    }
+  ],
+  "otherEntities": [
+    {
+      "id": "TubeWorm",
+      "location_x": 2,
+      "location_y": -1,
+      "element": "Creature",
+      "temperature": 348.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity"
+        },
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "TubeWorm",
+      "location_x": 4,
+      "element": "Creature",
+      "temperature": 348.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity"
+        },
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "TubeWorm",
+      "location_x": 5,
+      "element": "Creature",
+      "temperature": 348.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity"
+        },
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "UnderwaterVent",
+      "location_x": -2,
+      "element": "Katairite",
+      "temperature": 363.149994,
+      "units": 1,
+      "type": "Other"
+    }
+  ]
+}

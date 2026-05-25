@@ -1,0 +1,109 @@
+{
+  "TerrainBiomeLookupTable": {
+    "remove": [],
+    "add": {
+      "Solid": [
+        {
+          "content": "Coquina",
+          "bandSize": 0.5
+        },
+        {
+          "content": "Coquina",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Corallium",
+          "bandSize": 0.5
+        },
+        {
+          "content": "Dirt",
+          "bandSize": 0.3
+        },
+        {
+          "content": "Algae",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.5
+        },
+        {
+          "content": "Oxygen",
+          "bandSize": 0.6
+        }
+      ],
+      "Basic": [
+        {
+          "content": "SaltWater",
+          "bandSize": 0.25
+        },
+        {
+          "content": "Oxygen",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Phosphorite",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Coquina",
+          "bandSize": 0.1
+        },
+        {
+          "content": "ZincOre",
+          "bandSize": 0.1
+        }
+      ],
+      "Basic_backwall": [
+        {
+          "content": "Coquina",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Vacuum",
+          "bandSize": 0.8
+        }
+      ],
+      "Corals": [
+        {
+          "content": "SaltWater",
+          "bandSize": 0.25
+        },
+        {
+          "content": "Oxygen",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.07
+        },
+        {
+          "content": "Corallium",
+          "bandSize": 0.13
+        },
+        {
+          "content": "Coquina",
+          "bandSize": 0.1
+        },
+        {
+          "content": "ZincOre",
+          "bandSize": 0.1
+        }
+      ],
+      "Corals_backwall": [
+        {
+          "content": "Coquina",
+          "bandSize": 0.2
+        },
+        {
+          "content": "Vacuum",
+          "bandSize": 0.8
+        }
+      ]
+    }
+  }
+}

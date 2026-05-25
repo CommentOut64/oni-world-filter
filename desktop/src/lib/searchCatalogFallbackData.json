@@ -1,0 +1,116 @@
+{
+  "worlds": [
+    { "code": "SNDST-A-", "category": "baseAsteroid" },
+    { "code": "OCAN-A-", "category": "baseAsteroid" },
+    { "code": "S-FRZ-", "category": "baseAsteroid" },
+    { "code": "LUSH-A-", "category": "baseAsteroid" },
+    { "code": "FRST-A-", "category": "baseAsteroid" },
+    { "code": "VOLCA-", "category": "baseAsteroid" },
+    { "code": "BAD-A-", "category": "baseAsteroid" },
+    { "code": "HTFST-A-", "category": "baseAsteroid" },
+    { "code": "OASIS-A-", "category": "baseAsteroid" },
+    { "code": "CER-A-", "category": "baseAsteroid" },
+    { "code": "CERS-A-", "category": "baseAsteroid" },
+    { "code": "PRE-A-", "category": "baseAsteroid" },
+    { "code": "PRES-A-", "category": "baseAsteroid" },
+    { "code": "V-SNDST-C-", "category": "classicCluster" },
+    { "code": "V-OCAN-C-", "category": "classicCluster" },
+    { "code": "V-SWMP-C-", "category": "classicCluster" },
+    { "code": "V-SFRZ-C-", "category": "classicCluster" },
+    { "code": "V-LUSH-C-", "category": "classicCluster" },
+    { "code": "V-FRST-C-", "category": "classicCluster" },
+    { "code": "V-VOLCA-C-", "category": "classicCluster" },
+    { "code": "V-BAD-C-", "category": "classicCluster" },
+    { "code": "V-HTFST-C-", "category": "classicCluster" },
+    { "code": "V-OASIS-C-", "category": "classicCluster" },
+    { "code": "V-CER-C-", "category": "classicCluster" },
+    { "code": "V-CERS-C-", "category": "classicCluster" },
+    { "code": "V-PRE-C-", "category": "classicCluster" },
+    { "code": "V-PRES-C-", "category": "classicCluster" },
+    { "code": "SNDST-C-", "category": "moonletCluster" },
+    { "code": "PRE-C-", "category": "moonletCluster" },
+    { "code": "CER-C-", "category": "moonletCluster" },
+    { "code": "FRST-C-", "category": "moonletCluster" },
+    { "code": "SWMP-C-", "category": "moonletCluster" },
+    { "code": "M-SWMP-C-", "category": "moonletCluster" },
+    { "code": "M-BAD-C-", "category": "moonletCluster" },
+    { "code": "M-FRZ-C-", "category": "moonletCluster" },
+    { "code": "M-FLIP-C-", "category": "moonletCluster" },
+    { "code": "M-RAD-C-", "category": "moonletCluster" },
+    { "code": "M-CERS-C-", "category": "moonletCluster" },
+    { "code": "AQU-A-", "category": "baseAsteroid" },
+    { "code": "V-AQU-C-", "category": "classicCluster" },
+    { "code": "AQU-C-", "category": "moonletCluster" }
+  ],
+  "hiddenWorldCodes": [
+    "PRES-A-",
+    "V-PRES-C-"
+  ],
+  "geysers": [
+    { "key": "steam", "name": "Cool Steam Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "hot_steam", "name": "Steam Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "hot_water", "name": "Water Geyser", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "slush_water", "name": "Cool Slush Geyser", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "filthy_water", "name": "Polluted Water Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "slush_salt_water", "name": "Cool Salt Slush Geyser", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "salt_water", "name": "Salt Water Geyser", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "small_volcano", "name": "Minor Volcano", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "big_volcano", "name": "Volcano", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "liquid_co2", "name": "Carbon Dioxide Geyser", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "hot_co2", "name": "Carbon Dioxide Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "hot_hydrogen", "name": "Hydrogen Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "hot_po2", "name": "Hot Polluted Oxygen Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "slimy_po2", "name": "InFectious Polluted Oxygen Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "chlorine_gas", "name": "Chlorine Gas Vent", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "methane", "name": "Natural Gas Geyser", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "molten_copper", "name": "Copper Volcano", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "molten_iron", "name": "Iron Volcano", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "molten_gold", "name": "Gold Volcano", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "molten_aluminum", "name": "Aluminum Volcano", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "molten_cobalt", "name": "Cobalt Volcano", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "oil_drip", "name": "Leaky Oil Fissure", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "liquid_sulfur", "name": "Liquid Sulfur Geyser", "kind": "generic_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "chlorine_gas_cool", "name": "Cool Chlorine Gas Vent", "kind": "fixed_template_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "molten_tungsten", "name": "Tungsten Volcano", "kind": "fixed_template_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "molten_niobium", "name": "Niobium Volcano", "kind": "fixed_template_geyser", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "printing_pod", "name": "Printing Pod", "kind": "facility", "parameterSource": "printing_pod", "supportsDynamicParameters": false, "supportsCoordinateParameters": false },
+    { "key": "oil_reservoir", "name": "Oil Reservoir", "kind": "reservoir", "parameterSource": "oil_reservoir", "supportsDynamicParameters": false, "supportsCoordinateParameters": false },
+    { "key": "warp_sender", "name": "Supply Teleporter Output", "kind": "warp_portal", "parameterSource": "warp_facility", "supportsDynamicParameters": false, "supportsCoordinateParameters": false },
+    { "key": "warp_receiver", "name": "Supply Teleporter Input", "kind": "warp_portal", "parameterSource": "warp_facility", "supportsDynamicParameters": false, "supportsCoordinateParameters": false },
+    { "key": "warp_portal", "name": "Teleporter Transmitter", "kind": "warp_portal", "parameterSource": "warp_facility", "supportsDynamicParameters": false, "supportsCoordinateParameters": false },
+    { "key": "cryo_tank", "name": "Cryotank 3000", "kind": "cryopod", "parameterSource": "cryopod", "supportsDynamicParameters": false, "supportsCoordinateParameters": false },
+    { "key": "murky_brine", "name": "Polluted Brine Vent", "kind": "aquatic", "parameterSource": "generic_config", "supportsDynamicParameters": true, "supportsCoordinateParameters": true },
+    { "key": "small_reef_geyser", "name": "Tidal Spring", "kind": "aquatic", "parameterSource": "small_reef_geyser_runtime", "supportsDynamicParameters": false, "supportsCoordinateParameters": false },
+    { "key": "underwater_vent", "name": "Thermal Gas Fissure", "kind": "aquatic", "parameterSource": "underwater_vent_runtime", "supportsDynamicParameters": false, "supportsCoordinateParameters": false }
+  ],
+  "mixingPackages": [
+    {
+      "path": "DLC2_ID",
+      "prefixes": [
+        "dlc2::worldMixing/",
+        "dlc2::subworldMixing/"
+      ]
+    },
+    {
+      "path": "DLC3_ID",
+      "prefixes": [
+        "dlc3::worldMixing/",
+        "dlc3::subworldMixing/"
+      ]
+    },
+    {
+      "path": "DLC4_ID",
+      "prefixes": [
+        "dlc4::worldMixing/",
+        "dlc4::subworldMixing/"
+      ]
+    },
+    {
+      "path": "DLC5_ID",
+      "prefixes": [
+        "dlc5::worldMixing/",
+        "dlc5::subworldMixing/"
+      ]
+    }
+  ]
+}

@@ -15,6 +15,11 @@ struct WorldCatalogItem {
 struct GeyserCatalogItem {
     int id = 0;
     std::string key;
+    std::string name;
+    std::string kind;
+    std::string parameterSource;
+    bool supportsDynamicParameters = false;
+    bool supportsCoordinateParameters = false;
 };
 
 struct TraitMeta {

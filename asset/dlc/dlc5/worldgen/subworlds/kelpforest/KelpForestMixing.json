@@ -1,0 +1,32 @@
+{
+  "biomeNoise": "dlc5::noise/kelpForestNoise",
+  "backwallNoise": "dlc5::noise/reefNoise",
+  "temperatureRange": "HumanWarm",
+  "density": {
+    "min": 10,
+    "max": 15
+  },
+  "avoidRadius": 15,
+  "doAvoidPoints": false,
+  "dontRelaxChildren": true,
+  "extraBiomeChildren": 1,
+  "sampleBehaviour": "PoissonDisk",
+  "biomes": [
+    {
+      "name": "dlc5::biomes/KelpForest/Basic",
+      "weight": 1,
+      "tags": [
+        "SeaTree",
+        "SeaFairy",
+        "SeaTurtle",
+        "KelpForestThimbleReed",
+        "KelpForestBulbPlant"
+      ]
+    }
+  ],
+  "tags": [
+    "IgnoreCaveOverride",
+    "Mixing"
+  ],
+  "zoneType": "KelpForest"
+}

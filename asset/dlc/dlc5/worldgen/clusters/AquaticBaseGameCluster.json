@@ -1,0 +1,39 @@
+{
+  "name": "STRINGS.CLUSTER_NAMES.AQUATIC_BASE_CLUSTER.NAME",
+  "description": "STRINGS.CLUSTER_NAMES.AQUATIC_BASE_CLUSTER.DESCRIPTION",
+  "welcomeMessage": "STRINGS.UI.WELCOMEMESSAGEBODY_DLC5_AQUATIC",
+  "dlcIdFrom": "DLC5_ID",
+  "requiredDlcIds": [
+    "DLC5_ID"
+  ],
+  "forbiddenDlcIds": [
+    "EXPANSION1_ID"
+  ],
+  "coordinatePrefix": "AQU-A",
+  "menuOrder": 7,
+  "clusterCategory": "Vanilla",
+  "difficulty": 3,
+  "clusterTags": [
+    "AquaticCluster",
+    "MinnowRecruitedAchievement"
+  ],
+  "startingMinions": [
+    "KAI"
+  ],
+  "clusterAudio": {
+    "musicWelcome": "Music_WattsonMessage_DLC5",
+    "musicFirst": "DynamicMusic_Aquatic_Planet_DLC5",
+    "stingerDay": "Stinger_Day_DLC5",
+    "stingerNight": "Stinger_Loop_Night_DLC5"
+  },
+  "startWorldIndex": 0,
+  "worldPlacements": [
+    {
+      "world": "dlc5::worlds/AquaticBaseGameAsteroid",
+      "allowedRings": {
+        "min": 0,
+        "max": 0
+      }
+    }
+  ]
+}

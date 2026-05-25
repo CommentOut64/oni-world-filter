@@ -1,0 +1,19 @@
+{
+  "remove": [],
+  "add": {
+    "reefBeachBorder": [
+      {
+        "element": "Corallium",
+        "weight": 1
+      },
+      {
+        "element": "ZincOre",
+        "weight": 2
+      },
+      {
+        "element": "Coquina",
+        "weight": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "settings": {
+    "zoom": 1,
+    "normalise": true,
+    "lowerBound": {
+      "X": 2,
+      "Y": 2
+    },
+    "upperBound": {
+      "X": 4,
+      "Y": 4
+    },
+    "name": "StartWorld"
+  },
+  "links": [
+    {
+      "target": {
+        "type": "Terminator",
+        "name": "TERMINATOR"
+      },
+      "source0": {
+        "type": "Modifier",
+        "name": "FinalStretch"
+      }
+    },
+    {
+      "target": {
+        "type": "Filter",
+        "name": "MainNoise"
+      },
+      "source0": {
+        "type": "Primitive",
+        "name": "DefaultSimplexPerlinPrimative"
+      }
+    },
+    {
+      "target": {
+        "type": "Modifier",
+        "name": "LayerSqueue"
+      },
+      "source0": {
+        "type": "Filter",
+        "name": "MainNoise"
+      }
+    },
+    {
+      "target": {
+        "type": "Modifier",
+        "name": "FinalStretch"
+      },
+      "source0": {
+        "type": "Transformer",
+        "name": "Turbulence"
+      }
+    },
+    {
+      "target": {
+        "type": "Transformer",
+        "name": "Turbulence"
+      },
+      "source0": {
+        "type": "Filter",
+        "name": "MainNoise"
+      },
+      "source1": {
+        "type": "Modifier",
+        "name": "LayerSqueue"
+      },
+      "source2": {
+        "type": "Modifier",
+        "name": "LayerSqueue"
+      }
+    }
+  ],
+  "primitives": {
+    "DefaultSimplexPerlinPrimative": {
+      "primative": "SimplexPerlin",
+      "quality": "Best",
+      "seed": 5,
+      "offset": 1,
+      "name": "DefaultSimplexPerlinPrimative",
+      "pos": {
+        "X": -1000,
+        "Y": -60
+      }
+    }
+  },
+  "filters": {
+    "MainNoise": {
+      "filter": "RidgedMultiFractal",
+      "frequency": 0.0500000007,
+      "lacunarity": 3,
+      "octaves": 1,
+      "offset": 1,
+      "gain": 1,
+      "exponent": 0.899999976,
+      "scale": 1,
+      "name": "MainNoise"
+    }
+  },
+  "transformers": {
+    "Turbulence": {
+      "transformerType": "Turbulence",
+      "power": 3.57999992,
+      "vector": {
+        "X": 8.44999981
+      },
+      "name": "Turbulence"
+    }
+  },
+  "modifiers": {
+    "LayerSqueue": {
+      "modifyType": "Scale2d",
+      "lower": -1,
+      "upper": 1,
+      "exponent": 0.0199999996,
+      "scale": 1,
+      "scale2d": {
+        "X": 2.43000007,
+        "Y": 0.660000026
+      },
+      "name": "LayerSqueue",
+      "pos": {
+        "X": -348,
+        "Y": -54
+      }
+    },
+    "FinalStretch": {
+      "modifyType": "Scale2d",
+      "lower": -1,
+      "upper": 1,
+      "exponent": 0.0199999996,
+      "scale": 1,
+      "scale2d": {
+        "X": 1.21000004,
+        "Y": 0.660000026
+      },
+      "name": "FinalStretch"
+    }
+  }
+}

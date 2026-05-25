@@ -1,0 +1,43 @@
+{
+  "TerrainBiomeLookupTable": {
+    "remove": [],
+    "add": {
+      "Basic": [
+        {
+          "content": "MurkyBrine",
+          "bandSize": 0.3933333
+        },
+        {
+          "content": "Diamond",
+          "bandSize": 0.03874999
+        },
+        {
+          "content": "Basalt",
+          "bandSize": 0.2720833
+        },
+        {
+          "content": "Galena",
+          "bandSize": 0.0990625
+        },
+        {
+          "content": "Carbon",
+          "bandSize": 0.11625
+        },
+        {
+          "content": "Basalt",
+          "bandSize": 0.08052084
+        }
+      ],
+      "Basic_backwall": [
+        {
+          "content": "Basalt",
+          "bandSize": 0.14
+        },
+        {
+          "content": "Vacuum",
+          "bandSize": 0.86
+        }
+      ]
+    }
+  }
+}

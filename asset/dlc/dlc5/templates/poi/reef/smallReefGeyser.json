@@ -1,0 +1,186 @@
+{
+  "info": {
+    "size": {
+      "X": 7,
+      "Y": 6
+    },
+    "min": {
+      "X": -3,
+      "Y": -2
+    },
+    "area": 25
+  },
+  "cells": [
+    {
+      "element": "SaltWater",
+      "mass": 907.086792,
+      "temperature": 302.818054,
+      "location_x": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1037.95996,
+      "temperature": 302.795746
+    },
+    {
+      "element": "SaltWater",
+      "mass": 915.183838,
+      "temperature": 302.739166,
+      "location_x": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": -1,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1012.18433,
+      "temperature": 302.831696,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 1,
+      "location_y": 1
+    },
+    {
+      "element": "SedimentaryRock",
+      "mass": 978.299988,
+      "temperature": 295.165649,
+      "location_y": -2
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 978.299988,
+      "temperature": 295.166229,
+      "location_x": -1,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 978.299988,
+      "temperature": 295.15863,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 978.299988,
+      "temperature": 295.166626,
+      "location_x": 1,
+      "location_y": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": -2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": -2,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 2,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 3,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": -3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": -2,
+      "location_y": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": -1,
+      "location_y": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_y": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 1,
+      "location_y": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 1,
+      "location_y": 3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": -1,
+      "location_y": 3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_y": 3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 895.299988,
+      "temperature": 303.149994,
+      "location_x": 2,
+      "location_y": 2
+    }
+  ],
+  "otherEntities": [
+    {
+      "id": "SmallReefGeyser",
+      "element": "Katairite",
+      "temperature": 305.149994,
+      "units": 1,
+      "type": "Other"
+    }
+  ]
+}

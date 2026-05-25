@@ -1,81 +1,8 @@
 import type { SearchCatalog } from "./contracts";
 import { FALLBACK_MIXING_SLOT_PATHS, MIXING_SLOT_DISPLAY_NAMES } from "./displayNames.ts";
+import fallbackData from "./searchCatalogFallbackData.json";
 
-const FALLBACK_WORLD_CODES = [
-  "SNDST-A-",
-  "OCAN-A-",
-  "S-FRZ-",
-  "LUSH-A-",
-  "FRST-A-",
-  "VOLCA-",
-  "BAD-A-",
-  "HTFST-A-",
-  "OASIS-A-",
-  "CER-A-",
-  "CERS-A-",
-  "PRE-A-",
-  "PRES-A-",
-  "V-SNDST-C-",
-  "V-OCAN-C-",
-  "V-SWMP-C-",
-  "V-SFRZ-C-",
-  "V-LUSH-C-",
-  "V-FRST-C-",
-  "V-VOLCA-C-",
-  "V-BAD-C-",
-  "V-HTFST-C-",
-  "V-OASIS-C-",
-  "V-CER-C-",
-  "V-CERS-C-",
-  "V-PRE-C-",
-  "V-PRES-C-",
-  "SNDST-C-",
-  "PRE-C-",
-  "CER-C-",
-  "FRST-C-",
-  "SWMP-C-",
-  "M-SWMP-C-",
-  "M-BAD-C-",
-  "M-FRZ-C-",
-  "M-FLIP-C-",
-  "M-RAD-C-",
-  "M-CERS-C-",
-] as const;
-
-const FALLBACK_GEYSER_IDS = [
-  "steam",
-  "hot_steam",
-  "hot_water",
-  "slush_water",
-  "filthy_water",
-  "slush_salt_water",
-  "salt_water",
-  "small_volcano",
-  "big_volcano",
-  "liquid_co2",
-  "hot_co2",
-  "hot_hydrogen",
-  "hot_po2",
-  "slimy_po2",
-  "chlorine_gas",
-  "methane",
-  "molten_copper",
-  "molten_iron",
-  "molten_gold",
-  "molten_aluminum",
-  "molten_cobalt",
-  "oil_drip",
-  "liquid_sulfur",
-  "chlorine_gas_cool",
-  "molten_tungsten",
-  "molten_niobium",
-  "printing_pod",
-  "oil_reservoir",
-  "warp_sender",
-  "warp_receiver",
-  "warp_portal",
-  "cryo_tank",
-] as const;
+const FALLBACK_DLC_PATHS = new Set(fallbackData.mixingPackages.map((item) => item.path));
 
 export const FALLBACK_MIXING_SLOTS = FALLBACK_MIXING_SLOT_PATHS.map((path, slot) => {
   const displayName = MIXING_SLOT_DISPLAY_NAMES[path];
@@ -83,7 +10,7 @@ export const FALLBACK_MIXING_SLOTS = FALLBACK_MIXING_SLOT_PATHS.map((path, slot)
     slot,
     path,
     type:
-      path === "DLC2_ID" || path === "DLC3_ID" || path === "DLC4_ID"
+      FALLBACK_DLC_PATHS.has(path)
         ? "dlc"
         : path.includes("worldMixing/")
           ? "world"
@@ -106,9 +33,17 @@ export const EMPTY_SEARCH_CATALOG: SearchCatalog = {
 };
 
 export const FALLBACK_SEARCH_CATALOG: SearchCatalog = {
-  worlds: FALLBACK_WORLD_CODES.map((code, id) => ({ id, code })),
-  geysers: FALLBACK_GEYSER_IDS.map((key, id) => ({ id, key })),
-  traits: [],  
+  worlds: fallbackData.worlds.map((item, id) => ({ id, code: item.code })),
+  geysers: fallbackData.geysers.map((item, id) => ({
+    id,
+    key: item.key,
+    name: item.name,
+    kind: item.kind,
+    parameterSource: item.parameterSource,
+    supportsDynamicParameters: item.supportsDynamicParameters,
+    supportsCoordinateParameters: item.supportsCoordinateParameters,
+  })),
+  traits: [],
   mixingSlots: FALLBACK_MIXING_SLOTS,
   parameterSpecs: [],
 };

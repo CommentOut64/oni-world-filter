@@ -1,0 +1,31 @@
+{
+  "biomeNoise": "dlc5::noise/abyssNoise",
+  "backwallNoise": "noise/SandstoneStrange",
+  "temperatureRange": "SomewhatHot",
+  "density": {
+    "min": 5,
+    "max": 10
+  },
+  "avoidRadius": 15,
+  "doAvoidPoints": false,
+  "dontRelaxChildren": true,
+  "extraBiomeChildren": 3,
+  "sampleBehaviour": "PoissonDisk",
+  "biomes": [
+    {
+      "name": "dlc5::biomes/Abyss/Basic",
+      "weight": 1,
+      "tags": [
+        "TubeWorm",
+        "Squid",
+        "UrchinPlant",
+        "Bulbloom"
+      ]
+    }
+  ],
+  "tags": [
+    "IgnoreCaveOverride",
+    "Mixing"
+  ],
+  "zoneType": "Abyss"
+}

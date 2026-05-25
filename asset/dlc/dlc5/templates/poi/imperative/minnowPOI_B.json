@@ -1,0 +1,992 @@
+{
+  "info": {
+    "size": {
+      "X": 13,
+      "Y": 12
+    },
+    "min": {
+      "X": -6,
+      "Y": -5
+    },
+    "area": 124
+  },
+  "cells": [
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.14978,
+      "location_x": -3,
+      "location_y": -5
+    },
+    {
+      "element": "Granite",
+      "mass": 1659.51001,
+      "temperature": 304.150787,
+      "location_x": -2,
+      "location_y": -5
+    },
+    {
+      "element": "Granite",
+      "mass": 1659.51001,
+      "temperature": 304.150787,
+      "location_x": -1,
+      "location_y": -5
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.14975,
+      "location_y": -5
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": -5
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": 2,
+      "location_y": -5
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149384,
+      "location_x": -3,
+      "location_y": -4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149384,
+      "location_x": -2,
+      "location_y": -4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149384,
+      "location_x": -1,
+      "location_y": -4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.148254,
+      "location_y": -4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": -4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149994,
+      "location_x": 2,
+      "location_y": -4
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": -3,
+      "location_y": -3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": -2,
+      "location_y": -3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": -1,
+      "location_y": -3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_y": -3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": -3
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149994,
+      "location_x": 2,
+      "location_y": -3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -3,
+      "location_y": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -2,
+      "location_y": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -1,
+      "location_y": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_y": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": 2,
+      "location_y": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -3,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -2,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -1,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 2,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "diseaseName": "FoodPoisoning"
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -3,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -2,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -1,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 2,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -3,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -2,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -1,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149963,
+      "location_x": 2,
+      "location_y": 2
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": 3,
+      "location_y": -4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149994,
+      "location_x": 3,
+      "location_y": -3
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": 4,
+      "location_y": -3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": 3,
+      "location_y": -2
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149994,
+      "location_x": 4,
+      "location_y": -2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 3,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": 4,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 4
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 3,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149963,
+      "location_x": 4,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149963,
+      "location_x": 3,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149963,
+      "location_x": 4,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149872,
+      "location_x": 3,
+      "location_y": 3
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.152832,
+      "location_x": 4,
+      "location_y": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149872,
+      "location_x": 3,
+      "location_y": 4
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.152679,
+      "location_x": 4,
+      "location_y": 4
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.154938,
+      "location_x": 3,
+      "location_y": 5
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.148651,
+      "location_x": 4,
+      "location_y": 5
+    },
+    {
+      "element": "Granite",
+      "mass": 1680.23999,
+      "temperature": 305.149445,
+      "location_x": 3,
+      "location_y": 6
+    },
+    {
+      "element": "Granite",
+      "mass": 1680.23999,
+      "temperature": 305.149994,
+      "location_x": 4,
+      "location_y": 6
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": 5,
+      "location_y": -2
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149994,
+      "location_x": 5,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": 5
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": 5,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149963,
+      "location_x": 5,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149963,
+      "location_x": 5,
+      "location_y": 3
+    },
+    {
+      "element": "IronOre",
+      "mass": 733.349731,
+      "temperature": 304.787262,
+      "location_x": 5,
+      "location_y": 4
+    },
+    {
+      "element": "Granite",
+      "mass": 1680.23999,
+      "temperature": 305.149994,
+      "location_x": 5,
+      "location_y": 5
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": 6,
+      "location_y": -1
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.19995,
+      "temperature": 305.149994,
+      "location_x": 6
+    },
+    {
+      "element": "Dirt",
+      "mass": 1701,
+      "temperature": 305.149994,
+      "location_x": 6,
+      "location_y": 1
+    },
+    {
+      "element": "Dirt",
+      "mass": 1700.99646,
+      "temperature": 304.668243,
+      "location_x": 6,
+      "location_y": 2
+    },
+    {
+      "element": "IronOre",
+      "mass": 738.027405,
+      "temperature": 304.775696,
+      "location_x": 6,
+      "location_y": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149933,
+      "location_x": -1,
+      "location_y": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149963,
+      "location_y": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149963,
+      "location_x": 1,
+      "location_y": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149963,
+      "location_x": 2,
+      "location_y": 3
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.152832,
+      "location_x": -1,
+      "location_y": 4
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149933,
+      "location_y": 4
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149933,
+      "location_x": 1,
+      "location_y": 4
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.152832,
+      "location_x": 2,
+      "location_y": 4
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.154419,
+      "location_x": -1,
+      "location_y": 5
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149933,
+      "location_y": 5
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149933,
+      "location_x": 1,
+      "location_y": 5
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.153412,
+      "location_x": 2,
+      "location_y": 5
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149323,
+      "location_x": -1,
+      "location_y": 6
+    },
+    {
+      "element": "IronOre",
+      "mass": 724.194214,
+      "temperature": 305.057343,
+      "location_y": 6
+    },
+    {
+      "element": "IronOre",
+      "mass": 724.190002,
+      "temperature": 305.149994,
+      "location_x": 1,
+      "location_y": 6
+    },
+    {
+      "element": "IronOre",
+      "mass": 724.190002,
+      "temperature": 305.147522,
+      "location_x": 2,
+      "location_y": 6
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149933,
+      "location_x": -4,
+      "location_y": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149963,
+      "location_x": -3,
+      "location_y": 3
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -2,
+      "location_y": 3
+    },
+    {
+      "element": "IronOre",
+      "mass": 721.679993,
+      "temperature": 304.153625,
+      "location_x": -4,
+      "location_y": 4
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149963,
+      "location_x": -3,
+      "location_y": 4
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149933,
+      "location_x": -2,
+      "location_y": 4
+    },
+    {
+      "element": "Dirt",
+      "mass": 1660.64001,
+      "temperature": 304.150146,
+      "location_x": -4,
+      "location_y": 5
+    },
+    {
+      "element": "Dirt",
+      "mass": 1661.48999,
+      "temperature": 305.149841,
+      "location_x": -3,
+      "location_y": 5
+    },
+    {
+      "element": "Dirt",
+      "mass": 1661.48999,
+      "temperature": 305.14975,
+      "location_x": -2,
+      "location_y": 5
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.14978,
+      "location_x": -6,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149933,
+      "location_x": -5,
+      "location_y": 1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -4,
+      "location_y": 1
+    },
+    {
+      "element": "Granite",
+      "mass": 1659.51001,
+      "temperature": 304.151001,
+      "location_x": -6,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1051.69507,
+      "temperature": 305.149933,
+      "location_x": -5,
+      "location_y": 2
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149933,
+      "location_x": -4,
+      "location_y": 2
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.148773,
+      "location_x": -6,
+      "location_y": 3
+    },
+    {
+      "element": "Granite",
+      "mass": 1659.51001,
+      "temperature": 304.151215,
+      "location_x": -5,
+      "location_y": 3
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": -6
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": -5
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1056.97998,
+      "temperature": 305.149994,
+      "location_x": -4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.148712,
+      "location_x": -5,
+      "location_y": 4
+    },
+    {
+      "element": "ToxicMud",
+      "mass": 1014.21997,
+      "temperature": 305.149994,
+      "location_x": -4,
+      "location_y": -2
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.14978,
+      "location_x": -4,
+      "location_y": -3
+    },
+    {
+      "element": "Granite",
+      "mass": 1659.51001,
+      "temperature": 304.150787,
+      "location_x": -4,
+      "location_y": -4
+    },
+    {
+      "element": "Dirt",
+      "mass": 1704.73999,
+      "temperature": 305.149994,
+      "location_x": -5,
+      "location_y": -1
+    },
+    {
+      "element": "DirtyWater",
+      "mass": 1062.26489,
+      "temperature": 305.149994,
+      "location_x": -4,
+      "location_y": -1
+    }
+  ],
+  "pickupables": [
+    {
+      "id": "SeaTurtleBaby",
+      "location_x": 1,
+      "location_y": 2,
+      "element": "Creature",
+      "temperature": 303.149994,
+      "units": 1,
+      "type": "Pickupable",
+      "rottable": {}
+    }
+  ],
+  "otherEntities": [
+    {
+      "id": "BasicFabricPlant",
+      "location_x": -4,
+      "location_y": -1,
+      "element": "Creature",
+      "temperature": 293,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity",
+          "value": 1.99979997
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "BulbPlant",
+      "location_x": -2,
+      "location_y": -3,
+      "element": "Creature",
+      "temperature": 293,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        }
+      ]
+    },
+    {
+      "id": "SeaTree",
+      "location_x": 3,
+      "location_y": -2,
+      "element": "Creature",
+      "temperature": 302.649994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        }
+      ]
+    },
+    {
+      "id": "SeaTree",
+      "location_x": 4,
+      "location_y": -1,
+      "element": "Creature",
+      "temperature": 302.649994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        }
+      ]
+    },
+    {
+      "id": "SeaTree",
+      "location_x": 5,
+      "element": "Creature",
+      "temperature": 302.649994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "AirPressure"
+        },
+        {
+          "id": "Temperature"
+        }
+      ]
+    },
+    {
+      "id": "MinnowImperativePOIB",
+      "location_y": -2,
+      "element": "Creature",
+      "temperature": 293,
+      "units": 1,
+      "type": "Other"
+    },
+    {
+      "id": "KelpVista",
+      "location_y": -4,
+      "element": "Creature",
+      "temperature": 293,
+      "units": 1,
+      "type": "Other"
+    }
+  ]
+}

@@ -1,0 +1,757 @@
+{
+  "info": {
+    "size": {
+      "X": 11,
+      "Y": 9
+    },
+    "min": {
+      "X": -5,
+      "Y": -3
+    },
+    "area": 76
+  },
+  "cells": [
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 308.725159,
+      "location_x": -3,
+      "location_y": -2,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.429688,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 303.19397,
+      "location_x": -2,
+      "location_y": -2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 305.086731,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0158331133,
+      "temperature": 302.554474,
+      "location_x": -1,
+      "location_y": -2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.188538,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0173544139,
+      "temperature": 301.694244,
+      "location_y": -2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.191345,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 300.153564,
+      "location_x": 1,
+      "location_y": -2,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.346588,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 309.047607,
+      "location_x": 2,
+      "location_y": -2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 307.282288,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 309.102905,
+      "location_x": 3,
+      "location_y": -2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 307.297485,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 309.104889,
+      "location_x": 4,
+      "location_y": -2,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.506317,
+      "backwallMass": 1887.64307
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 296.305054,
+      "location_x": -3,
+      "location_y": -1,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.323181,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0401922315,
+      "temperature": 303.266632,
+      "location_x": -2,
+      "location_y": -1
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0383193083,
+      "temperature": 302.454254,
+      "location_x": -1,
+      "location_y": -1
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0360388681,
+      "temperature": 303.056244,
+      "location_y": -1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.19162,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0444316082,
+      "temperature": 303.331085,
+      "location_x": 1,
+      "location_y": -1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.189758,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0453032963,
+      "temperature": 306.531189,
+      "location_x": 2,
+      "location_y": -1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.193695,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 308.814392,
+      "location_x": 3,
+      "location_y": -1,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.430237,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 309.100616,
+      "location_x": 4,
+      "location_y": -1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 307.297302,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0733228102,
+      "temperature": 304.502747,
+      "location_x": -3,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.600891,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0639319569,
+      "temperature": 304.082947,
+      "location_x": -2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.47583,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0635646358,
+      "temperature": 303.158691,
+      "location_x": -1
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0624520518,
+      "temperature": 303.273254
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0661936179,
+      "temperature": 303.601318,
+      "location_x": 1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 302.263397,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0744511783,
+      "temperature": 307.277588,
+      "location_x": 2,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.174896,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0761129111,
+      "temperature": 306.041382,
+      "location_x": 3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.175385,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 309.088196,
+      "location_x": 4,
+      "backwallElement": "Algae",
+      "backwallTemperature": 307.293518,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.082002081,
+      "temperature": 305.806946,
+      "location_x": -3,
+      "location_y": 1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.159515,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0870984048,
+      "temperature": 305.572174,
+      "location_x": -2,
+      "location_y": 1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.152527,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0917400867,
+      "temperature": 304.252472,
+      "location_x": -1,
+      "location_y": 1
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.093109183,
+      "temperature": 304.122253,
+      "location_y": 1
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.095970653,
+      "temperature": 304.833801,
+      "location_x": 1,
+      "location_y": 1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.150818,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.0978606269,
+      "temperature": 304.169617,
+      "location_x": 2,
+      "location_y": 1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.15448,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.101104997,
+      "temperature": 306.717224,
+      "location_x": 3,
+      "location_y": 1,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.149994,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.729279,
+      "location_x": 4,
+      "location_y": 1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.540955,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 306.965546,
+      "location_x": -3,
+      "location_y": 2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.31015,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.111819476,
+      "temperature": 305.977295,
+      "location_x": -2,
+      "location_y": 2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.160034,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.116553038,
+      "temperature": 306.063171,
+      "location_x": -1,
+      "location_y": 2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.15799,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.119936369,
+      "temperature": 306.003174,
+      "location_y": 2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.158569,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.12050572,
+      "temperature": 306.592682,
+      "location_x": 1,
+      "location_y": 2
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.121439755,
+      "temperature": 306.294342,
+      "location_x": 2,
+      "location_y": 2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.157654,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.125366434,
+      "temperature": 306.933685,
+      "location_x": 3,
+      "location_y": 2,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.149994,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.828186,
+      "location_x": 4,
+      "location_y": 2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.597168,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.869659,
+      "location_x": -3,
+      "location_y": 3,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.577637,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 306.98175,
+      "location_x": -2,
+      "location_y": 3,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.316406,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.135129869,
+      "temperature": 306.834259,
+      "location_x": -1,
+      "location_y": 3,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.159882,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.136273444,
+      "temperature": 306.874908,
+      "location_y": 3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.149994,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.134966463,
+      "temperature": 308.209229,
+      "location_x": 1,
+      "location_y": 3,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.162933,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.135570198,
+      "temperature": 308.079559,
+      "location_x": 2,
+      "location_y": 3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.149994,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.138560146,
+      "temperature": 308.081818,
+      "location_x": 3,
+      "location_y": 3,
+      "backwallElement": "Algae",
+      "backwallTemperature": 304.16217,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.797424,
+      "location_x": 4,
+      "location_y": 3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.594635,
+      "backwallMass": 1903.43286
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.012634,
+      "location_x": -4,
+      "location_y": -3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.326416,
+      "backwallMass": 1829.20313
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 306.163879,
+      "location_x": -3,
+      "location_y": -3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.347748,
+      "backwallMass": 1829.03516
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 298.594025,
+      "location_x": -2,
+      "location_y": -3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.3414,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 296.556122,
+      "location_x": -1,
+      "location_y": -3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.325012,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 296.787048,
+      "location_y": -3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.325531,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 297.862183,
+      "location_x": 1,
+      "location_y": -3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.332123,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 308.833099,
+      "location_x": -4,
+      "location_y": -2,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.430298,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 303.735352,
+      "location_x": -4,
+      "location_y": -1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 305.311523,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 305.504761,
+      "location_x": -4,
+      "backwallElement": "Algae",
+      "backwallTemperature": 305.842499,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 306.928375,
+      "location_x": -4,
+      "location_y": 1,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.300934,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.746216,
+      "location_x": -4,
+      "location_y": 2,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.525146,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 306.856598,
+      "location_x": -5,
+      "location_y": -3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.309814,
+      "backwallMass": 1825.85144
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 302.739471,
+      "location_x": -5,
+      "location_y": -2,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 290.366211,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.365936,
+      "location_x": -5,
+      "location_y": -1,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.576263,
+      "backwallMass": 1835.28809
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.853729,
+      "location_x": -5,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.728119,
+      "backwallMass": 1843.24268
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.551605,
+      "location_x": 5,
+      "location_y": 3,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.257568,
+      "backwallMass": 1921.86316
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.71994,
+      "location_x": -1,
+      "location_y": 4,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.521881,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 307.842743,
+      "location_y": 4,
+      "backwallElement": "Algae",
+      "backwallTemperature": 306.584747,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 309.102905,
+      "location_x": 1,
+      "location_y": 4,
+      "backwallElement": "Algae",
+      "backwallTemperature": 307.297485,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Dirt",
+      "mass": 1842.21997,
+      "temperature": 309.102905,
+      "location_x": 2,
+      "location_y": 4,
+      "backwallElement": "Algae",
+      "backwallTemperature": 307.297485,
+      "backwallMass": 204.279999
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.947876,
+      "location_x": 3,
+      "location_y": 4,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.83194,
+      "backwallMass": 1874.66064
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.868103,
+      "location_x": 4,
+      "location_y": 4,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.705994,
+      "backwallMass": 1907.97803
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.135559,
+      "location_x": 5,
+      "location_y": 4,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.243896,
+      "backwallMass": 1927.93005
+    },
+    {
+      "element": "Algae",
+      "mass": 200.504181,
+      "temperature": 308.917847,
+      "location_x": 1,
+      "location_y": 5,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.919373,
+      "backwallMass": 1844.63855
+    },
+    {
+      "element": "Oxygen",
+      "mass": 1.00666487,
+      "temperature": 308.704529,
+      "location_x": 2,
+      "location_y": 5,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.882599,
+      "backwallMass": 1857.1366
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.995514,
+      "location_x": 3,
+      "location_y": 5,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.906708,
+      "backwallMass": 1877.50098
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.873962,
+      "location_x": 4,
+      "location_y": 5,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.71521,
+      "backwallMass": 1917.44177
+    },
+    {
+      "element": "Algae",
+      "mass": 204.570007,
+      "temperature": 308.398499,
+      "location_x": 5,
+      "location_y": 5,
+      "backwallElement": "Dirt",
+      "backwallTemperature": 308.347992,
+      "backwallMass": 1931.63098
+    }
+  ],
+  "pickupables": [
+    {
+      "id": "Snail",
+      "location_x": 3,
+      "element": "Creature",
+      "temperature": 313.148102,
+      "units": 1,
+      "type": "Pickupable",
+      "rottable": {}
+    },
+    {
+      "id": "Snail",
+      "location_x": -2,
+      "location_y": -1,
+      "element": "Creature",
+      "temperature": 313.146301,
+      "units": 1,
+      "type": "Pickupable",
+      "rottable": {}
+    }
+  ]
+}

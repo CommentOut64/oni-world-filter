@@ -1,0 +1,123 @@
+{
+  "settings": {
+    "zoom": 0.100000001,
+    "normalise": false,
+    "seamless": false,
+    "lowerBound": {
+      "X": 2,
+      "Y": 2
+    },
+    "upperBound": {
+      "X": 4,
+      "Y": 4
+    },
+    "name": "Untitled",
+    "pos": {
+      "X": 0,
+      "Y": 0
+    }
+  },
+  "links": [
+    {
+      "target": {
+        "type": "Filter",
+        "name": "RidgedMultiFractal_EeHJnQIA"
+      },
+      "source0": {
+        "type": "Primitive",
+        "name": "SimplexPerlin_10CNh3XY"
+      }
+    },
+    {
+      "target": {
+        "type": "Modifier",
+        "name": "Scale2D_PvwCH4D3"
+      },
+      "source0": {
+        "type": "Filter",
+        "name": "RidgedMultiFractal_EeHJnQIA"
+      }
+    },
+    {
+      "target": {
+        "type": "Terminator",
+        "name": "TERMINATOR"
+      },
+      "source0": {
+        "type": "Modifier",
+        "name": "Scale2D_PvwCH4D3"
+      }
+    }
+  ],
+  "primitives": {
+    "SimplexPerlin_10CNh3XY": {
+      "primative": "SimplexPerlin",
+      "quality": "Fast",
+      "seed": 0,
+      "offset": 1,
+      "name": "SimplexPerlin_10CNh3XY",
+      "pos": {
+        "X": 21.333333333333258,
+        "Y": 206.04
+      }
+    },
+    "Cylinders_FJsy4Cix": {
+      "primative": "Cylinders",
+      "quality": "Fast",
+      "seed": 0,
+      "offset": 1,
+      "name": "Cylinders_FJsy4Cix",
+      "pos": {
+        "X": 805.4408315018372,
+        "Y": 112.5073101139603
+      }
+    }
+  },
+  "filters": {
+    "RidgedMultiFractal_EeHJnQIA": {
+      "filter": "RidgedMultiFractal",
+      "frequency": 1,
+      "lacunarity": 3,
+      "octaves": 10,
+      "offset": 1,
+      "gain": 0,
+      "exponent": 1,
+      "name": "RidgedMultiFractal_EeHJnQIA",
+      "pos": {
+        "X": 410.03498454513215,
+        "Y": 288.48636492133
+      }
+    }
+  },
+  "transformers": {},
+  "selectors": {},
+  "modifiers": {
+    "Scale2D_kFXntAgp": {
+      "modifyType": "Scale2d",
+      "scale2d": {
+        "X": 1,
+        "Y": 1
+      },
+      "name": "Scale2D_kFXntAgp",
+      "pos": {
+        "X": 0,
+        "Y": 0
+      }
+    },
+    "Scale2D_PvwCH4D3": {
+      "modifyType": "Scale2d",
+      "scale2d": {
+        "X": 0.400000006,
+        "Y": 1
+      },
+      "name": "Scale2D_PvwCH4D3",
+      "pos": {
+        "X": 836.7778263261376,
+        "Y": 521.9570732669904
+      }
+    }
+  },
+  "combiners": {},
+  "floats": {},
+  "controlpoints": {}
+}

@@ -4,14 +4,16 @@
 #include <string>
 
 #include "Batch/FilterConfig.hpp"
+#include "Geyser/GeyserCatalog.hpp"
 #include "SearchAnalysis/TraitCatalog.hpp"
+#include "Setting/DlcRegistry.hpp"
 #include "Setting/SettingsCache.hpp"
 
 namespace SearchAnalysis {
 
 namespace {
 
-static const std::array<const char *, 38> kWorldPrefixes = {
+static const std::array<const char *, 41> kWorldPrefixes = {
     "SNDST-A-",  "OCAN-A-",    "S-FRZ-",     "LUSH-A-",    "FRST-A-",
     "VOLCA-",    "BAD-A-",     "HTFST-A-",   "OASIS-A-",   "CER-A-",
     "CERS-A-",   "PRE-A-",     "PRES-A-",    "V-SNDST-C-", "V-OCAN-C-",
@@ -19,7 +21,8 @@ static const std::array<const char *, 38> kWorldPrefixes = {
     "V-BAD-C-",  "V-HTFST-C-", "V-OASIS-C-", "V-CER-C-",   "V-CERS-C-",
     "V-PRE-C-",  "V-PRES-C-",  "SNDST-C-",   "PRE-C-",     "CER-C-",
     "FRST-C-",   "SWMP-C-",    "M-SWMP-C-",  "M-BAD-C-",   "M-FRZ-C-",
-    "M-FLIP-C-", "M-RAD-C-",   "M-CERS-C-"};
+    "M-FLIP-C-", "M-RAD-C-",   "M-CERS-C-",  "AQU-A-",     "V-AQU-C-",
+    "AQU-C-"};
 
 std::string ToMixingSlotType(int type)
 {
@@ -64,12 +67,8 @@ void FillMixingSlotLabel(const SettingsCache &settings,
         return;
     }
 
-    if (config.path == "DLC2_ID") {
-        slot->name = "The Frosty Planet Pack";
-    } else if (config.path == "DLC3_ID") {
-        slot->name = "The Bionic Booster Pack";
-    } else if (config.path == "DLC4_ID") {
-        slot->name = "The Prehistoric Planet Pack";
+    if (const auto *dlc = DlcRegistry::FindById(config.path); dlc != nullptr) {
+        slot->name = std::string(dlc->displayName);
     }
 }
 
@@ -205,12 +204,17 @@ SearchCatalog BuildSearchCatalog(const SettingsCache &settings)
         });
     }
 
-    const auto &geyserIds = Batch::GetGeyserIds();
-    catalog.geysers.reserve(geyserIds.size());
-    for (size_t i = 0; i < geyserIds.size(); ++i) {
+    const auto &geyserEntries = Geyser::GetCatalog();
+    catalog.geysers.reserve(geyserEntries.size());
+    for (const auto &entry : geyserEntries) {
         catalog.geysers.push_back(GeyserCatalogItem{
-            .id = static_cast<int>(i),
-            .key = geyserIds[i],
+            .id = entry.id,
+            .key = std::string(entry.key),
+            .name = std::string(entry.displayName),
+            .kind = std::string(Geyser::ToString(entry.kind)),
+            .parameterSource = std::string(entry.parameterSource),
+            .supportsDynamicParameters = entry.supportsDynamicParameters,
+            .supportsCoordinateParameters = entry.supportsCoordinateParameters,
         });
     }
 

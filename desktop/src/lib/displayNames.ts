@@ -13,6 +13,10 @@ export interface PlayerBiomeDisplayName extends DisplayName {
   key: string;
 }
 
+export interface GeyserKindDisplayName extends DisplayName {}
+
+export interface GeyserParameterSourceDisplayName extends DisplayName {}
+
 export const WORLD_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
   "SNDST-A-": { zh: "类地星体", en: "Terra" },
   "OCAN-A-": { zh: "海洋星体", en: "Oceania" },
@@ -52,6 +56,9 @@ export const WORLD_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
   "M-FLIP-C-": { zh: "卫星星群 - 倒置", en: "Moonlet Cluster - Flipped" },
   "M-RAD-C-": { zh: "卫星星群 - 放射性海洋", en: "Moonlet Cluster - Radioactive Ocean" },
   "M-CERS-C-": { zh: "卫星星群 - 谷神星地幔", en: "Moonlet Cluster - Ceres Mantle" },
+  "AQU-A-": { zh: "汪洋星", en: "Marinea" },
+  "V-AQU-C-": { zh: "汪洋星星群", en: "Marinea Cluster" },
+  "AQU-C-": { zh: "小汪洋星星群", en: "Marinea Minor Cluster" },
 };
 
 export const ASTEROID_DISPLAY_NAMES: Record<string, WorldDisplayName> = {
@@ -146,6 +153,33 @@ export const GEYSER_DISPLAY_NAMES: Record<string, GeyserDisplayName> = {
   warp_receiver: { zh: "供给传送器输入端", en: "Supply Teleporter Input" },
   warp_portal: { zh: "传送发射/接收器", en: "Teleporter Transmitter" },
   cryo_tank: { zh: "低温箱3000", en: "Cryotank 3000" },
+  murky_brine: { zh: "污浊盐水喷口", en: "Polluted Brine Vent" },
+  small_reef_geyser: { zh: "潮汐泉", en: "Tidal Spring" },
+  underwater_vent: { zh: "热气裂隙", en: "Thermal Gas Fissure" },
+};
+
+export const GEYSER_KIND_DISPLAY_NAMES: Record<string, GeyserKindDisplayName> = {
+  generic_geyser: { zh: "通用喷口", en: "Generic Geyser" },
+  fixed_template_geyser: { zh: "固定模板喷口", en: "Fixed Template Geyser" },
+  reservoir: { zh: "储层对象", en: "Reservoir" },
+  warp_portal: { zh: "传送设施", en: "Warp Facility" },
+  cryopod: { zh: "低温设施", en: "Cryopod" },
+  aquatic: { zh: "水生喷口", en: "Aquatic Vent" },
+  facility: { zh: "固定设施", en: "Facility" },
+  unknown: { zh: "未知分类", en: "Unknown" },
+};
+
+export const GEYSER_PARAMETER_SOURCE_DISPLAY_NAMES: Record<
+  string,
+  GeyserParameterSourceDisplayName
+> = {
+  generic_config: { zh: "通用喷口参数表", en: "Generic Config" },
+  small_reef_geyser_runtime: { zh: "潮汐泉运行时规则", en: "Tidal Spring Runtime" },
+  underwater_vent_runtime: { zh: "热气裂隙运行时规则", en: "Thermal Gas Fissure Runtime" },
+  oil_reservoir: { zh: "储油石固定对象", en: "Oil Reservoir" },
+  warp_facility: { zh: "传送设施固定对象", en: "Warp Facility" },
+  cryopod: { zh: "低温箱固定对象", en: "Cryotank" },
+  printing_pod: { zh: "打印舱固定对象", en: "Printing Pod" },
 };
 
 export const MIXING_SLOT_DISPLAY_NAMES: Record<string, MixingSlotDisplayName> = {
@@ -160,6 +194,12 @@ export const MIXING_SLOT_DISPLAY_NAMES: Record<string, MixingSlotDisplayName> = 
   "dlc4::subworldMixing/RaptorMixingSettings": { zh: "寒羽生态", en: "Feather Biome" },
   "dlc4::subworldMixing/WetlandsMixingSettings": { zh: "险沼生态", en: "Wetlands Biome" },
   "dlc4::worldMixing/PrehistoricMixingSettings": { zh: "古迹星碎片", en: "Relica Fragment" },
+  DLC5_ID: { zh: "汪洋行星包", en: "The Aquatic Planet Pack" },
+  "dlc5::subworldMixing/BeachMixingSettings": { zh: "浅滩生态", en: "Beach Biome" },
+  "dlc5::subworldMixing/ReefMixingSettings": { zh: "珊瑚礁生态", en: "Reef Biome" },
+  "dlc5::subworldMixing/KelpForestMixingSettings": { zh: "海藻林生态", en: "Kelp Forest Biome" },
+  "dlc5::subworldMixing/AbyssMixingSettings": { zh: "深渊生态", en: "Abyss Biome" },
+  "dlc5::worldMixing/AquaticMixingSettings": { zh: "汪洋星碎片", en: "Marinea Fragment" },
 };
 
 export const FALLBACK_MIXING_SLOT_PATHS = Object.keys(MIXING_SLOT_DISPLAY_NAMES);
@@ -191,6 +231,10 @@ export const PLAYER_BIOME_DISPLAY_NAMES: PlayerBiomeDisplayName[] = [
   { key: "PrehistoricGarden", zh: "花园生态", en: "Garden Biome" },
   { key: "PrehistoricRaptor", zh: "寒羽生态", en: "Feather Biome" },
   { key: "PrehistoricWetlands", zh: "险沼生态", en: "Wetlands Biome" },
+  { key: "Beach", zh: "沙滩生态", en: "Beach Biome" },
+  { key: "Reef", zh: "珊瑚生态", en: "Reef Biome" },
+  { key: "KelpForest", zh: "藻林生态", en: "Kelp Forest Biome" },
+  { key: "Abyss", zh: "深渊生态", en: "Abyss Biome" },
 ];
 
 // 用户可见的 ZoneType 映射。内部类型保留在后端，但不直接展示给桌面端用户。
@@ -219,6 +263,10 @@ export const PLAYER_ZONE_TYPE_DISPLAY_NAMES: Array<DisplayName | null> = [
   { zh: "花园生态", en: "Garden Biome" },
   { zh: "寒羽生态", en: "Feather Biome" },
   { zh: "险沼生态", en: "Wetlands Biome" },
+  { zh: "沙滩生态", en: "Beach Biome" },
+  { zh: "珊瑚生态", en: "Reef Biome" },
+  { zh: "藻林生态", en: "Kelp Forest Biome" },
+  { zh: "深渊生态", en: "Abyss Biome" },
 ];
 
 // 区域类型名称，索引对应 C++ ZoneType 枚举值
@@ -247,4 +295,8 @@ export const ZONE_TYPE_DISPLAY_NAMES: DisplayName[] = [
   { zh: "花园生态", en: "Garden Biome" },
   { zh: "寒羽生态", en: "Feather Biome" },
   { zh: "险沼生态", en: "Wetlands Biome" },
+  { zh: "沙滩生态", en: "Beach Biome" },
+  { zh: "珊瑚生态", en: "Reef Biome" },
+  { zh: "藻林生态", en: "Kelp Forest Biome" },
+  { zh: "深渊生态", en: "Abyss Biome" },
 ];

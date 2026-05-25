@@ -1,0 +1,1195 @@
+{
+  "info": {
+    "size": {
+      "X": 12,
+      "Y": 14
+    },
+    "min": {
+      "X": -5,
+      "Y": -6
+    },
+    "area": 124
+  },
+  "cells": [
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 331.14267,
+      "location_x": -4,
+      "location_y": -4
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_x": -3,
+      "location_y": -4
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_x": -2,
+      "location_y": -4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_x": -1,
+      "location_y": -4
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 9999,
+      "temperature": 1.1499939,
+      "location_y": -4
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.956757,
+      "location_x": 1,
+      "location_y": -4
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.96997,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 2,
+      "location_y": -4
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 331.451355,
+      "location_x": -4,
+      "location_y": -3,
+      "backwallElement": "Galena",
+      "backwallTemperature": 335.246765,
+      "backwallMass": 1007.83002
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.96606,
+      "temperature": 341.924072,
+      "location_x": -3,
+      "location_y": -3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.857483,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.97095,
+      "temperature": 341.913818,
+      "location_x": -2,
+      "location_y": -3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.855988,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.96082,
+      "temperature": 341.932465,
+      "location_x": -1,
+      "location_y": -3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.858673,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.97205,
+      "temperature": 341.676636,
+      "location_y": -3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.833923,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 328.804138,
+      "location_x": 1,
+      "location_y": -3
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 329.457764,
+      "location_x": 2,
+      "location_y": -3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.9834,
+      "temperature": 341.974976,
+      "location_x": -4,
+      "location_y": -2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 327.335449,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.98303,
+      "temperature": 342.135773,
+      "location_x": -3,
+      "location_y": -2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.9856,
+      "temperature": 341.955475,
+      "location_x": -2,
+      "location_y": -2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.717621,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.98047,
+      "temperature": 342.141693,
+      "location_x": -1,
+      "location_y": -2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.98486,
+      "temperature": 341.956726,
+      "location_y": -2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.716858,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.98828,
+      "temperature": 341.989807,
+      "location_x": 1,
+      "location_y": -2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.98901,
+      "temperature": 341.988861,
+      "location_x": 2,
+      "location_y": -2
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 977.072266,
+      "temperature": 341.983795,
+      "location_x": -4,
+      "location_y": -1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 327.060181,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 977.023926,
+      "temperature": 342.148132,
+      "location_x": -3,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 977.000244,
+      "temperature": 341.974762,
+      "location_x": -2,
+      "location_y": -1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.233063,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 976.954407,
+      "temperature": 342.14679,
+      "location_x": -1,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 976.927734,
+      "temperature": 341.974426,
+      "location_y": -1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.256805,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 976.872131,
+      "temperature": 342.146545,
+      "location_x": 1,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 976.845459,
+      "temperature": 342.145294,
+      "location_x": 2,
+      "location_y": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": -4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": -3
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": -2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.221436,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": -1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.265869,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 1
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 2
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00975089148,
+      "temperature": 326.786804,
+      "location_x": -4,
+      "location_y": 1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00974900275,
+      "temperature": 329.262543,
+      "location_x": -3,
+      "location_y": 1
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00975623447,
+      "temperature": 327.971588,
+      "location_x": -2,
+      "location_y": 1
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00976772793,
+      "temperature": 329.189514,
+      "location_x": -1,
+      "location_y": 1
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00979404151,
+      "temperature": 327.514435,
+      "location_y": 1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.247986,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00978551898,
+      "temperature": 326.26767,
+      "location_x": 1,
+      "location_y": 1
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00999999978,
+      "temperature": 325.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 2,
+      "location_y": 1
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 324.163727,
+      "location_x": -4,
+      "location_y": 2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00974296872,
+      "temperature": 325.777344,
+      "location_x": -3,
+      "location_y": 2
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00974721089,
+      "temperature": 326.64505,
+      "location_x": -2,
+      "location_y": 2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150085,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00975494087,
+      "temperature": 326.47644,
+      "location_x": -1,
+      "location_y": 2
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00976624433,
+      "temperature": 324.881287,
+      "location_y": 2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.218506,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00977333449,
+      "temperature": 325.370148,
+      "location_x": 1,
+      "location_y": 2
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 324.158081,
+      "location_x": 2,
+      "location_y": 2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 324.92807,
+      "location_x": -4,
+      "location_y": 3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.244934,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00973361544,
+      "temperature": 326.587616,
+      "location_x": -3,
+      "location_y": 3
+    },
+    {
+      "element": "Methane",
+      "mass": 0.0097365221,
+      "temperature": 326.049713,
+      "location_x": -2,
+      "location_y": 3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150055,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00974173192,
+      "temperature": 325.710022,
+      "location_x": -1,
+      "location_y": 3
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00975377671,
+      "temperature": 324.975067,
+      "location_y": 3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00975450128,
+      "temperature": 325.766205,
+      "location_x": 1,
+      "location_y": 3
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 324.881561,
+      "location_x": 2,
+      "location_y": 3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.387512,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 328.820984,
+      "location_x": -4,
+      "location_y": 4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.023499,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00972402655,
+      "temperature": 328.126373,
+      "location_x": -3,
+      "location_y": 4
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00972518884,
+      "temperature": 326.222687,
+      "location_x": -2,
+      "location_y": 4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00972598605,
+      "temperature": 325.336395,
+      "location_x": -1,
+      "location_y": 4
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 324.161469,
+      "location_y": 4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00973505899,
+      "temperature": 326.769287,
+      "location_x": 1,
+      "location_y": 4
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.227203,
+      "location_x": 2,
+      "location_y": 4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.152222,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1907.29578,
+      "temperature": 339.970337,
+      "location_x": -4,
+      "location_y": 5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 329.58136,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00971881486,
+      "temperature": 327.003174,
+      "location_x": -3,
+      "location_y": 5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00971820392,
+      "temperature": 331.685883,
+      "location_x": -2,
+      "location_y": 5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00971598364,
+      "temperature": 325.649475,
+      "location_x": -1,
+      "location_y": 5
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 324.18634,
+      "location_y": 5
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00972194783,
+      "temperature": 331.227661,
+      "location_x": 1,
+      "location_y": 5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 326.679077,
+      "location_x": 2,
+      "location_y": 5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.611633,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1913.49048,
+      "temperature": 336.571228,
+      "location_x": -3,
+      "location_y": 6,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 328.878937,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 328.359924,
+      "location_x": -2,
+      "location_y": 6,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.983032,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00970607623,
+      "temperature": 325.560822,
+      "location_x": -1,
+      "location_y": 6,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 324.819885,
+      "location_y": 6,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.246918,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00971523672,
+      "temperature": 336.034424,
+      "location_x": 1,
+      "location_y": 6,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 336.354828,
+      "location_x": 2,
+      "location_y": 6,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 341.791595,
+      "backwallMass": 1891.14563
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 326.344269,
+      "location_x": -1,
+      "location_y": 7,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.352142,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 327.781677,
+      "location_y": 7,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.878418,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 337.061401,
+      "location_x": 1,
+      "location_y": 7,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 342.14743,
+      "backwallMass": 1896.28345
+    },
+    {
+      "element": "Basalt",
+      "mass": 1898.53247,
+      "temperature": 345.588959,
+      "location_x": 2,
+      "location_y": 7,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 345.588959,
+      "backwallMass": 1898.53247
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 976.799622,
+      "temperature": 341.972229,
+      "location_x": 3,
+      "location_y": -1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.221405,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150055,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.010131564,
+      "temperature": 325.142487,
+      "location_x": 3,
+      "location_y": 1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.0101303766,
+      "temperature": 325.320709,
+      "location_x": 3,
+      "location_y": 2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00999999978,
+      "temperature": 325.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 3,
+      "location_y": 3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.15799,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.149994,
+      "location_x": 3,
+      "location_y": 4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.149994,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.98438,
+      "temperature": 341.92514,
+      "location_x": 4,
+      "location_y": -2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.494904,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 976.776001,
+      "temperature": 341.969025,
+      "location_x": 4,
+      "location_y": -1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.142395,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150024,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Methane",
+      "mass": 0.00999999978,
+      "temperature": 326.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 4,
+      "location_y": 1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.920471,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.149628,
+      "location_x": 4,
+      "location_y": 2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.999512,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.97998,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.150116,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 327.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 5,
+      "location_y": 1
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 326.16095,
+      "location_x": 6,
+      "location_y": -4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 324.701447,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 328.28833,
+      "location_x": 6,
+      "location_y": -3,
+      "backwallElement": "Galena",
+      "backwallTemperature": 334.431305,
+      "backwallMass": 1007.83002
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 328.651733,
+      "location_x": 6,
+      "location_y": -2,
+      "backwallElement": "Galena",
+      "backwallTemperature": 334.343231,
+      "backwallMass": 1007.83002
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 328.955597,
+      "location_x": 6,
+      "location_y": -1
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 327.396912,
+      "location_x": 6
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 330.488129,
+      "location_x": 5,
+      "location_y": -5,
+      "backwallElement": "Galena",
+      "backwallTemperature": 335.016937,
+      "backwallMass": 1007.83002
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1224.07788,
+      "temperature": 341.739075,
+      "location_x": 5,
+      "location_y": -4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 327.337769,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.97217,
+      "temperature": 341.738129,
+      "location_x": 5,
+      "location_y": -3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 327.338837,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 329.344177,
+      "location_x": 3,
+      "location_y": -6
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 331.142914,
+      "location_x": 4,
+      "location_y": -6,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 338.202606,
+      "backwallMass": 1748.97534
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1236.29749,
+      "temperature": 341.911163,
+      "location_x": 3,
+      "location_y": -5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 327.350006,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1236.29944,
+      "temperature": 341.769135,
+      "location_x": 4,
+      "location_y": -5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 327.339172,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1224.07312,
+      "temperature": 341.912689,
+      "location_x": 3,
+      "location_y": -4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.856049,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1224.07288,
+      "temperature": 341.917175,
+      "location_x": 4,
+      "location_y": -4,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 327.351013,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.96924,
+      "temperature": 341.929047,
+      "location_x": 3,
+      "location_y": -3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.858612,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.96851,
+      "temperature": 341.925171,
+      "location_x": 4,
+      "location_y": -3,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.858826,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1211.96997,
+      "temperature": 342.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 2,
+      "location_y": -5
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 1199.98621,
+      "temperature": 341.738129,
+      "location_x": 5,
+      "location_y": -2,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.489594,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "MurkyBrine",
+      "mass": 976.727661,
+      "temperature": 341.812256,
+      "location_x": 5,
+      "location_y": -1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 326.048187,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 327.893982,
+      "location_x": 5,
+      "location_y": 2
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 331.214691,
+      "location_x": -3,
+      "location_y": -5
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 328.604614,
+      "location_x": -2,
+      "location_y": -5
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.977539,
+      "location_x": -1,
+      "location_y": -5
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.149994,
+      "location_y": -5
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.739471,
+      "location_x": 1,
+      "location_y": -5
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 329.816833,
+      "location_x": -5,
+      "location_y": -2,
+      "backwallElement": "Galena",
+      "backwallTemperature": 334.951935,
+      "backwallMass": 1007.83002
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 326.713623,
+      "location_x": -5,
+      "location_y": -1,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.362915,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.167023,
+      "location_x": -5,
+      "backwallElement": "Basalt",
+      "backwallTemperature": 325.152283,
+      "backwallMass": 1823.08997
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 325.489899,
+      "location_x": -5,
+      "location_y": 1
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 326.847076,
+      "location_x": -5,
+      "location_y": 2
+    },
+    {
+      "element": "Basalt",
+      "mass": 1823.08997,
+      "temperature": 331.149994,
+      "diseaseName": "FoodPoisoning",
+      "location_x": 2,
+      "location_y": -6
+    }
+  ],
+  "pickupables": [
+    {
+      "id": "SnailIron",
+      "location_x": 5,
+      "location_y": -4,
+      "element": "Creature",
+      "temperature": 358.525635,
+      "units": 1,
+      "type": "Pickupable",
+      "rottable": {}
+    },
+    {
+      "id": "SnailIron",
+      "location_x": 1,
+      "location_y": -2,
+      "element": "Creature",
+      "temperature": 358.756958,
+      "units": 1,
+      "type": "Pickupable",
+      "rottable": {}
+    }
+  ],
+  "otherEntities": [
+    {
+      "id": "TubeWorm",
+      "location_x": 3,
+      "location_y": -5,
+      "element": "Creature",
+      "temperature": 347.42868,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity",
+          "value": 0.0275832266
+        },
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure",
+          "value": 1230.18518
+        },
+        {
+          "id": "Temperature",
+          "value": 348.149994
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "TubeWorm",
+      "location_x": 3,
+      "location_y": -5,
+      "element": "Creature",
+      "temperature": 347.428711,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity",
+          "value": 8
+        },
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure",
+          "value": 1230.18518
+        },
+        {
+          "id": "Temperature",
+          "value": 348.149994
+        },
+        {
+          "id": "OldAge",
+          "value": 62.2001648
+        }
+      ]
+    },
+    {
+      "id": "UnderwaterVent",
+      "location_x": -2,
+      "location_y": -3,
+      "element": "Katairite",
+      "temperature": 363.149994,
+      "units": 1,
+      "type": "Other"
+    }
+  ]
+}

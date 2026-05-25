@@ -7,12 +7,14 @@ struct ClusterLayout;
 struct MixingConfig;
 struct WorldMixingSettings;
 struct SubworldMixingSettings;
+struct World;
 
 struct ActiveContentSet {
     bool expansion1 = false;
     bool dlc2 = false;
     bool dlc3 = false;
     bool dlc4 = false;
+    bool dlc5 = false;
     std::vector<std::string> ids;
 
     bool HasContent(const std::string &id) const;
@@ -23,6 +25,14 @@ ActiveContentSet BuildActiveContentSet(const ClusterLayout *cluster,
 
 bool HasAnyClusterTag(const ClusterLayout *cluster,
                       const std::vector<std::string> &forbiddenClusterTags);
+
+bool IsContentSetAllowed(const std::vector<std::string> &requiredIds,
+                         const std::vector<std::string> &forbiddenIds,
+                         const ActiveContentSet &activeContent);
+
+bool IsWorldAllowed(const World &world,
+                    const ClusterLayout *cluster,
+                    const ActiveContentSet &activeContent);
 
 std::vector<std::string> GetRequiredContentIds(const MixingConfig &config,
                                                const WorldMixingSettings *worldSetting,

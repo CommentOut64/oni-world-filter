@@ -1,0 +1,22 @@
+{
+  "spaceDesinations": [
+    {
+      "type": "DLC5AquaticSpaceDestination",
+      "minTier": 3,
+      "maxTier": 10
+    }
+  ],
+  "spacePois": [
+    {
+      "pois": [
+        "HarvestableSpacePOI_DLC5AquaticMixingField"
+      ],
+      "numToSpawn": 1,
+      "guarantee": true,
+      "allowedRings": {
+        "min": 5,
+        "max": 11
+      }
+    }
+  ]
+}

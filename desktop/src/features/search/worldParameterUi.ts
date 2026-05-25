@@ -1,4 +1,5 @@
 import type { MixingSlotMeta, WorldOption } from "../../lib/contracts";
+import fallbackData from "../../lib/searchCatalogFallbackData.json";
 
 export type WorldCategory = "baseAsteroid" | "classicCluster" | "moonletCluster";
 
@@ -33,56 +34,32 @@ export const WORLD_CATEGORY_OPTIONS: readonly WorldCategoryOption[] = [
     },
 ];
 
-const HIDDEN_WORLD_CODES = new Set(["PRES-A-", "V-PRES-C-"]);
-const BASE_ASTEROID_WORLD_CODES = new Set([
-    "SNDST-A-",
-    "OCAN-A-",
-    "S-FRZ-",
-    "LUSH-A-",
-    "FRST-A-",
-    "VOLCA-",
-    "BAD-A-",
-    "HTFST-A-",
-    "OASIS-A-",
-    "CER-A-",
-    "CERS-A-",
-    "PRE-A-",
-    "PRES-A-",
-]);
-const CLASSIC_CLUSTER_WORLD_CODES = new Set([
-    "V-SNDST-C-",
-    "V-OCAN-C-",
-    "V-SWMP-C-",
-    "V-SFRZ-C-",
-    "V-LUSH-C-",
-    "V-FRST-C-",
-    "V-VOLCA-C-",
-    "V-BAD-C-",
-    "V-HTFST-C-",
-    "V-OASIS-C-",
-    "V-CER-C-",
-    "V-CERS-C-",
-    "V-PRE-C-",
-    "V-PRES-C-",
-]);
-
-const MIXING_PACKAGE_ORDER = ["DLC2_ID", "DLC3_ID", "DLC4_ID"] as const;
-
-type MixingPackagePath = (typeof MIXING_PACKAGE_ORDER)[number];
-
-const MIXING_PACKAGE_PREFIX: Record<MixingPackagePath, string[]> = {
-  DLC2_ID: ["dlc2::worldMixing/", "dlc2::subworldMixing/"],
-  DLC3_ID: ["dlc3::worldMixing/", "dlc3::subworldMixing/"],
-  DLC4_ID: ["dlc4::worldMixing/", "dlc4::subworldMixing/"],
-};
+const HIDDEN_WORLD_CODES = new Set(fallbackData.hiddenWorldCodes);
+const WORLD_CATEGORY_BY_CODE = new Map(
+  fallbackData.worlds.map((item) => [item.code, item.category] as const)
+);
+const CLASSIC_CLUSTER_WORLD_CODES = new Set(
+  fallbackData.worlds
+    .filter((item) => item.category === "classicCluster")
+    .map((item) => item.code)
+);
+const BASE_ASTEROID_WORLD_CODES = new Set(
+  fallbackData.worlds
+    .filter((item) => item.category === "baseAsteroid")
+    .map((item) => item.code)
+);
+const MIXING_PACKAGES = fallbackData.mixingPackages;
 
 export function classifyWorld(code: string): WorldCategory {
-    // 使用完整映射表，避免 S-FRZ / VOLCA 这类不满足简单前缀规则的世界被误分。
+    const category = WORLD_CATEGORY_BY_CODE.get(code);
+    if (category) {
+      return category;
+    }
     if (BASE_ASTEROID_WORLD_CODES.has(code)) {
-        return "baseAsteroid";
+      return "baseAsteroid";
     }
     if (CLASSIC_CLUSTER_WORLD_CODES.has(code)) {
-        return "classicCluster";
+      return "classicCluster";
     }
     return "moonletCluster";
 }
@@ -133,8 +110,9 @@ export function isWorldTypeVisibleInCategory(
   return findCategoryForWorld(worlds, worldType) === category;
 }
 
-function isChildOfPackage(path: string, packagePath: MixingPackagePath): boolean {
-  return MIXING_PACKAGE_PREFIX[packagePath].some((prefix) => path.startsWith(prefix));
+function isChildOfPackage(path: string, packagePath: string): boolean {
+  const packageConfig = MIXING_PACKAGES.find((item) => item.path === packagePath);
+  return packageConfig ? packageConfig.prefixes.some((prefix) => path.startsWith(prefix)) : false;
 }
 
 export function groupMixingSlots<TSlot extends MixingSlotMeta>(
@@ -142,7 +120,7 @@ export function groupMixingSlots<TSlot extends MixingSlotMeta>(
 ): MixingPackageGroup<TSlot>[] {
   const groups: MixingPackageGroup<TSlot>[] = [];
 
-  for (const packagePath of MIXING_PACKAGE_ORDER) {
+  for (const { path: packagePath } of MIXING_PACKAGES) {
     const packageSlot = slots.find((item) => item.path === packagePath);
     if (!packageSlot) {
       continue;

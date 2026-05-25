@@ -14,6 +14,8 @@
 
 #include "JsonDeserializeGen.hpp"
 #include "Setting/ContentActivation.hpp"
+#include "Setting/DlcRegistry.hpp"
+#include "Setting/WorldTraitConflict.hpp"
 #include "Utils/KRandom.hpp"
 #include "Utils/Polygon.hpp"
 #include "Utils/PointGenerator.hpp"
@@ -49,6 +51,7 @@ SettingsCache &SettingsCache::operator=(const SettingsCache &other)
     biomes = other.biomes;
     clusters = other.clusters;
     features = other.features;
+    noise = other.noise;
     subworldMixing = other.subworldMixing;
     subworlds = other.subworlds;
     orderedSubworlds = other.orderedSubworlds;
@@ -147,29 +150,62 @@ static bool LoadJsonFile(mz_zip_archive &zip, int index, T &result)
 
 static std::string GenerateKey(const char *filename)
 {
+    std::string_view view(filename);
     std::string key;
-    unsigned offset = 0;
-    if (strstr(filename, "dlc/expansion1") != nullptr) {
-        key = "expansion1::";
-        offset = 15;
-    } else if (strstr(filename, "dlc/dlc2") != nullptr) {
-        key = "dlc2::";
-        offset = 9;
-    } else if (strstr(filename, "dlc/dlc3") != nullptr) {
-        key = "dlc3::";
-        offset = 9;
-    } else if (strstr(filename, "dlc/dlc4") != nullptr) {
-        key = "dlc4::";
-        offset = 9;
+    if (const auto *dlc = DlcRegistry::FindByArchivePath(view); dlc != nullptr) {
+        key = std::string(dlc->resourcePrefix);
     }
-    if (strstr(filename, "templates/") != nullptr) {
-        offset += 10;
-    } else {
-        offset += 9; // worldgen/
+
+    std::string_view relative = view;
+    if (const size_t templatePos = relative.find("templates/");
+        templatePos != std::string_view::npos) {
+        relative.remove_prefix(templatePos + 10);
+    } else if (const size_t worldgenPos = relative.find("worldgen/");
+               worldgenPos != std::string_view::npos) {
+        relative.remove_prefix(worldgenPos + 9);
     }
-    key += filename + offset;
+
+    key += relative;
     key.resize(key.size() - 5);
     return key;
+}
+
+static std::string ResolveOwnedResourcePath(std::string_view resourcePath,
+                                            std::string_view ownerResourcePath)
+{
+    if (resourcePath.empty()) {
+        return {};
+    }
+    if (DlcRegistry::FindByResourcePath(resourcePath) != nullptr) {
+        return std::string(resourcePath);
+    }
+    if (resourcePath.starts_with("noise/")) {
+        if (const auto *dlc = DlcRegistry::FindByResourcePath(ownerResourcePath);
+            dlc != nullptr) {
+            return std::string(dlc->resourcePrefix) + std::string(resourcePath);
+        }
+    }
+    return std::string(resourcePath);
+}
+
+const NoiseTree *SettingsCache::FindNoise(std::string_view resourcePath,
+                                          std::string_view ownerResourcePath) const
+{
+    if (resourcePath.empty()) {
+        return nullptr;
+    }
+    if (const auto itr = noise.find(std::string(resourcePath)); itr != noise.end()) {
+        return &itr->second;
+    }
+    const std::string resolvedPath =
+        ResolveOwnedResourcePath(resourcePath, ownerResourcePath);
+    if (resolvedPath.empty()) {
+        return nullptr;
+    }
+    if (const auto itr = noise.find(resolvedPath); itr != noise.end()) {
+        return &itr->second;
+    }
+    return nullptr;
 }
 
 bool SettingsCache::LoadSettingsCache(const std::string_view &content)
@@ -237,12 +273,9 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
             continue;
         }
         if (strstr(stat.m_filename, "worldgen/mixing.json") != nullptr) {
-            if (strstr(stat.m_filename, "dlc/dlc2") != nullptr) {
-                LoadJsonFile(zip, i, dlcMixings["dlc2"]);
-            } else if (strstr(stat.m_filename, "dlc/dlc4") != nullptr) {
-                LoadJsonFile(zip, i, dlcMixings["dlc4"]);
-            } else {
-                LoadJsonFile(zip, i, dlcMixings["dlc3"]);
+            if (const auto *dlc = DlcRegistry::FindByArchivePath(stat.m_filename);
+                dlc != nullptr) {
+                LoadJsonFile(zip, i, dlcMixings[std::string(dlc->storageKey)]);
             }
             continue;
         }
@@ -267,6 +300,8 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
             continue;
         }
         if (strstr(stat.m_filename, "worldgen/noise/") != nullptr) {
+            std::string key = GenerateKey(stat.m_filename);
+            LoadJsonFile(zip, i, noise[key]);
             continue;
         }
         if (strstr(stat.m_filename, "worldgen/storytraits/") != nullptr) {
@@ -339,6 +374,12 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
         {"dlc4::subworldMixing/RaptorMixingSettings", 2},
         {"dlc4::subworldMixing/WetlandsMixingSettings", 2},
         {"dlc4::worldMixing/PrehistoricMixingSettings", 1},
+        {"DLC5_ID", 0},
+        {"dlc5::subworldMixing/BeachMixingSettings", 2},
+        {"dlc5::subworldMixing/ReefMixingSettings", 2},
+        {"dlc5::subworldMixing/KelpForestMixingSettings", 2},
+        {"dlc5::subworldMixing/AbyssMixingSettings", 2},
+        {"dlc5::worldMixing/AquaticMixingSettings", 1},
     };
     return true;
 }
@@ -405,14 +446,14 @@ static std::vector<std::string> ParseSettingCoordinate(const std::string &coord)
     return result;
 }
 
-uint32_t SettingsCache::Base36ToBinary(const std::string &input)
+uint64_t SettingsCache::Base36ToBinary(const std::string &input)
 {
     uint8_t dict[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  // 0-9
                       0,  0,  0,  0,  0,  0,  0,              // 3A-40
                       10, 11, 12, 13, 14, 15, 16, 17, 18, 19, // A-J
                       20, 21, 22, 23, 24, 25, 26, 27, 28, 29, // K-T
                       30, 31, 32, 33, 34, 35};                // U-Z
-    uint32_t result = 0;
+    uint64_t result = 0;
     for (auto itr = input.rbegin(); itr != input.rend(); ++itr) {
         result *= 36;
         result += dict[*itr - '0'];
@@ -420,7 +461,7 @@ uint32_t SettingsCache::Base36ToBinary(const std::string &input)
     return result;
 }
 
-std::string SettingsCache::BinaryToBase36(uint32_t input)
+std::string SettingsCache::BinaryToBase36(uint64_t input)
 {
     if (input == 0) {
         return "0";
@@ -455,14 +496,8 @@ bool SettingsCache::CoordinateChanged(const std::string &text,
     }
     m_dlcState = 0;
     for (auto &id : cluster->requiredDlcIds) {
-        if (id == "EXPANSION1_ID") {
-            m_dlcState |= 1;
-        } else if (id == "DLC2_ID") {
-            m_dlcState |= 2;
-        } else if (id == "DLC3_ID") {
-            m_dlcState |= 4;
-        } else if (id == "DLC4_ID") {
-            m_dlcState |= 8;
+        if (const auto *dlc = DlcRegistry::FindById(id); dlc != nullptr) {
+            m_dlcState |= static_cast<int>(dlc->stateBit);
         }
     }
     ParseAndApplyMixingSettingsCode(codes[5]);
@@ -558,12 +593,15 @@ SettingsCache::GetRandomTraits(const World &world) const
             total.push_back(&pair.second);
         }
     }
+    const auto fixedConflictState = BuildFixedTraitConflictState(traits, world.fixedTraits);
     std::vector<const WorldTrait *> result;
-    std::vector<std::string> names;
-    std::set<std::string> except;
+    std::vector<std::string> names(world.fixedTraits.begin(), world.fixedTraits.end());
+    std::set<std::string> except = fixedConflictState.blockedExclusiveTags;
     for (auto &rule : world.worldTraitRules) {
         for (auto &specificTrait : rule.specificTraits) {
-            if (traits.find(specificTrait) != traits.end()) {
+            const auto itr = traits.find(specificTrait);
+            if (itr != traits.end() &&
+                !TraitConflictsWithFixedTraits(itr->second, fixedConflictState)) {
                 names.emplace_back(specificTrait);
                 for (auto trait : total) {
                     if (specificTrait == trait->filePath) {
@@ -590,6 +628,9 @@ SettingsCache::GetRandomTraits(const World &world) const
                 continue;
             }
             if (std::ranges::contains(rule.forbiddenTraits, trait->filePath)) {
+                continue;
+            }
+            if (TraitConflictsWithFixedTraits(*trait, fixedConflictState)) {
                 continue;
             }
             if (trait->IsValid(world)) {

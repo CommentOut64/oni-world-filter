@@ -59,7 +59,7 @@ public:
     std::map<std::string, std::vector<ElementGradient>> biomes;
     std::map<std::string, ClusterLayout> clusters;
     std::map<std::string, FeatureSettings> features;
-    // std::map<std::string, NoiseTree> noise;
+    std::map<std::string, NoiseTree> noise;
     // std::map<std::string, WorldTrait> storytraits;
     std::map<std::string, SubworldMixingSettings> subworldMixing;
     std::map<std::string, SubWorld> subworlds;
@@ -87,12 +87,14 @@ public:
     bool IsSpaceOutEnabled() const { return (m_dlcState & 1) == 1; }
     ActiveContentSet BuildActiveContentSet() const;
     bool IsContentEnabled(const std::string &id) const;
+    const NoiseTree *FindNoise(std::string_view resourcePath,
+                               std::string_view ownerResourcePath = {}) const;
     std::vector<const WorldTrait *> GetRandomTraits(const World &world) const;
     void DoSubworldMixing(std::vector<World *> worlds, bool resetWorldRuntime = true);
     SearchMutableStateSnapshot CaptureSearchMutableState() const;
     void RestoreSearchMutableState(const SearchMutableStateSnapshot &snapshot);
-    static uint32_t Base36ToBinary(const std::string &input);
-    static std::string BinaryToBase36(uint32_t input);
+    static uint64_t Base36ToBinary(const std::string &input);
+    static std::string BinaryToBase36(uint64_t input);
 
     template<typename T>
     const T &GetDefaultData(const World &world, const std::string &key) const

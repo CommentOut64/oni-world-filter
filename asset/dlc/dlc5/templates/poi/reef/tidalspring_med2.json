@@ -1,0 +1,865 @@
+{
+  "info": {
+    "size": {
+      "X": 11,
+      "Y": 11
+    },
+    "min": {
+      "X": -4,
+      "Y": -4
+    },
+    "area": 102
+  },
+  "cells": [
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.600922,
+      "location_x": -1,
+      "location_y": 4
+    },
+    {
+      "element": "SaltWater",
+      "mass": 936.534424,
+      "temperature": 305.097229,
+      "location_y": 4,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.506378,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 964.696167,
+      "temperature": 305.12561,
+      "location_x": 1,
+      "location_y": 4,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.510132,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 957.065002,
+      "temperature": 305.115631,
+      "location_x": 2,
+      "location_y": 4,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.509796,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 922.225098,
+      "temperature": 305.130432,
+      "location_x": 3,
+      "location_y": 4
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 303.328583,
+      "location_x": 4,
+      "location_y": 4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.601044,
+      "location_x": -1,
+      "location_y": 5
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 302.733307,
+      "location_y": 5
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.860000014,
+      "temperature": 301.149994,
+      "diseaseName": "SlimeLung",
+      "location_x": 1,
+      "location_y": 5,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.186401,
+      "backwallMass": 1840
+    },
+    {
+      "element": "Oxygen",
+      "mass": 0.860000014,
+      "temperature": 301.149994,
+      "diseaseName": "SlimeLung",
+      "location_x": 2,
+      "location_y": 5
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 303.253876,
+      "location_x": 3,
+      "location_y": 5
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.299408,
+      "location_x": 4,
+      "location_y": 5
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.344025,
+      "location_x": -1,
+      "location_y": 6
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 302.413696,
+      "location_y": 6
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 303.408997,
+      "location_x": 1,
+      "location_y": 6
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 303.40036,
+      "location_x": 2,
+      "location_y": 6
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 303.372772,
+      "location_x": 3,
+      "location_y": 6
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1077.53821,
+      "temperature": 305.085388,
+      "location_x": 4,
+      "location_y": 1
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 302.156372,
+      "location_x": 5,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1062.05408,
+      "temperature": 305.086914,
+      "location_x": 4,
+      "location_y": 2
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 302.066223,
+      "location_x": 5,
+      "location_y": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 965.889099,
+      "temperature": 305.116913,
+      "location_x": 4,
+      "location_y": 3
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 303.098633,
+      "location_x": 5,
+      "location_y": 3
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 303.546875,
+      "location_x": 5,
+      "location_y": 4
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 302.242035,
+      "location_x": -3,
+      "location_y": -2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1091.59766,
+      "temperature": 305.050934,
+      "location_x": -2,
+      "location_y": -2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1081.51587,
+      "temperature": 305.080414,
+      "location_x": -1,
+      "location_y": -2
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 303.253387,
+      "location_y": -2
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.246613,
+      "location_x": 1,
+      "location_y": -2
+    },
+    {
+      "element": "Corallium",
+      "mass": 918.150024,
+      "temperature": 302.604828,
+      "location_x": 2,
+      "location_y": -2
+    },
+    {
+      "element": "Corallium",
+      "mass": 918.150024,
+      "temperature": 303.116791,
+      "location_x": 3,
+      "location_y": -2
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 552.275757,
+      "temperature": 303.15802,
+      "location_x": 4,
+      "location_y": -2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1094.83118,
+      "temperature": 304.953125,
+      "location_x": -3,
+      "location_y": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1090.25513,
+      "temperature": 305.091187,
+      "location_x": -2,
+      "location_y": -1
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 304.154816,
+      "location_x": -1,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 549.02002,
+      "temperature": 304.145142,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 549.02002,
+      "temperature": 304.154236,
+      "location_x": 1,
+      "location_y": -1
+    },
+    {
+      "element": "Unobtanium",
+      "mass": 549.02002,
+      "temperature": 304.169556,
+      "location_x": 2,
+      "location_y": -1
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 304.116089,
+      "location_x": 3,
+      "location_y": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1097.17004,
+      "temperature": 305.067261,
+      "location_x": 4,
+      "location_y": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1085.72559,
+      "temperature": 305.091003,
+      "location_x": -3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1086.45056,
+      "temperature": 305.091248,
+      "location_x": -2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1093.7959,
+      "temperature": 305.071381,
+      "location_x": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1096.07019,
+      "temperature": 305.092773,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.567871,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1096.85474,
+      "temperature": 305.127472,
+      "location_x": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1096.03101,
+      "temperature": 305.117706,
+      "location_x": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1094.49329,
+      "temperature": 305.115753,
+      "location_x": 3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1087.09302,
+      "temperature": 305.085388,
+      "location_x": 4
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1072.49182,
+      "temperature": 305.116577,
+      "location_x": -3,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1076.71973,
+      "temperature": 305.091248,
+      "location_x": -2,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1083.68823,
+      "temperature": 305.071381,
+      "location_x": -1,
+      "location_y": 1,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.566559,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1086.45752,
+      "temperature": 305.092773,
+      "location_y": 1,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.568268,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1087.77783,
+      "temperature": 305.126678,
+      "location_x": 1,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1086.75415,
+      "temperature": 305.116882,
+      "location_x": 2,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1083.2002,
+      "temperature": 305.122803,
+      "location_x": 3,
+      "location_y": 1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 986.250977,
+      "temperature": 305.117188,
+      "location_x": -3,
+      "location_y": 2
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1007.18958,
+      "temperature": 305.090851,
+      "location_x": -2,
+      "location_y": 2,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.495239,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1060.6842,
+      "temperature": 305.072113,
+      "location_x": -1,
+      "location_y": 2,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.49469,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1072.65955,
+      "temperature": 305.092804,
+      "location_y": 2,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.490479,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1074.54797,
+      "temperature": 305.126007,
+      "location_x": 1,
+      "location_y": 2,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.481293,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1071.59741,
+      "temperature": 305.116425,
+      "location_x": 2,
+      "location_y": 2,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 301.474335,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1069.37195,
+      "temperature": 305.124725,
+      "location_x": 3,
+      "location_y": 2
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 304.118134,
+      "location_x": -3,
+      "location_y": 3
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 304.125031,
+      "location_x": -2,
+      "location_y": 3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 984.349731,
+      "temperature": 305.089325,
+      "location_x": -1,
+      "location_y": 3,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.683411,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1048.57324,
+      "temperature": 305.097229,
+      "location_y": 3,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.681854,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1057.6582,
+      "temperature": 305.12561,
+      "location_x": 1,
+      "location_y": 3,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.688751,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1055.99097,
+      "temperature": 305.116425,
+      "location_x": 2,
+      "location_y": 3,
+      "backwallElement": "Coquina",
+      "backwallTemperature": 300.70459,
+      "backwallMass": 1840
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1039.82544,
+      "temperature": 305.130432,
+      "location_x": 3,
+      "location_y": 3
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 303.195587,
+      "location_x": -2,
+      "location_y": 4
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 302.691406,
+      "location_x": -2,
+      "location_y": 5
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.022736,
+      "location_x": -3,
+      "location_y": -3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1100.19995,
+      "temperature": 304.901489,
+      "location_x": -2,
+      "location_y": -3
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1099.32178,
+      "temperature": 304.902496,
+      "location_x": -1,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.481018,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.483246,
+      "location_x": 1,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.606323,
+      "location_x": 2,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.121338,
+      "location_x": 3,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.157074,
+      "location_x": 4,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.491791,
+      "location_x": -3,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.489899,
+      "location_x": -2,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.51712,
+      "location_x": -1,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.517456,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.186218,
+      "location_x": 1,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.186218,
+      "location_x": 2,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.186218,
+      "location_x": 3,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.226898,
+      "location_x": 4,
+      "location_y": -4
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.751678,
+      "location_x": 5,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.217072,
+      "location_x": 6,
+      "location_y": -3
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 302.725861,
+      "location_x": 5,
+      "location_y": -2
+    },
+    {
+      "element": "ZincOre",
+      "mass": 870,
+      "temperature": 301.746582,
+      "location_x": 6,
+      "location_y": -2
+    },
+    {
+      "element": "Sand",
+      "mass": 902.194153,
+      "temperature": 304.202759,
+      "location_x": 5,
+      "location_y": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 0.0386490636,
+      "temperature": 303.399078,
+      "location_x": 6,
+      "location_y": -1
+    },
+    {
+      "element": "SaltWater",
+      "mass": 1069.94067,
+      "temperature": 304.933685,
+      "location_x": 5
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 301.723206,
+      "location_x": 6
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.73465,
+      "location_x": 6,
+      "location_y": 1
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 301.116028,
+      "location_x": -4,
+      "location_y": -2
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 302.122223,
+      "location_x": -4,
+      "location_y": -1
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 549.02002,
+      "temperature": 303.102203,
+      "location_x": -4
+    },
+    {
+      "element": "Phosphorite",
+      "mass": 558.893616,
+      "temperature": 304.068024,
+      "location_x": -4,
+      "location_y": 1
+    },
+    {
+      "element": "Corallium",
+      "mass": 200,
+      "temperature": 303.927185,
+      "location_x": -4,
+      "location_y": 2
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 301.030609,
+      "location_x": -4,
+      "location_y": -3
+    }
+  ],
+  "pickupables": [
+    {
+      "id": "PufferFish",
+      "location_y": 1,
+      "element": "Creature",
+      "temperature": 303.329895,
+      "units": 1,
+      "type": "Pickupable",
+      "rottable": {}
+    }
+  ],
+  "otherEntities": [
+    {
+      "id": "SeaLettuce",
+      "location_x": 4,
+      "location_y": -1,
+      "element": "Creature",
+      "temperature": 308.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity",
+          "value": 0.0467501357
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure",
+          "value": 1067.63159
+        },
+        {
+          "id": "Temperature",
+          "value": 304.954834
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "SeaLettuce",
+      "location_x": -3,
+      "location_y": -1,
+      "element": "Creature",
+      "temperature": 308.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity",
+          "value": 0.0467501357
+        },
+        {
+          "id": "Irrigation"
+        },
+        {
+          "id": "AirPressure",
+          "value": 1064.2981
+        },
+        {
+          "id": "Temperature",
+          "value": 304.794495
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "PlanktonCoral",
+      "location_x": 1,
+      "location_y": 3,
+      "element": "Creature",
+      "temperature": 303.149994,
+      "units": 1,
+      "type": "Other",
+      "amounts": [
+        {
+          "id": "Maturity",
+          "value": 0.0129166394
+        },
+        {
+          "id": "Fertilization"
+        },
+        {
+          "id": "AirPressure",
+          "value": 988.202515
+        },
+        {
+          "id": "Temperature",
+          "value": 305.126953
+        },
+        {
+          "id": "OldAge"
+        }
+      ]
+    },
+    {
+      "id": "SmallReefGeyser",
+      "location_x": 1,
+      "element": "Katairite",
+      "temperature": 305.149994,
+      "units": 1,
+      "type": "Other"
+    }
+  ]
+}
