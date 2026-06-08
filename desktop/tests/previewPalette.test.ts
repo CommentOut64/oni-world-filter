@@ -39,12 +39,12 @@ test("zone fill uses higher opacity in light mode for vivid colors", () => {
 });
 
 test("preview palette includes explicit DLC5 biome tones", () => {
-  assert.equal(zoneFillColor(24, "dark"), "#bd9368CC");
+  assert.equal(zoneFillColor(24, "dark"), "#5f5d35CC");
   assert.equal(zoneFillColor(25, "dark"), "#a48597CC");
-  assert.equal(zoneFillColor(26, "dark"), "#5f5d35CC");
-  assert.equal(zoneFillColor(27, "dark"), "#585f6fCC");
-  assert.equal(zoneFillColor(24, "light"), "#bd9368E6");
+  assert.equal(zoneFillColor(26, "dark"), "#585f6fCC");
+  assert.equal(zoneFillColor(27, "dark"), "#bd9368CC");
+  assert.equal(zoneFillColor(24, "light"), "#5f5d35E6");
   assert.equal(zoneFillColor(25, "light"), "#a48597E6");
-  assert.equal(zoneFillColor(26, "light"), "#5f5d35E6");
-  assert.equal(zoneFillColor(27, "light"), "#585f6fE6");
+  assert.equal(zoneFillColor(26, "light"), "#585f6fE6");
+  assert.equal(zoneFillColor(27, "light"), "#bd9368E6");
 });

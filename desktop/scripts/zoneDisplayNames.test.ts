@@ -89,8 +89,8 @@ test("desktop player biome resolver hides internal zone types and renames barren
   assert.equal(formatPlayerBiomeNameByZoneType(14), null);
   assert.equal(formatPlayerBiomeNameByZoneType(16), "浮土生态");
   assert.equal(formatPlayerBiomeNameByZoneType(21), "花园生态");
-  assert.equal(formatPlayerBiomeNameByZoneType(24), "沙滩生态");
+  assert.equal(formatPlayerBiomeNameByZoneType(24), "藻林生态");
   assert.equal(formatPlayerBiomeNameByZoneType(25), "珊瑚生态");
-  assert.equal(formatPlayerBiomeNameByZoneType(26), "藻林生态");
-  assert.equal(formatPlayerBiomeNameByZoneType(27), "深渊生态");
+  assert.equal(formatPlayerBiomeNameByZoneType(26), "深渊生态");
+  assert.equal(formatPlayerBiomeNameByZoneType(27), "沙滩生态");
 });
