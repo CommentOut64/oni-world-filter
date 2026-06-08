@@ -42,10 +42,10 @@ const ZONE_FILL: string[] = [
   "#98b07e", // 21 花园
   "#9a98ac", // 22 寒羽
   "#a0ae84", // 23 险沼
-  "#bd9368", // 24 沙滩
+  "#5f5d35", // 24 藻林
   "#a48597", // 25 珊瑚
-  "#5f5d35", // 26 藻林
-  "#585f6f", // 27 深渊
+  "#585f6f", // 26 深渊
+  "#bd9368", // 27 沙滩
 ];
 
 const PREVIEW_PALETTE_BY_MODE: Record<DesktopThemeMode, PreviewPalette> = {

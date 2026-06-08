@@ -14,329 +14,329 @@
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.140717,
+      "temperature": 300.067413,
       "location_x": -4,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.16156,
+      "temperature": 300.157928,
       "location_x": -3,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.172913,
+      "temperature": 300.151703,
       "location_x": -3,
       "location_y": -1
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 302.085693,
+      "temperature": 301.990631,
       "location_x": -2,
       "location_y": -1
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 296.193054,
+      "temperature": 296.248901,
       "location_x": -1,
       "location_y": -1
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 292.322876,
+      "temperature": 292.553986,
       "location_y": -1
     },
     {
       "element": "Oxygen",
-      "mass": 0.611317754,
-      "temperature": 301.045319,
+      "mass": 0.667207599,
+      "temperature": 298.302673,
       "location_x": -3
     },
     {
       "element": "Oxygen",
-      "mass": 0.781953514,
-      "temperature": 296.899658,
+      "mass": 0.683765233,
+      "temperature": 300.9198,
       "location_x": -2
     },
     {
       "element": "Oxygen",
-      "mass": 0.786729813,
-      "temperature": 295.947113,
+      "mass": 0.703983068,
+      "temperature": 295.838531,
       "location_x": -1
     },
     {
       "element": "Oxygen",
-      "mass": 0.720898986,
-      "temperature": 301.025726
+      "mass": 0.721657991,
+      "temperature": 298.235992
     },
     {
       "element": "Oxygen",
-      "mass": 0.634716868,
-      "temperature": 305.15625,
+      "mass": 0.671329737,
+      "temperature": 292.789673,
       "location_x": -3,
       "location_y": 1
     },
     {
       "element": "Oxygen",
-      "mass": 0.732443929,
-      "temperature": 304.243134,
+      "mass": 0.687160611,
+      "temperature": 299.455963,
       "location_x": -2,
       "location_y": 1
     },
     {
       "element": "Oxygen",
-      "mass": 0.754713714,
-      "temperature": 304.43924,
+      "mass": 0.704427004,
+      "temperature": 301.066376,
       "location_x": -1,
       "location_y": 1
     },
     {
       "element": "Oxygen",
-      "mass": 0.805410206,
-      "temperature": 305.115875,
+      "mass": 0.719098508,
+      "temperature": 300.815552,
       "location_y": 1
     },
     {
       "element": "Oxygen",
-      "mass": 0.693409562,
-      "temperature": 301.682678,
+      "mass": 0.676114798,
+      "temperature": 299.351288,
       "location_x": -3,
       "location_y": 2
     },
     {
       "element": "Oxygen",
-      "mass": 0.722452164,
-      "temperature": 301.559387,
+      "mass": 0.691178441,
+      "temperature": 299.608154,
       "location_x": -2,
       "location_y": 2
     },
     {
       "element": "Oxygen",
-      "mass": 0.792514324,
-      "temperature": 299.74527,
+      "mass": 0.704139709,
+      "temperature": 299.050232,
       "location_x": -1,
       "location_y": 2
     },
     {
       "element": "Oxygen",
-      "mass": 0.771621406,
-      "temperature": 302.045471,
+      "mass": 0.714745343,
+      "temperature": 299.552277,
       "location_y": 2
     },
     {
       "element": "Oxygen",
-      "mass": 0.791933179,
-      "temperature": 300.218048,
+      "mass": 0.699025691,
+      "temperature": 300.109863,
       "location_x": -2,
       "location_y": 3
     },
     {
       "element": "Oxygen",
-      "mass": 0.807228506,
-      "temperature": 299.640594,
+      "mass": 0.701154828,
+      "temperature": 300.373566,
       "location_x": -1,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 298.129364,
+      "temperature": 298.109009,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.143494,
+      "temperature": 300.08017,
       "location_x": -3,
       "location_y": 4
     },
     {
       "element": "ZincOre",
       "mass": 870,
-      "temperature": 301.130219,
+      "temperature": 300.99054,
       "location_x": -2,
       "location_y": 4
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.124664,
+      "temperature": 300.057831,
       "location_x": -1,
       "location_y": 4
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 296.188446,
+      "temperature": 296.213745,
       "location_y": 4
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.163635,
+      "temperature": 300.117004,
       "location_x": -2,
       "location_y": -2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.098236,
+      "temperature": 299.998077,
       "location_x": -1,
       "location_y": -2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 296.15033,
+      "temperature": 296.138855,
       "location_y": -2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 296.227478,
+      "temperature": 296.316437,
       "location_x": 1,
       "location_y": -2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 307.943146,
+      "temperature": 307.650879,
       "location_x": 1,
       "location_y": -1
     },
     {
       "element": "Oxygen",
-      "mass": 0.851880431,
-      "temperature": 307.018677,
+      "mass": 0.72810173,
+      "temperature": 304.00946,
       "location_x": 1
     },
     {
       "element": "Oxygen",
-      "mass": 0.869271219,
-      "temperature": 302.004028,
+      "mass": 0.729804635,
+      "temperature": 301.840454,
       "location_x": 1,
       "location_y": 1
     },
     {
       "element": "ZincOre",
       "mass": 870,
-      "temperature": 301.074402,
+      "temperature": 300.90921,
       "location_x": 1,
       "location_y": 2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 296.222076,
+      "temperature": 296.318512,
       "location_x": 1,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.124115,
+      "temperature": 300.026947,
       "location_x": 2,
       "location_y": -3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 296.199554,
+      "temperature": 296.272034,
       "location_x": 2,
       "location_y": -2
     },
     {
       "element": "Water",
-      "mass": 997.567749,
-      "temperature": 300.152588,
+      "mass": 997.51886,
+      "temperature": 300.156281,
       "location_x": 2,
       "location_y": -1
     },
     {
       "element": "Oxygen",
-      "mass": 0.860367715,
-      "temperature": 302.094299,
+      "mass": 0.718059838,
+      "temperature": 301.374146,
       "location_x": 2
     },
     {
       "element": "Oxygen",
-      "mass": 0.910098791,
-      "temperature": 301.907227,
+      "mass": 0.73397845,
+      "temperature": 301.920715,
       "location_x": 2,
       "location_y": 1
     },
     {
       "element": "ZincOre",
       "mass": 870,
-      "temperature": 301.141418,
+      "temperature": 301.107147,
       "location_x": 2,
       "location_y": 2
     },
     {
       "element": "Sand",
       "mass": 1000,
-      "temperature": 300.135254,
+      "temperature": 300.07782,
       "location_x": 2,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.149933,
+      "temperature": 300.117645,
       "location_x": 3,
       "location_y": -3
     },
     {
       "element": "Water",
-      "mass": 1007.38599,
-      "temperature": 300.147614,
+      "mass": 1007.46863,
+      "temperature": 300.141876,
       "location_x": 3,
       "location_y": -2
     },
     {
       "element": "Water",
-      "mass": 997.478516,
-      "temperature": 300.149841,
+      "mass": 997.493591,
+      "temperature": 300.149017,
       "location_x": 3,
       "location_y": -1
     },
     {
       "element": "Oxygen",
-      "mass": 0.483519375,
-      "temperature": 302.627747,
+      "mass": 0.667797565,
+      "temperature": 300.26239,
       "location_x": 3
     },
     {
       "element": "ZincOre",
       "mass": 870,
-      "temperature": 301.184235,
+      "temperature": 301.15097,
       "location_x": 3,
       "location_y": 1
     },
     {
       "element": "ZincOre",
       "mass": 870,
-      "temperature": 301.148315,
+      "temperature": 301.115875,
       "location_x": 3,
       "location_y": 2
     },
     {
       "element": "Sand",
       "mass": 1000,
-      "temperature": 300.151489,
+      "temperature": 300.096069,
       "location_x": 3,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.149994,
+      "temperature": 300.086639,
       "location_x": 4,
       "location_y": -3
     },
@@ -349,69 +349,69 @@
     },
     {
       "element": "Water",
-      "mass": 997.567749,
-      "temperature": 300.150208,
+      "mass": 997.51886,
+      "temperature": 300.149811,
       "location_x": 4,
       "location_y": -1
     },
     {
       "element": "Oxygen",
-      "mass": 0.849557042,
-      "temperature": 303.810638,
+      "mass": 0.618335605,
+      "temperature": 299.24762,
       "location_x": 4
     },
     {
       "element": "Oxygen",
-      "mass": 0.24995093,
-      "temperature": 302.113281,
+      "mass": 0.58743602,
+      "temperature": 301.588318,
       "location_x": 4,
       "location_y": 1
     },
     {
       "element": "ZincOre",
       "mass": 870,
-      "temperature": 301.166046,
+      "temperature": 300.874207,
       "location_x": 4,
       "location_y": 2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.150055,
+      "temperature": 300.0867,
       "location_x": 5,
       "location_y": -2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.153076,
+      "temperature": 300.0896,
       "location_x": 5,
       "location_y": -1
     },
     {
       "element": "ZincOre",
       "mass": 870,
-      "temperature": 301.164154,
+      "temperature": 300.862122,
       "location_x": -4,
       "location_y": -1
     },
     {
       "element": "Oxygen",
-      "mass": 0.412421435,
-      "temperature": 301.856598,
+      "mass": 0.660429358,
+      "temperature": 301.581055,
       "location_x": -4
     },
     {
       "element": "Oxygen",
-      "mass": 0.191292733,
-      "temperature": 302.629211,
+      "mass": 0.662239313,
+      "temperature": 299.395874,
       "location_x": -4,
       "location_y": 1
     },
     {
       "element": "Oxygen",
-      "mass": 0.470362961,
-      "temperature": 301.342194,
+      "mass": 0.662582576,
+      "temperature": 300.761963,
       "location_x": -4,
       "location_y": 2
     }
@@ -421,7 +421,7 @@
       "id": "PropBeachChair",
       "location_x": -2,
       "element": "SiltStone",
-      "temperature": 293.183075
+      "temperature": 293.211914
     }
   ],
   "pickupables": [
@@ -429,18 +429,18 @@
       "id": "RubberBoots",
       "location_x": 1,
       "location_y": 1,
-      "element": "CarbonDioxide",
-      "temperature": 293.014862,
+      "element": "Rubber",
+      "temperature": 293.037476,
       "units": 1,
       "type": "Pickupable",
       "rottable": {}
     },
     {
       "id": "RubberGasket",
-      "location_x": -1,
-      "location_y": 1,
+      "location_x": 3,
+      "location_y": -1,
       "element": "Creature",
-      "temperature": 293.025696,
+      "temperature": 295.888214,
       "units": 1,
       "type": "Pickupable",
       "rottable": {}
@@ -451,14 +451,14 @@
       "id": "MusselSprout",
       "location_x": -4,
       "element": "Creature",
-      "temperature": 293.001831,
+      "temperature": 293,
       "units": 1,
       "type": "Other"
     },
     {
       "id": "PropDrySuitHanger",
       "element": "ZincOre",
-      "temperature": 294.141724,
+      "temperature": 294.149994,
       "units": 1,
       "type": "Other"
     }

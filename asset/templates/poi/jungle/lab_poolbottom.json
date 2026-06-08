@@ -1738,7 +1738,7 @@
     },
     {
       "element": "CarbonDioxide",
-      "mass": 8.25205643e-05,
+      "mass": 0.0000825205643,
       "temperature": 315.942871,
       "location_x": 3,
       "location_y": 7
@@ -3146,105 +3146,120 @@
       "element": "Oxygen",
       "mass": 0.952695012,
       "temperature": 316.842407,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.96123755,
       "temperature": 316.837891,
       "location_x": 1,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.966960371,
       "temperature": 316.788788,
       "location_x": 2,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.972943544,
       "temperature": 316.892151,
       "location_x": 3,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.980031967,
       "temperature": 316.673126,
       "location_x": 4,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.990922689,
       "temperature": 314.703308,
       "location_x": 5,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.997434914,
       "temperature": 313.929535,
       "location_x": 6,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 1.0031215,
       "temperature": 313.561188,
       "location_x": 7,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 1.0077281,
       "temperature": 313.318512,
       "location_x": 8,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.947884798,
       "temperature": 316.878876,
       "location_x": -1,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 1.0111922,
       "temperature": 314.402039,
       "location_x": 9,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.943300784,
       "temperature": 317.144501,
       "location_x": -2,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 1.01369512,
       "temperature": 314.934845,
       "location_x": 10,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 1.01520765,
       "temperature": 316.624939,
       "location_x": 11,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "ChlorineGas",
       "mass": 0.113937557,
       "temperature": 317.70517,
       "location_x": -3,
-      "location_y": -2
+      "location_y": -2,
+      "preventFoWReveal": true
     },
     {
       "element": "Iron",

@@ -23,6 +23,9 @@
   "clusterAudio": {
     "musicWelcome": "Music_WattsonMessage_DLC5",
     "musicFirst": "DynamicMusic_Aquatic_Planet_DLC5",
+    "musicPlaylist": [
+      "DynamicMusic_Aquatic_Planet_waterfall_DLC5"
+    ],
     "stingerDay": "Stinger_Day_DLC5",
     "stingerNight": "Stinger_Loop_Night_DLC5"
   },

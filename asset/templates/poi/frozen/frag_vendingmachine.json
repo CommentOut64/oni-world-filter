@@ -150,7 +150,8 @@
       "element": "Granite",
       "mass": 1604.83777,
       "temperature": 234.132813,
-      "location_y": 2
+      "location_y": 2,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
@@ -205,7 +206,8 @@
       "element": "Ice",
       "mass": 844.960022,
       "temperature": 234.393555,
-      "location_y": 3
+      "location_y": 3,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",

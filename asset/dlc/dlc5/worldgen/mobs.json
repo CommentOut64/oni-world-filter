@@ -58,7 +58,7 @@
         "selectMethod": "Centroid",
         "density": {
           "min": 0.005,
-          "max": 0.02860784
+          "max": 0.01068669
         },
         "width": 1,
         "height": 1
@@ -257,8 +257,8 @@
         "location": "Liquid",
         "selectMethod": "Centroid",
         "density": {
-          "min": 0.005,
-          "max": 0.01
+          "min": 0.02,
+          "max": 0.022
         },
         "width": 1,
         "height": 2

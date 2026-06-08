@@ -263,10 +263,10 @@ export const PLAYER_ZONE_TYPE_DISPLAY_NAMES: Array<DisplayName | null> = [
   { zh: "花园生态", en: "Garden Biome" },
   { zh: "寒羽生态", en: "Feather Biome" },
   { zh: "险沼生态", en: "Wetlands Biome" },
-  { zh: "沙滩生态", en: "Beach Biome" },
-  { zh: "珊瑚生态", en: "Reef Biome" },
   { zh: "藻林生态", en: "Kelp Forest Biome" },
+  { zh: "珊瑚生态", en: "Reef Biome" },
   { zh: "深渊生态", en: "Abyss Biome" },
+  { zh: "沙滩生态", en: "Beach Biome" },
 ];
 
 // 区域类型名称，索引对应 C++ ZoneType 枚举值
@@ -295,8 +295,8 @@ export const ZONE_TYPE_DISPLAY_NAMES: DisplayName[] = [
   { zh: "花园生态", en: "Garden Biome" },
   { zh: "寒羽生态", en: "Feather Biome" },
   { zh: "险沼生态", en: "Wetlands Biome" },
-  { zh: "沙滩生态", en: "Beach Biome" },
-  { zh: "珊瑚生态", en: "Reef Biome" },
   { zh: "藻林生态", en: "Kelp Forest Biome" },
+  { zh: "珊瑚生态", en: "Reef Biome" },
   { zh: "深渊生态", en: "Abyss Biome" },
+  { zh: "沙滩生态", en: "Beach Biome" },
 ];

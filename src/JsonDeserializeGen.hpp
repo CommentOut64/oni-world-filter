@@ -59,6 +59,8 @@ struct Deserializer<ClusterAudioSettings>
             count += Setting::deserialize(*ptr, obj.musicWelcome) ? 1 : 0;
         if ((ptr = value.find("musicFirst")) != nullptr)
             count += Setting::deserialize(*ptr, obj.musicFirst) ? 1 : 0;
+        if ((ptr = value.find("musicPlaylist")) != nullptr)
+            count += Setting::deserialize(*ptr, obj.musicPlaylist) ? 1 : 0;
         if ((ptr = value.find("stingerDay")) != nullptr)
             count += Setting::deserialize(*ptr, obj.stingerDay) ? 1 : 0;
         if ((ptr = value.find("stingerNight")) != nullptr)
@@ -665,6 +667,7 @@ struct Deserializer<SimHashes>
             { "Polypropylene", SimHashes::Polypropylene },
             { "Radium", SimHashes::Radium },
             { "RefinedCarbon", SimHashes::RefinedCarbon },
+            { "Rubber", SimHashes::Rubber },
             { "Regolith", SimHashes::Regolith },
             { "Rust", SimHashes::Rust },
             { "Salt", SimHashes::Salt },
@@ -887,10 +890,10 @@ struct Deserializer<ZoneType>
             { "PrehistoricGarden", ZoneType::PrehistoricGarden },
             { "PrehistoricRaptor", ZoneType::PrehistoricRaptor },
             { "PrehistoricWetlands", ZoneType::PrehistoricWetlands },
-            { "Beach", ZoneType::Beach },
-            { "Reef", ZoneType::Reef },
             { "KelpForest", ZoneType::KelpForest },
-            { "Abyss", ZoneType::Abyss }
+            { "Reef", ZoneType::Reef },
+            { "Abyss", ZoneType::Abyss },
+            { "Beach", ZoneType::Beach }
         };
         auto itr = dict.find(name);
         if (itr == dict.end()) {

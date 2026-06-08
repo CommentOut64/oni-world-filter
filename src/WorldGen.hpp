@@ -50,6 +50,8 @@ public:
     bool GenerateOverworld(std::vector<Site> &sites);
 
     std::vector<Vector3i> GetGeysers(int seed) const;
+    void DumpDebugWorldState(const std::vector<Site> &sites,
+                             const std::string &path) const;
 #if 0
     // 临时 timing 检测，先停用。
     const GenerateTiming &LastGenerateTiming() const;
@@ -80,7 +82,7 @@ inline std::string ZoneTypeToString(ZoneType zone)
         "Swamp",        "Wasteland",         "RocketInterior", "Metallic",
         "Barren",       "Moo",               "IceCaves",       "CarrotQuarry",
         "SugarWoods",   "PrehistoricGarden", "PrehistoricRaptor",
-        "PrehistoricWetlands", "Beach", "Reef", "KelpForest", "Abyss"};
+        "PrehistoricWetlands", "KelpForest", "Reef", "Abyss", "Beach"};
     return dict[(int)zone];
 }
 // clang-format on

@@ -2,62 +2,55 @@
   "info": {
     "size": {
       "X": 9,
-      "Y": 11
+      "Y": 8
     },
     "min": {
-      "X": -4,
-      "Y": -4
+      "X": -3,
+      "Y": -3
     },
-    "area": 78
+    "area": 64
   },
   "cells": [
     {
       "element": "Coquina",
       "mass": 1840,
       "temperature": 300.153259,
-      "location_x": -2,
+      "location_x": -1,
       "location_y": -3
     },
     {
       "element": "Coquina",
       "mass": 1840,
       "temperature": 300.153259,
-      "location_x": -1,
       "location_y": -3
     },
     {
       "element": "Coquina",
       "mass": 1840,
       "temperature": 300.149994,
-      "location_y": -3
-    },
-    {
-      "element": "Coquina",
-      "mass": 1840,
-      "temperature": 300.15152,
       "location_x": 1,
       "location_y": -3
     },
     {
       "element": "Coquina",
       "mass": 1840,
-      "temperature": 300.15152,
+      "temperature": 300.152191,
       "location_x": 2,
       "location_y": -3
     },
     {
       "element": "Coquina",
       "mass": 1840,
-      "temperature": 300.150482,
+      "temperature": 300.152863,
       "location_x": 3,
       "location_y": -3
     },
     {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.149994,
-      "location_x": -3,
-      "location_y": -2
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.15387,
+      "location_x": 4,
+      "location_y": -3
     },
     {
       "element": "SiltStone",
@@ -74,55 +67,55 @@
       "location_y": -2
     },
     {
-      "element": "Water",
-      "mass": 1031.94727,
-      "temperature": 300.167023,
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.149994,
       "location_y": -2
     },
     {
       "element": "Water",
-      "mass": 1031.93347,
+      "mass": 1032.79175,
+      "temperature": 300.166992,
+      "location_x": 1,
+      "location_y": -2
+    },
+    {
+      "element": "Water",
+      "mass": 1033.18896,
       "temperature": 300.151733,
-      "location_x": 1,
-      "location_y": -2
-    },
-    {
-      "element": "Water",
-      "mass": 1032.79724,
-      "temperature": 300.151703,
       "location_x": 2,
       "location_y": -2
     },
     {
-      "element": "Coquina",
-      "mass": 1840,
-      "temperature": 300.149994,
+      "element": "Water",
+      "mass": 1033.58423,
+      "temperature": 300.151703,
       "location_x": 3,
       "location_y": -2
     },
     {
       "element": "Coquina",
       "mass": 1840,
-      "temperature": 300.153748,
+      "temperature": 300.149994,
       "location_x": 4,
+      "location_y": -2
+    },
+    {
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.157043,
+      "location_x": 5,
       "location_y": -2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.144318,
-      "location_x": -4,
-      "location_y": -1
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.149994,
+      "temperature": 300.147705,
       "location_x": -3,
       "location_y": -1
     },
     {
-      "element": "Unobtanium",
+      "element": "SiltStone",
       "mass": 1000,
       "temperature": 300.149994,
       "location_x": -2,
@@ -142,406 +135,318 @@
       "location_y": -1
     },
     {
-      "element": "Water",
-      "mass": 1023.23596,
-      "temperature": 300.151703,
+      "element": "Unobtanium",
+      "mass": 1000,
+      "temperature": 300.149994,
       "location_x": 1,
       "location_y": -1
     },
     {
       "element": "Water",
-      "mass": 1022.26147,
+      "mass": 1024.0061,
       "temperature": 300.151703,
       "location_x": 2,
       "location_y": -1
     },
     {
       "element": "Water",
-      "mass": 1022.36926,
-      "temperature": 300.158142,
+      "mass": 1023.20007,
+      "temperature": 300.151703,
       "location_x": 3,
       "location_y": -1
     },
     {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.150116,
+      "element": "Water",
+      "mass": 1023.18286,
+      "temperature": 300.158112,
       "location_x": 4,
       "location_y": -1
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.145172,
-      "location_x": -4
+      "temperature": 300.15332,
+      "location_x": 5,
+      "location_y": -1
     },
     {
-      "element": "Water",
-      "mass": 1004.8631,
-      "temperature": 300.161285,
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.146729,
       "location_x": -3
     },
     {
       "element": "Water",
-      "mass": 1007.20703,
-      "temperature": 300.152435,
+      "mass": 1007.72913,
+      "temperature": 300.161255,
       "location_x": -2
     },
     {
       "element": "Water",
-      "mass": 1008.15417,
-      "temperature": 300.151886,
+      "mass": 1009.53491,
+      "temperature": 300.152313,
       "location_x": -1
     },
     {
       "element": "Water",
-      "mass": 1011.63525,
-      "temperature": 300.151703
+      "mass": 1011.11877,
+      "temperature": 300.151886
     },
     {
       "element": "Water",
-      "mass": 1011.66815,
-      "temperature": 300.151703,
+      "mass": 1013.89081,
+      "temperature": 300.151733,
       "location_x": 1
     },
     {
       "element": "Water",
-      "mass": 1013.80151,
+      "mass": 1013.49634,
       "temperature": 300.151703,
       "location_x": 2
     },
     {
       "element": "Water",
-      "mass": 1012.43005,
-      "temperature": 300.158142,
+      "mass": 1014.52423,
+      "temperature": 300.151703,
       "location_x": 3
     },
     {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.150116,
+      "element": "Water",
+      "mass": 1013.20471,
+      "temperature": 300.158112,
       "location_x": 4
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.146698,
-      "location_x": -4,
-      "location_y": 1
+      "temperature": 300.156616,
+      "location_x": 5
     },
     {
-      "element": "Water",
-      "mass": 995.154785,
-      "temperature": 300.161316,
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.148346,
       "location_x": -3,
       "location_y": 1
     },
     {
       "element": "Water",
-      "mass": 997.497742,
-      "temperature": 300.152435,
+      "mass": 997.86322,
+      "temperature": 300.161316,
       "location_x": -2,
       "location_y": 1
     },
     {
       "element": "Water",
-      "mass": 999.730591,
-      "temperature": 300.151886,
+      "mass": 999.383179,
+      "temperature": 300.152435,
       "location_x": -1,
       "location_y": 1
     },
     {
       "element": "Water",
-      "mass": 1000.84039,
-      "temperature": 300.151703,
+      "mass": 1002.94061,
+      "temperature": 300.151886,
       "location_y": 1
     },
     {
       "element": "Water",
-      "mass": 1005.12872,
+      "mass": 1003.64252,
       "temperature": 300.151703,
       "location_x": 1,
       "location_y": 1
     },
     {
       "element": "Water",
-      "mass": 1003.92749,
+      "mass": 1006.26318,
       "temperature": 300.151703,
       "location_x": 2,
       "location_y": 1
     },
     {
       "element": "Water",
-      "mass": 1002.65564,
-      "temperature": 300.158142,
+      "mass": 1005.10144,
+      "temperature": 300.151703,
       "location_x": 3,
+      "location_y": 1
+    },
+    {
+      "element": "Water",
+      "mass": 1003.52039,
+      "temperature": 300.158142,
+      "location_x": 4,
       "location_y": 1
     },
     {
       "element": "Coquina",
       "mass": 1840,
-      "temperature": 300.153748,
-      "location_x": 4,
+      "temperature": 300.158691,
+      "location_x": 5,
       "location_y": 1
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.14032,
-      "location_x": -4,
+      "temperature": 300.146698,
+      "location_x": -3,
       "location_y": 2
     },
     {
       "element": "SiltStone",
       "mass": 1000,
       "temperature": 300.149994,
-      "location_x": -3,
-      "location_y": 2
-    },
-    {
-      "element": "Water",
-      "mass": 973.689453,
-      "temperature": 300.152435,
       "location_x": -2,
       "location_y": 2
     },
     {
       "element": "Water",
-      "mass": 990.210999,
-      "temperature": 300.151886,
+      "mass": 986.848389,
+      "temperature": 300.152435,
       "location_x": -1,
       "location_y": 2
     },
     {
       "element": "Water",
-      "mass": 995.678223,
-      "temperature": 300.151703,
+      "mass": 994.109985,
+      "temperature": 300.151886,
       "location_y": 2
     },
     {
       "element": "Water",
-      "mass": 995.860901,
+      "mass": 997.290283,
       "temperature": 300.151703,
       "location_x": 1,
       "location_y": 2
     },
     {
       "element": "Water",
-      "mass": 997.648804,
+      "mass": 997.205017,
       "temperature": 300.151703,
       "location_x": 2,
       "location_y": 2
     },
     {
+      "element": "Water",
+      "mass": 997.8479,
+      "temperature": 300.151703,
+      "location_x": 3,
+      "location_y": 2
+    },
+    {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.150116,
-      "location_x": 3,
+      "temperature": 300.154877,
+      "location_x": 4,
       "location_y": 2
     },
     {
       "element": "Coquina",
       "mass": 1840,
-      "temperature": 300.144897,
-      "location_x": -3,
+      "temperature": 300.147583,
+      "location_x": -2,
       "location_y": 3
     },
     {
       "element": "Coquina",
       "mass": 1840,
       "temperature": 300.153259,
-      "location_x": -2,
-      "location_y": 3
-    },
-    {
-      "element": "Water",
-      "mass": 565.264038,
-      "temperature": 300.151886,
       "location_x": -1,
       "location_y": 3
     },
     {
       "element": "Water",
-      "mass": 585.828918,
-      "temperature": 300.151703,
+      "mass": 564.304016,
+      "temperature": 300.151886,
       "location_y": 3
     },
     {
       "element": "Water",
-      "mass": 608.030273,
+      "mass": 576.241943,
       "temperature": 300.151703,
       "location_x": 1,
       "location_y": 3
     },
     {
       "element": "Water",
-      "mass": 621.453735,
+      "mass": 589.833862,
       "temperature": 300.151703,
       "location_x": 2,
       "location_y": 3
     },
     {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.150116,
+      "element": "Water",
+      "mass": 598.325317,
+      "temperature": 300.151703,
       "location_x": 3,
       "location_y": 3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.150238,
-      "location_x": -2,
+      "temperature": 300.154419,
+      "location_x": 4,
+      "location_y": 3
+    },
+    {
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.158234,
+      "location_x": -1,
       "location_y": 4
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.150848,
-      "location_x": -1,
+      "temperature": 300.154053,
       "location_y": 4
     },
     {
       "element": "Coquina",
       "mass": 1840,
       "temperature": 300.155212,
-      "location_y": 4
-    },
-    {
-      "element": "Oxygen",
-      "mass": 0.271352291,
-      "temperature": 301.07251,
       "location_x": 1,
       "location_y": 4
     },
     {
       "element": "Coquina",
       "mass": 1840,
-      "temperature": 300.151978,
+      "temperature": 300.149994,
       "location_x": 2,
       "location_y": 4
     },
     {
-      "element": "ZincOre",
-      "mass": 870,
-      "temperature": 301.148712,
-      "location_x": -1,
-      "location_y": 5
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.151062,
-      "location_y": 5
-    },
-    {
-      "element": "Oxygen",
-      "mass": 0.271352172,
-      "temperature": 300.958282,
-      "location_x": 1,
-      "location_y": 5
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.150208,
-      "location_x": 2,
-      "location_y": 5
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.150238,
-      "location_x": 3,
-      "location_y": 5
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.151917,
+      "element": "Coquina",
+      "mass": 1840,
+      "temperature": 300.153351,
       "location_x": 3,
       "location_y": 4
     },
     {
-      "element": "ZincOre",
-      "mass": 870,
-      "temperature": 301.148712,
-      "location_y": 6
-    },
-    {
-      "element": "ZincOre",
-      "mass": 870,
-      "temperature": 301.148346,
-      "location_x": 1,
-      "location_y": 6
+      "element": "SiltStone",
+      "mass": 1000,
+      "temperature": 300.158783,
+      "location_x": 4,
+      "location_y": 4
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.151093,
-      "location_x": 2,
-      "location_y": 6
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.150238,
-      "location_x": -3,
-      "location_y": -4
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.151917,
-      "location_x": -3,
+      "temperature": 300.154846,
+      "location_x": -2,
       "location_y": -3
     },
     {
       "element": "SiltStone",
       "mass": 1000,
-      "temperature": 300.150116,
-      "location_x": -2,
-      "location_y": -4
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.150116,
-      "location_x": -1,
-      "location_y": -4
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.15097,
-      "location_y": -4
-    },
-    {
-      "element": "SiltStone",
-      "mass": 1000,
-      "temperature": 300.153839,
-      "location_x": -4,
+      "temperature": 300.160065,
+      "location_x": -3,
       "location_y": -2
-    },
-    {
-      "element": "ZincOre",
-      "mass": 870,
-      "temperature": 301.146301,
-      "location_x": 1,
-      "location_y": -4
-    },
-    {
-      "element": "ZincOre",
-      "mass": 870,
-      "temperature": 301.148682,
-      "location_x": 2,
-      "location_y": -4
     }
   ],
   "pickupables": [
     {
       "id": "PufferFish",
-      "location_x": 1,
+      "location_x": 2,
       "location_y": 1,
       "element": "Creature",
       "temperature": 303.149994,
@@ -553,7 +458,7 @@
   "otherEntities": [
     {
       "id": "SeaLettuce",
-      "location_x": 1,
+      "location_x": 2,
       "location_y": -2,
       "element": "Creature",
       "temperature": 308.149994,
@@ -579,7 +484,7 @@
     },
     {
       "id": "SeaLettuce",
-      "location_x": -3,
+      "location_x": -2,
       "element": "Creature",
       "temperature": 308.149994,
       "units": 1,
@@ -604,7 +509,7 @@
     },
     {
       "id": "SeaLettuce",
-      "location_x": 3,
+      "location_x": 4,
       "location_y": -1,
       "element": "Creature",
       "temperature": 308.149994,
@@ -630,7 +535,6 @@
     },
     {
       "id": "SmallReefGeyser",
-      "location_x": -1,
       "element": "Katairite",
       "temperature": 305.149994,
       "units": 1,

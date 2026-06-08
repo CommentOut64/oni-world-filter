@@ -1,5 +1,6 @@
 #include "WorldGen.hpp"
 
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
@@ -40,6 +41,35 @@ extern void WriteToBinary(const std::vector<Site> &sites);
 namespace {
 
 constexpr std::string_view kGenericTemplateName = "geysers/generic";
+
+std::string EscapeJsonString(std::string_view value)
+{
+    std::string escaped;
+    escaped.reserve(value.size() + 8);
+    for (const char ch : value) {
+        switch (ch) {
+        case '\\':
+            escaped += "\\\\";
+            break;
+        case '"':
+            escaped += "\\\"";
+            break;
+        case '\n':
+            escaped += "\\n";
+            break;
+        case '\r':
+            escaped += "\\r";
+            break;
+        case '\t':
+            escaped += "\\t";
+            break;
+        default:
+            escaped += ch;
+            break;
+        }
+    }
+    return escaped;
+}
 
 const Geyser::CatalogEntry *ResolveTemplateEntityGeyser(std::string_view entityId)
 {
@@ -845,7 +875,10 @@ std::vector<WorldGen::SpawnedTemplateEntity> WorldGen::ExpandTemplateEntities(
 {
     std::vector<SpawnedTemplateEntity> result;
     const TemplateContainer &container = *spawner.container;
-    const Vector2<int> templatePos{spawner.position};
+    const Vector2<int> templatePos{
+        spawner.position.x,
+        static_cast<int>(m_world.worldsize.y) - spawner.position.y,
+    };
 
     if (container.name == kGenericTemplateName) {
         result.push_back(SpawnedTemplateEntity{
@@ -855,16 +888,161 @@ std::vector<WorldGen::SpawnedTemplateEntity> WorldGen::ExpandTemplateEntities(
         return result;
     }
 
-    result.reserve(container.otherEntities.size());
+    result.reserve(container.otherEntities.size() + container.buildings.size());
 
     for (const auto &item : container.otherEntities) {
         result.push_back(SpawnedTemplateEntity{
             .entityId = item.id,
             .position = Vector2<int>{
                 templatePos.x + item.location_x,
-                templatePos.y + item.location_y,
+                templatePos.y - item.location_y,
+            },
+        });
+    }
+    for (const auto &item : container.buildings) {
+        result.push_back(SpawnedTemplateEntity{
+            .entityId = item.id,
+            .position = Vector2<int>{
+                templatePos.x + item.location_x,
+                templatePos.y - item.location_y,
             },
         });
     }
     return result;
+}
+
+void WorldGen::DumpDebugWorldState(const std::vector<Site> &sites,
+                                   const std::string &path) const
+{
+    std::ofstream file(path, std::ios::trunc);
+    if (!file.is_open()) {
+        return;
+    }
+
+    file << "{\n";
+    file << "  \"world\": \"" << EscapeJsonString(m_world.name) << "\",\n";
+    file << "  \"worldSize\": {\"x\": " << m_world.worldsize.x
+         << ", \"y\": " << m_world.worldsize.y << "},\n";
+    file << "  \"sites\": [\n";
+    for (size_t index = 0; index < sites.size(); ++index) {
+        const auto &site = sites[index];
+        const auto centroid = site.polygon.Centroid();
+        file << "    {\n";
+        file << "      \"index\": " << index << ",\n";
+        file << "      \"centroid\": {\"x\": " << centroid.x << ", \"y\": " << centroid.y
+             << "},\n";
+        file << "      \"subworld\": \""
+             << EscapeJsonString(site.subworld != nullptr ? site.subworld->name : "") << "\",\n";
+        file << "      \"zoneType\": "
+             << (site.subworld != nullptr ? static_cast<int>(site.subworld->zoneType) : -1)
+             << ",\n";
+        file << "      \"templateTag\": \"" << EscapeJsonString(site.templateTag) << "\",\n";
+        file << "      \"tags\": [";
+        bool firstTag = true;
+        for (const auto &tag : site.tags) {
+            if (!firstTag) {
+                file << ", ";
+            }
+            firstTag = false;
+            file << "\"" << EscapeJsonString(tag) << "\"";
+        }
+        file << "],\n";
+        file << "      \"minDistanceToTag\": {";
+        bool firstDistance = true;
+        for (const auto &[tag, distance] : site.minDistanceToTag) {
+            if (!firstDistance) {
+                file << ", ";
+            }
+            firstDistance = false;
+            file << "\"" << EscapeJsonString(tag) << "\": " << distance;
+        }
+        file << "}\n";
+        file << "    }";
+        if (index + 1 != sites.size()) {
+            file << ",";
+        }
+        file << "\n";
+    }
+    file << "  ],\n";
+    file << "  \"leafSites\": [\n";
+    bool firstLeafSite = true;
+    for (size_t parentIndex = 0; parentIndex < sites.size(); ++parentIndex) {
+        const auto &parent = sites[parentIndex];
+        if (parent.children == nullptr) {
+            continue;
+        }
+        for (size_t childIndex = 0; childIndex < parent.children->size(); ++childIndex) {
+            const auto &child = parent.children->at(childIndex);
+            const auto centroid = child.polygon.Centroid();
+            if (!firstLeafSite) {
+                file << ",\n";
+            }
+            firstLeafSite = false;
+            file << "    {\n";
+            file << "      \"parentIndex\": " << parentIndex << ",\n";
+            file << "      \"childIndex\": " << childIndex << ",\n";
+            file << "      \"centroid\": {\"x\": " << centroid.x << ", \"y\": " << centroid.y
+                 << "},\n";
+            file << "      \"subworld\": \""
+                 << EscapeJsonString(child.subworld != nullptr ? child.subworld->name : "")
+                 << "\",\n";
+            file << "      \"zoneType\": "
+                 << (child.subworld != nullptr ? static_cast<int>(child.subworld->zoneType) : -1)
+                 << ",\n";
+            file << "      \"templateTag\": \"" << EscapeJsonString(child.templateTag) << "\",\n";
+            file << "      \"tags\": [";
+            bool firstTag = true;
+            for (const auto &tag : child.tags) {
+                if (!firstTag) {
+                    file << ", ";
+                }
+                firstTag = false;
+                file << "\"" << EscapeJsonString(tag) << "\"";
+            }
+            file << "],\n";
+            file << "      \"minDistanceToTag\": {";
+            bool firstDistance = true;
+            for (const auto &[tag, distance] : child.minDistanceToTag) {
+                if (!firstDistance) {
+                    file << ", ";
+                }
+                firstDistance = false;
+                file << "\"" << EscapeJsonString(tag) << "\": " << distance;
+            }
+            file << "}\n";
+            file << "    }";
+        }
+    }
+    if (!firstLeafSite) {
+        file << "\n";
+    }
+    file << "  ],\n";
+    file << "  \"templates\": [\n";
+    for (size_t index = 0; index < m_templates.size(); ++index) {
+        const auto &spawner = m_templates[index];
+        file << "    {\n";
+        file << "      \"name\": \"" << EscapeJsonString(spawner.container->name) << "\",\n";
+        file << "      \"root\": {\"x\": " << spawner.position.x << ", \"y\": "
+             << spawner.position.y << "},\n";
+        file << "      \"entities\": [\n";
+        const auto entities = ExpandTemplateEntities(spawner);
+        for (size_t entityIndex = 0; entityIndex < entities.size(); ++entityIndex) {
+            const auto &entity = entities[entityIndex];
+            file << "        {\"id\": \"" << EscapeJsonString(entity.entityId)
+                 << "\", \"x\": " << entity.position.x << ", \"y\": " << entity.position.y
+                 << "}";
+            if (entityIndex + 1 != entities.size()) {
+                file << ",";
+            }
+            file << "\n";
+        }
+        file << "      ]\n";
+        file << "    }";
+        if (index + 1 != m_templates.size()) {
+            file << ",";
+        }
+        file << "\n";
+    }
+    file << "  ]\n";
+    file << "}\n";
 }

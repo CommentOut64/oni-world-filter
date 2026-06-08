@@ -508,12 +508,14 @@
       "temperature": 230.149994,
       "diseaseName": "FoodPoisoning",
       "location_x": -5,
-      "location_y": -1
+      "location_y": -1,
+      "preventFoWReveal": true
     },
     {
       "element": "Vacuum",
       "location_x": -4,
-      "location_y": -1
+      "location_y": -1,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
@@ -1373,19 +1375,22 @@
     {
       "element": "Vacuum",
       "location_x": -3,
-      "location_y": -1
+      "location_y": -1,
+      "preventFoWReveal": true
     },
     {
       "element": "Vacuum",
       "location_x": -2,
-      "location_y": -1
+      "location_y": -1,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.670000017,
       "temperature": 230.149994,
       "diseaseName": "FoodPoisoning",
-      "location_x": -3
+      "location_x": -3,
+      "preventFoWReveal": true
     },
     {
       "element": "Vacuum",
@@ -1406,14 +1411,16 @@
       "mass": 0.670000017,
       "temperature": 230.149994,
       "diseaseName": "FoodPoisoning",
-      "location_x": -5
+      "location_x": -5,
+      "preventFoWReveal": true
     },
     {
       "element": "Oxygen",
       "mass": 0.670000017,
       "temperature": 230.149994,
       "diseaseName": "FoodPoisoning",
-      "location_x": -4
+      "location_x": -4,
+      "preventFoWReveal": true
     },
     {
       "element": "Obsidian",

@@ -3,7 +3,8 @@
   "description": "STRINGS.SUBWORLDS.BEACH.DESC",
   "icon": "biomeIconBeach",
   "mixingTags": [
-    "Aquatic"
+    "Aquatic",
+    "LargePOIs"
   ],
   "forbiddenClusterTags": [
     "AquaticCluster"
@@ -18,11 +19,11 @@
         "dlc5::poi/beach/simplepalm2",
         "dlc5::poi/beach/simplepalm3",
         "dlc5::poi/beach/simplepalm4",
-        "dlc5::poi/beach/simplepalm5"
+        "dlc5::poi/beach/simplepalm5",
+        "dlc5::poi/beach/tiny_palm"
       ],
-      "listRule": "GuaranteeSomeTryMore",
-      "someCount": 1,
-      "moreCount": 2,
+      "listRule": "TrySome",
+      "someCount": 2,
       "priority": 100,
       "allowedCellsFilter": [
         {

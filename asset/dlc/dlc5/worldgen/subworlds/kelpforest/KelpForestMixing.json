@@ -9,7 +9,7 @@
   "avoidRadius": 15,
   "doAvoidPoints": false,
   "dontRelaxChildren": true,
-  "extraBiomeChildren": 1,
+  "extraBiomeChildren": 3,
   "sampleBehaviour": "PoissonDisk",
   "biomes": [
     {

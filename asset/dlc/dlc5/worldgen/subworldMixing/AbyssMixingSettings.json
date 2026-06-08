@@ -3,7 +3,8 @@
   "description": "STRINGS.SUBWORLDS.ABYSS.DESC",
   "icon": "biomeIconAbyss",
   "mixingTags": [
-    "Aquatic"
+    "Aquatic",
+    "LargePOIs"
   ],
   "forbiddenClusterTags": [
     "AquaticCluster"
@@ -16,23 +17,8 @@
       "names": [
         "dlc5::poi/abyss/abyss_geyser"
       ],
-      "listRule": "GuaranteeOne",
-      "priority": 100,
-      "allowedCellsFilter": [
-        {
-          "command": "Replace",
-          "zoneTypes": [
-            "Abyss"
-          ]
-        }
-      ]
-    },
-    {
-      "names": [
-        "dlc5::poi/abyss/abyss_geyser"
-      ],
       "listRule": "TryOne",
-      "times": 2,
+      "times": 3,
       "allowDuplicates": true,
       "priority": 100,
       "allowedCellsFilter": [
@@ -46,11 +32,10 @@
     },
     {
       "names": [
-        "dlc5::poi/abyss/murky_vent_large",
         "dlc5::poi/abyss/murky_vent_small"
       ],
-      "listRule": "GuaranteeOne",
-      "priority": 100,
+      "listRule": "TryOne",
+      "priority": 200,
       "allowedCellsFilter": [
         {
           "command": "Replace",

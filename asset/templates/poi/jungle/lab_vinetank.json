@@ -652,7 +652,8 @@
       "mass": 800,
       "temperature": 314.597198,
       "location_x": 2,
-      "location_y": -1
+      "location_y": -1,
+      "preventFoWReveal": true
     },
     {
       "element": "IgneousRock",
@@ -1239,7 +1240,8 @@
       "mass": 1840,
       "temperature": 312.995087,
       "location_x": 1,
-      "location_y": 5
+      "location_y": 5,
+      "preventFoWReveal": true
     },
     {
       "element": "Carbon",

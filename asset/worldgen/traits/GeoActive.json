@@ -3,7 +3,7 @@
   "description": "STRINGS.WORLD_TRAITS.GEOACTIVE.DESCRIPTION",
   "colorHex": "F8A22E",
   "exclusiveWith": [
-    "traits/Geodormant"
+    "traits/GeoDormant"
   ],
   "traitTags": [
     "Geysers",

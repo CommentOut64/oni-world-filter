@@ -368,7 +368,12 @@
     },
     {
       "names": [
-        "dlc5::poi/beach/spring_small"
+        "dlc5::poi/beach/simplepalm1",
+        "dlc5::poi/beach/simplepalm2",
+        "dlc5::poi/beach/simplepalm3",
+        "dlc5::poi/beach/simplepalm4",
+        "dlc5::poi/beach/simplepalm5",
+        "dlc5::poi/beach/tiny_palm"
       ],
       "listRule": "GuaranteeOne",
       "priority": 100,
@@ -378,26 +383,6 @@
           "command": "Replace",
           "zoneTypes": [
             "Beach"
-          ]
-        }
-      ]
-    },
-    {
-      "names": [
-        "dlc5::poi/beach/simplepalm1",
-        "dlc5::poi/beach/simplepalm2",
-        "dlc5::poi/beach/simplepalm3",
-        "dlc5::poi/beach/simplepalm4",
-        "dlc5::poi/beach/simplepalm5"
-      ],
-      "listRule": "GuaranteeOne",
-      "priority": 50,
-      "allowNearStart": true,
-      "allowedCellsFilter": [
-        {
-          "command": "Replace",
-          "subworldNames": [
-            "dlc5::subworlds/beach/BeachStart"
           ]
         }
       ]

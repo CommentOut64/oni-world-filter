@@ -4,6 +4,7 @@
     "StartLocation"
   ],
   "shape": "Square",
+  "borders": null,
   "blobSize": {
     "min": 1,
     "max": 1

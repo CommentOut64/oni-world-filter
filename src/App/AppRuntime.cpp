@@ -1,6 +1,7 @@
 #include "App/AppRuntime.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <memory>
 #include <mutex>
@@ -52,6 +53,28 @@ AppRuntime *AppRuntime::Instance()
 #endif
     return &inst;
 }
+
+namespace {
+
+std::string ReadEnvironmentVariable(const char *name)
+{
+    if (name == nullptr || name[0] == '\0') {
+        return {};
+    }
+    char *value = nullptr;
+    size_t length = 0;
+    if (_dupenv_s(&value, &length, name) != 0 || value == nullptr || length == 0) {
+        if (value != nullptr) {
+            free(value);
+        }
+        return {};
+    }
+    std::string result(value);
+    free(value);
+    return result;
+}
+
+} // namespace
 
 void AppRuntime::SetResultSink(ResultSink *sink)
 {
@@ -332,6 +355,12 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlac
         if (sites.empty()) {
             LogE("generate overworld produced empty sites.");
             return false;
+        }
+        const std::string dumpPrefix = ReadEnvironmentVariable("ONI_DEBUG_WORLD_DUMP");
+        if (!dumpPrefix.empty()) {
+            worldGen.DumpDebugWorldState(
+                sites,
+                dumpPrefix + "-" + std::to_string(placementIndex) + ".json");
         }
 
         const auto *worldOffset = FindClusterWorldOffset(worldOffsets, placementIndex);

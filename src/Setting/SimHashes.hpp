@@ -137,6 +137,7 @@ enum class SimHashes {
     Polypropylene = -1142341158,
     Radium = -47820500,
     RefinedCarbon = -902240476,
+    Rubber = -351425712,
     Regolith = 1362238252,
     Rust = -233232444,
     Salt = 381665462,
@@ -264,10 +265,10 @@ enum class ZoneType {
     PrehistoricGarden,
     PrehistoricRaptor,
     PrehistoricWetlands,
-    Beach,
-    Reef,
     KelpForest,
-    Abyss
+    Reef,
+    Abyss,
+    Beach
 };
 
 enum class LocationType {

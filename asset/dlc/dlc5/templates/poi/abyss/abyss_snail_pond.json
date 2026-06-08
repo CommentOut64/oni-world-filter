@@ -1122,38 +1122,6 @@
       "location_x": 3,
       "location_y": -5,
       "element": "Creature",
-      "temperature": 347.42868,
-      "units": 1,
-      "type": "Other",
-      "amounts": [
-        {
-          "id": "Maturity",
-          "value": 0.0275832266
-        },
-        {
-          "id": "Fertilization"
-        },
-        {
-          "id": "Irrigation"
-        },
-        {
-          "id": "AirPressure",
-          "value": 1230.18518
-        },
-        {
-          "id": "Temperature",
-          "value": 348.149994
-        },
-        {
-          "id": "OldAge"
-        }
-      ]
-    },
-    {
-      "id": "TubeWorm",
-      "location_x": 3,
-      "location_y": -5,
-      "element": "Creature",
       "temperature": 347.428711,
       "units": 1,
       "type": "Other",

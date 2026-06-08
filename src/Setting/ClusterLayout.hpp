@@ -41,6 +41,7 @@ struct WorldPlacement {
 struct ClusterAudioSettings {
     std::string musicWelcome;
     std::string musicFirst;
+    std::vector<std::string> musicPlaylist;
     std::string stingerDay;
     std::string stingerNight;
 };

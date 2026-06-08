@@ -86,15 +86,17 @@ struct HashSet<T, std::enable_if_t<std::is_pointer<T>::value>> {
 
     void IntersectWith(const HashSet &rhs)
     {
-        for (auto &item : rhs.map) {
-            auto itr = map.find(item.first);
-            if (itr == map.end()) {
+        for (auto itr = map.begin(); itr != map.end();) {
+            if (rhs.map.find(itr->first) == rhs.map.end()) {
+                const size_t removedIndex = itr->second;
+                itr = map.erase(itr);
                 for (auto &pair : map) {
-                    if (itr->second < pair.second) {
+                    if (removedIndex < pair.second) {
                         pair.second--;
                     }
                 }
-                map.erase(itr);
+            } else {
+                ++itr;
             }
         }
     }

@@ -87,21 +87,20 @@ bool Polygon::Contains(const Vector2f &point) const
     if (!Bounds().Contains(point)) {
         return false;
     }
-    bool flag = false;
     size_t j = Vertices.size() - 1;
+    bool flag = false;
     for (size_t i = 0; i < Vertices.size(); j = i++) {
-        auto first = Vertices[j] - Vertices[i];
-        auto second = point - Vertices[i];
-        auto cross = first.Cross(second);
-        if (cross == 0) {
-            return true; // at edge;
-        } else if (i == 0) {
-            flag = cross > 0;
-        } else if (flag != cross > 0) {
-            return false;
+        const auto &current = Vertices[i];
+        const auto &previous = Vertices[j];
+        if ((((current.y <= point.y) && (point.y < previous.y)) ||
+             ((previous.y <= point.y) && (point.y < current.y))) &&
+            (point.x < (previous.x - current.x) * (point.y - current.y) /
+                               (previous.y - current.y) +
+                           current.x)) {
+            flag = !flag;
         }
     }
-    return true;
+    return flag;
 }
 
 void Polygon::Intersect(const Polygon &clip)

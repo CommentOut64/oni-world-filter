@@ -3,10 +3,10 @@
   "backwallNoise": "noise/SandstoneStrange",
   "temperatureRange": "SomewhatHot",
   "density": {
-    "min": 10,
-    "max": 15
+    "min": 5,
+    "max": 7
   },
-  "avoidRadius": 15,
+  "avoidRadius": 5,
   "doAvoidPoints": false,
   "dontRelaxChildren": true,
   "extraBiomeChildren": 5,

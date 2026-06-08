@@ -13,7 +13,16 @@ class Voronoi
     struct HalfedgeGreater {
         bool operator()(const Halfedge *lhs, const Halfedge *rhs) const
         {
-            return (*lhs) < (*rhs);
+            if (lhs == rhs) {
+                return false;
+            }
+            if ((*lhs) < (*rhs)) {
+                return true;
+            }
+            if ((*rhs) < (*lhs)) {
+                return false;
+            }
+            return lhs < rhs;
         }
     };
 

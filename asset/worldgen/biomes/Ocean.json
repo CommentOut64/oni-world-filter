@@ -96,6 +96,40 @@
           "bandSize": 0.2
         }
       ],
+      "AllBrine": [
+        {
+          "content": "Granite",
+          "bandSize": 0.05
+        },
+        {
+          "content": "SedimentaryRock",
+          "bandSize": 0.1
+        },
+        {
+          "content": "BleachStone",
+          "bandSize": 0.05
+        },
+        {
+          "content": "Sand",
+          "bandSize": 0.25
+        },
+        {
+          "content": "CarbonDioxide",
+          "bandSize": 0.1
+        },
+        {
+          "content": "Hydrogen",
+          "bandSize": 0.25
+        },
+        {
+          "content": "Brine",
+          "bandSize": 0.25
+        },
+        {
+          "content": "Brine",
+          "bandSize": 0.2
+        }
+      ],
       "Frozen": [
         {
           "content": "Granite",
@@ -141,7 +175,7 @@
         },
         {
           "content": "SaltWater",
-          "bandSize": 1.0
+          "bandSize": 1
         },
         {
           "content": "Granite",

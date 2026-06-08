@@ -249,7 +249,7 @@
         "dlc5::poi/abyss/murky_vent_small"
       ],
       "listRule": "GuaranteeOne",
-      "priority": 100,
+      "priority": 200,
       "allowedCellsFilter": [
         {
           "command": "Replace",
