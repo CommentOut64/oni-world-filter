@@ -5,6 +5,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <filesystem>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -312,6 +313,135 @@ bool BuildRawGeyserSummariesForTarget(int worldType,
         rawGeysers->push_back({geyser.z, geyser.x, geyser.y, geyser.x, geyser.y});
     }
     *worldSize = selectedState->world.worldsize;
+    settings.seed = baseSeed;
+    return true;
+}
+
+bool BuildGenericGeyserTemplatePreviewAnchorsForTarget(
+    int worldType,
+    int seed,
+    int mixing,
+    Batch::PreviewTarget target,
+    std::vector<Vector2i> *anchors,
+    std::string *errorMessage)
+{
+    if (anchors == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "template anchor output is null";
+        }
+        return false;
+    }
+
+    SettingsCache settings;
+    std::string code;
+    if (!LoadSettingsForWorldType(worldType, seed, mixing, &settings, &code, errorMessage)) {
+        return false;
+    }
+
+    PreviewPlacementSelection selection;
+    if (!ResolvePreviewPlacementSelection(settings, &selection, errorMessage)) {
+        return false;
+    }
+
+    const int placementIndex = IsPrimaryTarget(target)
+                                   ? selection.primaryPlacementIndex
+                                   : (selection.secondaryPlacementIndex.has_value()
+                                          ? selection.secondaryPlacementIndex.value()
+                                          : -1);
+    if (placementIndex < 0) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "secondary preview is not available for current seed";
+        }
+        return false;
+    }
+
+    std::vector<ResolvedWorldPlacement> placements;
+    if (!BuildResolvedWorldPlacements(settings, &placements, errorMessage)) {
+        return false;
+    }
+
+    std::vector<WorldEffectiveState> states;
+    if (!InitializeWorldEffectiveStates(settings, placements, &states, errorMessage)) {
+        return false;
+    }
+
+    const int baseSeed = settings.seed;
+    for (auto &state : states) {
+        World *world = &state.world;
+        if (world->locationType == LocationType::Cluster) {
+            continue;
+        }
+
+        settings.seed = baseSeed + state.placementIndex;
+        state.randomTraits = settings.GetRandomTraits(*world);
+        for (const auto *trait : state.randomTraits) {
+            if (trait != nullptr) {
+                world->ApplayTraits(*trait, settings);
+            }
+        }
+    }
+    settings.seed = baseSeed;
+    ApplySubworldMixingToWorldEffectiveStates(settings, states);
+
+    WorldEffectiveState *selectedState = FindWorldEffectiveState(states, placementIndex);
+    if (selectedState == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "selected placement state not found";
+        }
+        return false;
+    }
+
+    settings.seed = baseSeed + placementIndex;
+    WorldGen worldGen(selectedState->world, settings);
+    std::vector<Site> sites;
+    if (!worldGen.GenerateOverworld(sites)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "GenerateOverworld failed";
+        }
+        return false;
+    }
+
+    const auto dumpPath =
+        std::filesystem::temp_directory_path() /
+        ("oni-preview-geyser-anchor-" + std::to_string(worldType) + "-" +
+         std::to_string(seed) + "-" + std::to_string(mixing) + "-" +
+         std::to_string(placementIndex) + ".json");
+    worldGen.DumpDebugWorldState(sites, dumpPath.string());
+
+    Json::Value dump;
+    std::ifstream stream(dumpPath);
+    Json::CharReaderBuilder builder;
+    std::string errors;
+    const bool parsed = Json::parseFromStream(builder, stream, &dump, &errors);
+    stream.close();
+    std::filesystem::remove(dumpPath);
+    if (!parsed) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "debug world dump parse failed: " + errors;
+        }
+        return false;
+    }
+
+    const int worldHeight = static_cast<int>(selectedState->world.worldsize.y);
+    anchors->clear();
+    for (const auto &item : dump["templates"]) {
+        if (item["name"].asString() != "geysers/generic") {
+            continue;
+        }
+        const auto &root = item["root"];
+        anchors->push_back({
+            static_cast<int>(root["x"].asDouble()),
+            worldHeight - static_cast<int>(root["y"].asDouble()),
+        });
+    }
+
+    if (anchors->empty()) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "no generic geyser templates found";
+        }
+        return false;
+    }
+
     settings.seed = baseSeed;
     return true;
 }
@@ -1430,6 +1560,26 @@ int RunAllTests()
                            "V-AQU-C primary preview geyser y should be flipped into preview coordinates",
                            &failures);
                 }
+            }
+            std::vector<Vector2i> primaryGenericAnchors;
+            errorMessage.clear();
+            Expect(BuildGenericGeyserTemplatePreviewAnchorsForTarget(
+                       39,
+                       100123,
+                       0,
+                       Batch::PreviewTarget::Primary,
+                       &primaryGenericAnchors,
+                       &errorMessage),
+                   "V-AQU-C primary generic geyser template anchors should rebuild: " + errorMessage,
+                   &failures);
+            for (const auto &anchor : primaryGenericAnchors) {
+                const bool found = std::ranges::any_of(
+                    previewGeysers, [&anchor](const GeyserSummary &geyser) {
+                        return geyser.x == anchor.x && geyser.y == anchor.y;
+                    });
+                Expect(found,
+                       "V-AQU-C primary generic geyser preview marker should match template preview anchor",
+                       &failures);
             }
         }
         Expect(session.secondaryPreview.has_value(),
