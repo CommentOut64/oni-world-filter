@@ -2,10 +2,10 @@
 
 #include <algorithm>
 #include <ranges>
-#include <unordered_set>
 
 #include "SearchAnalysis/BottleneckSelectivityPredictor.hpp"
 #include "SearchAnalysis/SearchConstraintNormalizer.hpp"
+#include "Setting/WorldTraitConflict.hpp"
 
 namespace SearchAnalysis {
 
@@ -136,7 +136,7 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
 {
     auto hasSearchableTrait = [&](const std::string &traitId) {
         return std::ranges::any_of(catalog.traits, [&](const TraitMeta &trait) {
-            return trait.id == traitId && trait.searchable;
+            return TraitIdEquals(trait.id, traitId) && trait.searchable;
         });
     };
 
@@ -195,7 +195,7 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
     }
 
     for (const auto &traitId : request.requiredTraits) {
-        if (std::ranges::contains(worldProfile->impossibleTraitIds, traitId)) {
+        if (TraitIdListContains(worldProfile->impossibleTraitIds, traitId)) {
             AddIssue(errors,
                      "layer2",
                      "world.required_trait_impossible",
@@ -204,7 +204,7 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
         }
     }
     for (const auto &traitId : request.forbiddenTraits) {
-        if (std::ranges::contains(worldProfile->impossibleTraitIds, traitId)) {
+        if (TraitIdListContains(worldProfile->impossibleTraitIds, traitId)) {
             AddIssue(warnings,
                      "layer2",
                      "world.forbidden_trait_already_impossible",
@@ -320,34 +320,40 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
                     std::vector<ValidationIssue> *errors)
 {
     auto findTrait = [&](const std::string &traitId) -> const TraitMeta * {
-        const auto itr = std::ranges::find(catalog.traits, traitId, &TraitMeta::id);
+        const auto itr = std::ranges::find_if(catalog.traits, [&traitId](const TraitMeta &meta) {
+            return TraitIdEquals(meta.id, traitId);
+        });
         return (itr == catalog.traits.end()) ? nullptr : &*itr;
     };
 
-    std::unordered_set<std::string> requiredTraits;
+    std::vector<std::string> requiredTraits;
     for (const auto &traitId : request.requiredTraits) {
-        if (!requiredTraits.insert(traitId).second) {
+        if (TraitIdListContains(requiredTraits, traitId)) {
             AddIssue(errors,
                      "layer3",
                      "conflict.required_trait_duplicate",
                      "constraints.requiredTraits",
                      "主星特质不能重复设置 must include: " + traitId);
+            continue;
         }
+        requiredTraits.push_back(traitId);
     }
 
-    std::unordered_set<std::string> forbiddenTraits;
+    std::vector<std::string> forbiddenTraits;
     for (const auto &traitId : request.forbiddenTraits) {
-        if (!forbiddenTraits.insert(traitId).second) {
+        if (TraitIdListContains(forbiddenTraits, traitId)) {
             AddIssue(errors,
                      "layer3",
                      "conflict.forbidden_trait_duplicate",
                      "constraints.forbiddenTraits",
                      "主星特质不能重复设置 must exclude: " + traitId);
+            continue;
         }
+        forbiddenTraits.push_back(traitId);
     }
 
     for (const auto &traitId : requiredTraits) {
-        if (forbiddenTraits.contains(traitId)) {
+        if (TraitIdListContains(forbiddenTraits, traitId)) {
             AddIssue(errors,
                      "layer3",
                      "conflict.required_forbidden_trait",
@@ -356,21 +362,20 @@ void ValidateLayer3(const NormalizedSearchRequest &request,
         }
     }
 
-    std::vector<std::string> uniqueRequiredTraits(requiredTraits.begin(), requiredTraits.end());
-    for (size_t i = 0; i < uniqueRequiredTraits.size(); ++i) {
-        const auto *lhs = findTrait(uniqueRequiredTraits[i]);
+    for (size_t i = 0; i < requiredTraits.size(); ++i) {
+        const auto *lhs = findTrait(requiredTraits[i]);
         if (lhs == nullptr) {
             continue;
         }
-        for (size_t j = i + 1; j < uniqueRequiredTraits.size(); ++j) {
-            const auto *rhs = findTrait(uniqueRequiredTraits[j]);
+        for (size_t j = i + 1; j < requiredTraits.size(); ++j) {
+            const auto *rhs = findTrait(requiredTraits[j]);
             if (rhs == nullptr) {
                 continue;
             }
 
             const bool explicitConflict =
-                std::ranges::contains(lhs->exclusiveWith, rhs->id) ||
-                std::ranges::contains(rhs->exclusiveWith, lhs->id);
+                TraitIdListContains(lhs->exclusiveWith, rhs->id) ||
+                TraitIdListContains(rhs->exclusiveWith, lhs->id);
             const bool tagConflict =
                 std::ranges::any_of(lhs->exclusiveWithTags, [&](const std::string &tag) {
                     return std::ranges::contains(rhs->exclusiveWithTags, tag);

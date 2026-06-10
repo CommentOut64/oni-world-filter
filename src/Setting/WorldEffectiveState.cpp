@@ -5,6 +5,7 @@
 
 #include "Setting/ContentActivation.hpp"
 #include "Setting/SettingsCache.hpp"
+#include "Setting/WorldTraitConflict.hpp"
 #include "Utils/KRandom.hpp"
 #include "Utils/PointGenerator.hpp"
 
@@ -217,7 +218,7 @@ bool InitializeWorldEffectiveStates(const SettingsCache &settings,
         state.fixedTraitIds = state.world.fixedTraits;
         state.fixedWorldTraits.reserve(state.fixedTraitIds.size());
         for (const auto &fixedTraitId : state.fixedTraitIds) {
-            const auto itr = settings.traits.find(fixedTraitId);
+            const auto itr = FindTraitById(settings.traits, fixedTraitId);
             if (itr == settings.traits.end()) {
                 continue;
             }

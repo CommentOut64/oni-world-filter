@@ -3,6 +3,7 @@
 #include <string>
 
 #include "Setting/SettingsCache.hpp"
+#include "Setting/WorldTraitConflict.hpp"
 
 namespace SearchAnalysis {
 
@@ -59,7 +60,7 @@ int ResolveTraitSummaryIndexById(const SettingsCache &settings, const std::strin
 {
     int index = 0;
     for (const auto &pair : settings.traits) {
-        if (pair.second.filePath == traitId) {
+        if (TraitIdEquals(pair.second.filePath, traitId)) {
             return index;
         }
         ++index;

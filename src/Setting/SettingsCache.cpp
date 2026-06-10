@@ -599,12 +599,12 @@ SettingsCache::GetRandomTraits(const World &world) const
     std::set<std::string> except = fixedConflictState.blockedExclusiveTags;
     for (auto &rule : world.worldTraitRules) {
         for (auto &specificTrait : rule.specificTraits) {
-            const auto itr = traits.find(specificTrait);
+            const auto itr = FindTraitById(traits, specificTrait);
             if (itr != traits.end() &&
                 !TraitConflictsWithFixedTraits(itr->second, fixedConflictState)) {
                 names.emplace_back(specificTrait);
                 for (auto trait : total) {
-                    if (specificTrait == trait->filePath) {
+                    if (TraitIdEquals(specificTrait, trait->filePath)) {
                         result.emplace_back(trait);
                         break;
                     }
@@ -627,7 +627,7 @@ SettingsCache::GetRandomTraits(const World &world) const
                     })) {
                 continue;
             }
-            if (std::ranges::contains(rule.forbiddenTraits, trait->filePath)) {
+            if (TraitIdListContains(rule.forbiddenTraits, trait->filePath)) {
                 continue;
             }
             if (TraitConflictsWithFixedTraits(*trait, fixedConflictState)) {
@@ -644,7 +644,7 @@ SettingsCache::GetRandomTraits(const World &world) const
             auto &worldTrait = subtotal[index];
             bool flag = false;
             for (auto &exclusiveId : worldTrait->exclusiveWith) {
-                if (std::ranges::contains(names, exclusiveId)) {
+                if (TraitIdListContains(names, exclusiveId)) {
                     flag = true;
                     break;
                 }
@@ -673,6 +673,7 @@ SettingsCache::GetRandomTraits(const World &world) const
     }
     return result;
 }
+
 
 void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids, bool resetWorldRuntime)
 {

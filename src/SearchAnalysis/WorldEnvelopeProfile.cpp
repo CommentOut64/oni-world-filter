@@ -138,7 +138,9 @@ std::vector<const WorldTrait *> BuildTraitSelectionPool(const SettingsCache &set
 const WorldTrait *FindTraitByPath(const std::vector<const WorldTrait *> &traits,
                                   const std::string &filePath)
 {
-    const auto itr = std::ranges::find(traits, filePath, &WorldTrait::filePath);
+    const auto itr = std::ranges::find_if(traits, [&filePath](const WorldTrait *trait) {
+        return trait != nullptr && TraitIdEquals(trait->filePath, filePath);
+    });
     return (itr == traits.end()) ? nullptr : *itr;
 }
 
@@ -166,7 +168,7 @@ bool RuleAllowsTrait(const TraitRule &rule, const WorldTrait &trait, const World
             })) {
         return false;
     }
-    if (std::ranges::contains(rule.forbiddenTraits, trait.filePath)) {
+    if (TraitIdListContains(rule.forbiddenTraits, trait.filePath)) {
         return false;
     }
     return trait.IsValid(world);

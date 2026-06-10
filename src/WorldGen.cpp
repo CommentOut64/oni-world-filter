@@ -511,7 +511,7 @@ void WorldGen::ConvertUnknownCells(std::vector<Site> &sites, KRandom &random)
         }
     }
     std::map<int, std::vector<WeightedSubWorld *>> dict2;
-    for (int i = 0; i <= (int)ZoneType::Abyss; ++i) {
+    for (int i = 0; i <= (int)ZoneType::Beach; ++i) {
         auto &list = dict2[i];
         for (auto &subworld : subworldsForWorld) {
             if (subworld.subWorld->zoneType == (ZoneType)i) {
@@ -877,7 +877,7 @@ std::vector<WorldGen::SpawnedTemplateEntity> WorldGen::ExpandTemplateEntities(
     const TemplateContainer &container = *spawner.container;
     const Vector2<int> templatePos{
         spawner.position.x,
-        static_cast<int>(m_world.worldsize.y) - spawner.position.y,
+        spawner.position.y,
     };
 
     if (container.name == kGenericTemplateName) {
@@ -895,7 +895,7 @@ std::vector<WorldGen::SpawnedTemplateEntity> WorldGen::ExpandTemplateEntities(
             .entityId = item.id,
             .position = Vector2<int>{
                 templatePos.x + item.location_x,
-                templatePos.y - item.location_y,
+                templatePos.y + item.location_y,
             },
         });
     }
@@ -904,7 +904,7 @@ std::vector<WorldGen::SpawnedTemplateEntity> WorldGen::ExpandTemplateEntities(
             .entityId = item.id,
             .position = Vector2<int>{
                 templatePos.x + item.location_x,
-                templatePos.y - item.location_y,
+                templatePos.y + item.location_y,
             },
         });
     }
