@@ -79,7 +79,24 @@ FilterConfigLoadResult LoadFilterConfig(const std::string &path)
     cfg.worldType = root.get("worldType", cfg.worldType).asInt();
     cfg.seedStart = root.get("seedStart", cfg.seedStart).asInt();
     cfg.seedEnd = root.get("seedEnd", cfg.seedEnd).asInt();
-    cfg.mixing = root.get("mixing", cfg.mixing).asInt();
+    const Json::Value mixingNode = root["mixing"];
+    if (!mixingNode.isNull()) {
+        if (!mixingNode.isUInt64() && !mixingNode.isUInt() &&
+            !mixingNode.isInt64() && !mixingNode.isInt()) {
+            AddError(result,
+                     FilterErrorCode::JsonParseFailed,
+                     "mixing",
+                     "mixing must be unsigned integer");
+        } else if ((mixingNode.isInt64() && mixingNode.asInt64() < 0) ||
+            (mixingNode.isInt() && mixingNode.asInt() < 0)) {
+            AddError(result,
+                     FilterErrorCode::JsonParseFailed,
+                     "mixing",
+                     "mixing must be >= 0");
+        } else {
+            cfg.mixing = mixingNode.asUInt64();
+        }
+    }
     if (cfg.seedStart > cfg.seedEnd) {
         AddError(result,
                  FilterErrorCode::InvalidSeedRange,

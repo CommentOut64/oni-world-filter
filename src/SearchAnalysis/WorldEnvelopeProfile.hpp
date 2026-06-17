@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <vector>
@@ -68,12 +69,12 @@ struct WorldEnvelopeProfile {
 
 WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
                                                  int worldType,
-                                                 int mixing,
+                                                 uint64_t mixing,
                                                  std::string *errorMessage = nullptr);
 
 WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
                                                  int worldType,
-                                                 int mixing,
+                                                 uint64_t mixing,
                                                  const WorldEnvelopeCompileOptions &options,
                                                  std::string *errorMessage = nullptr);
 

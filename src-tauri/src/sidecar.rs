@@ -90,7 +90,7 @@ pub struct SearchRequestPayload {
     pub seed_start: i32,
     pub seed_end: i32,
     #[serde(default)]
-    pub mixing: i32,
+    pub mixing: u64,
     #[serde(default)]
     pub constraints: SearchConstraints,
     #[serde(default)]
@@ -359,7 +359,7 @@ pub struct NormalizedSearchRequestPayload {
     pub world_type: i32,
     pub seed_start: i32,
     pub seed_end: i32,
-    pub mixing: i32,
+    pub mixing: u64,
     #[serde(default)]
     pub required_traits: Vec<String>,
     #[serde(default)]

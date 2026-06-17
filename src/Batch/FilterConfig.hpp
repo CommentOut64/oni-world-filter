@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@ struct FilterConfig {
     int worldType = 0;
     int seedStart = 1;
     int seedEnd = 100000;
-    int mixing = 0;
+    uint64_t mixing = 0;
     bool hasCpuSection = false;
     CpuConfig cpu;
     std::vector<int> required;

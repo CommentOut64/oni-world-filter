@@ -35,8 +35,8 @@ export const WORLD_CATEGORY_OPTIONS: readonly WorldCategoryOption[] = [
 ];
 
 const HIDDEN_WORLD_CODES = new Set(fallbackData.hiddenWorldCodes);
-const WORLD_CATEGORY_BY_CODE = new Map(
-  fallbackData.worlds.map((item) => [item.code, item.category] as const)
+const WORLD_CATEGORY_BY_CODE = new Map<string, WorldCategory>(
+  fallbackData.worlds.map((item) => [item.code, item.category as WorldCategory])
 );
 const CLASSIC_CLUSTER_WORLD_CODES = new Set(
   fallbackData.worlds

@@ -1,7 +1,17 @@
+import { FALLBACK_MIXING_SLOTS } from "../../lib/searchCatalog.ts";
+
 const NATIVE_COORD_ERROR =
   "坐标无效：请输入完整原生坐标，且最后一段需为非空大写 base36，且不能超出 mixing 有效范围。";
 
-const MIXING_MAX = 762_939_453_124n;
+function pow5(exponent: number): bigint {
+  let value = 1n;
+  for (let index = 0; index < exponent; index += 1) {
+    value *= 5n;
+  }
+  return value;
+}
+
+const MIXING_MAX = pow5(FALLBACK_MIXING_SLOTS.length) - 1n;
 
 function decodeLittleEndianBase36(input: string): bigint {
   let value = 0n;

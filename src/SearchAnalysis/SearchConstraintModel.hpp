@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <vector>
@@ -42,7 +43,7 @@ struct SearchAnalysisRequest {
     int worldType = 0;
     int seedStart = 0;
     int seedEnd = 0;
-    int mixing = 0;
+    uint64_t mixing = 0;
     SearchCpuConfig cpu;
     SearchConstraints constraints;
 };
@@ -62,7 +63,7 @@ struct NormalizedSearchRequest {
     int worldType = 0;
     int seedStart = 0;
     int seedEnd = 0;
-    int mixing = 0;
+    uint64_t mixing = 0;
     SearchCpuConfig cpu;
     std::vector<std::string> requiredTraits;
     std::vector<std::string> forbiddenTraits;

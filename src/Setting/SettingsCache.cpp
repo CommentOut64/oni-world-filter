@@ -15,6 +15,7 @@
 #include "JsonDeserializeGen.hpp"
 #include "Setting/ContentActivation.hpp"
 #include "Setting/DlcRegistry.hpp"
+#include "Setting/MixingCode.hpp"
 #include "Setting/WorldTraitConflict.hpp"
 #include "Utils/KRandom.hpp"
 #include "Utils/Polygon.hpp"
@@ -362,25 +363,14 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
             }
         }
     }
-    mixConfigs = {
-        {"DLC2_ID", 0},
-        {"dlc2::subworldMixing/IceCavesMixingSettings", 2},
-        {"dlc2::subworldMixing/CarrotQuarryMixingSettings", 2},
-        {"dlc2::subworldMixing/SugarWoodsMixingSettings", 2},
-        {"dlc2::worldMixing/CeresMixingSettings", 1},
-        {"DLC3_ID", 0},
-        {"DLC4_ID", 0},
-        {"dlc4::subworldMixing/GardenMixingSettings", 2},
-        {"dlc4::subworldMixing/RaptorMixingSettings", 2},
-        {"dlc4::subworldMixing/WetlandsMixingSettings", 2},
-        {"dlc4::worldMixing/PrehistoricMixingSettings", 1},
-        {"DLC5_ID", 0},
-        {"dlc5::subworldMixing/BeachMixingSettings", 2},
-        {"dlc5::subworldMixing/ReefMixingSettings", 2},
-        {"dlc5::subworldMixing/KelpForestMixingSettings", 2},
-        {"dlc5::subworldMixing/AbyssMixingSettings", 2},
-        {"dlc5::worldMixing/AquaticMixingSettings", 1},
-    };
+    mixConfigs.clear();
+    mixConfigs.reserve(MixingCode::kSupportedSlots.size());
+    for (const auto &slot : MixingCode::kSupportedSlots) {
+        mixConfigs.push_back(MixingConfig{
+            .path = std::string(slot.path),
+            .type = slot.type,
+        });
+    }
     return true;
 }
 
@@ -507,6 +497,10 @@ bool SettingsCache::CoordinateChanged(const std::string &text,
     } else if (codes[1].contains("PRE")) {
         mixConfigs[6].level = mixConfigs[7].level = mixConfigs[8].level =
             mixConfigs[9].level = mixConfigs[10].level = MixingLevel::Disabled;
+    } else if (codes[1].contains("AQU")) {
+        mixConfigs[11].level = mixConfigs[12].level = mixConfigs[13].level =
+            mixConfigs[14].level = mixConfigs[15].level = mixConfigs[16].level =
+                MixingLevel::Disabled;
     }
     SanitizeMixingConfigsForCurrentCluster();
     return true;

@@ -10,13 +10,12 @@
 #include <utility>
 
 #include "SearchAnalysis/SearchCatalog.hpp"
+#include "Setting/MixingCode.hpp"
 #include "Setting/SettingsCache.hpp"
 
 namespace NativeCoordinate {
 
 namespace {
-
-constexpr uint64_t kMaxNativeMixingValue = 762939453124ULL;
 
 bool IsAsciiDigits(std::string_view text)
 {
@@ -93,7 +92,7 @@ bool IsValidNativeMixingPart(std::string_view mixingPart)
     if (!TryDecodeLittleEndianBase36(mixingPart, &mixingValue)) {
         return false;
     }
-    return mixingValue <= kMaxNativeMixingValue;
+    return mixingValue <= MixingCode::GetSupportedMixingMax();
 }
 
 } // namespace
@@ -142,7 +141,7 @@ bool ResolveNativeCoordinate(const std::string &rawCoord,
 
     uint64_t mixingValue = 0;
     if (!TryDecodeLittleEndianBase36(mixingPart, &mixingValue) ||
-        mixingValue > kMaxNativeMixingValue) {
+        mixingValue > MixingCode::GetSupportedMixingMax()) {
         return false;
     }
 

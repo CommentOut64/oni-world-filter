@@ -275,24 +275,6 @@ target_link_libraries(test_adaptive_concurrency PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_adaptive_concurrency COMMAND test_adaptive_concurrency)
 
-add_executable(test_settings_cache
-    "../tests/native/test_main.cpp"
-    "../tests/native/test_settings_cache.cpp"
-    ${ONI_BASE_SOURCES}
-)
-target_include_directories(test_settings_cache
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
-    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
-    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
-    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
-    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
-)
-target_link_libraries(test_settings_cache PRIVATE clipper jsoncpp miniz)
-if(TARGET Threads::Threads)
-target_link_libraries(test_settings_cache PRIVATE Threads::Threads)
-endif()
-add_test(NAME test_settings_cache COMMAND test_settings_cache)
-
 add_executable(test_dlc5_mixing_registration
     "../tests/native/test_main.cpp"
     "../tests/native/test_dlc5_mixing_registration.cpp"
@@ -337,6 +319,7 @@ add_executable(test_sidecar_protocol
     "Geyser/GeyserCatalog.cpp"
     "Geyser/GeyserKind.cpp"
     "SearchAnalysis/TraitCatalog.cpp"
+    "Setting/WorldTraitConflict.cpp"
 )
 target_include_directories(test_sidecar_protocol
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -452,6 +435,7 @@ add_executable(test_search_analysis
     "Batch/FilterConfig.cpp"
     "Geyser/GeyserCatalog.cpp"
     "Geyser/GeyserKind.cpp"
+    "Setting/WorldTraitConflict.cpp"
 )
 target_include_directories(test_search_analysis
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"

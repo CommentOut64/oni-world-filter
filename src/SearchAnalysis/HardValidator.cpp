@@ -5,26 +5,12 @@
 
 #include "SearchAnalysis/BottleneckSelectivityPredictor.hpp"
 #include "SearchAnalysis/SearchConstraintNormalizer.hpp"
+#include "Setting/MixingCode.hpp"
 #include "Setting/WorldTraitConflict.hpp"
 
 namespace SearchAnalysis {
 
 namespace {
-
-constexpr int kMixingMax = 48828124;
-constexpr int kMixingSlotCount = 11;
-
-int ReadMixingSlotLevel(int mixing, int slot)
-{
-    if (slot < 0 || slot >= kMixingSlotCount) {
-        return 0;
-    }
-    int value = std::max(0, mixing);
-    for (int i = 0; i < (kMixingSlotCount - 1 - slot); ++i) {
-        value /= 5;
-    }
-    return value % 5;
-}
 
 void AddIssue(std::vector<ValidationIssue> *issues,
               std::string layer,
@@ -67,7 +53,7 @@ void ValidateLayer1(const SearchAnalysisRequest &request,
                  "seedStart/seedEnd",
                  "seedStart 必须 <= seedEnd");
     }
-    if (request.mixing < 0 || request.mixing > kMixingMax) {
+    if (request.mixing > MixingCode::GetSupportedMixingMax()) {
         AddIssue(errors,
                  "layer1",
                  "range.mixing_out_of_bounds",
@@ -224,7 +210,9 @@ void ValidateLayer2(const SearchAnalysisRequest &rawRequest,
     std::vector<int> enabledDisabledSlots;
     enabledDisabledSlots.reserve(worldProfile->disabledMixingSlots.size());
     for (const int slot : worldProfile->disabledMixingSlots) {
-        if (ReadMixingSlotLevel(rawRequest.mixing, slot) > 0) {
+        if (MixingCode::ReadMixingSlotLevel(rawRequest.mixing,
+                                            MixingCode::GetSupportedSlotCount(),
+                                            static_cast<std::size_t>(slot)) > 0) {
             enabledDisabledSlots.push_back(slot);
         }
     }

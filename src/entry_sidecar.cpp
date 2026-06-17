@@ -30,6 +30,7 @@
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "SearchAnalysis/WorldEnvelopeProfile.hpp"
 #include "App/SettingsAsset.hpp"
+#include "Setting/MixingCode.hpp"
 #include "Setting/NativeCoordinate.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "config.h"
@@ -258,14 +259,16 @@ bool BuildWorldCode(int worldType, int seed, uint64_t mixing, std::string *code)
     if (code == nullptr) {
         return false;
     }
+    if (mixing > MixingCode::GetSupportedMixingMax()) {
+        return false;
+    }
     const auto &worldPrefixes = SearchAnalysis::GetWorldPrefixes();
     if (worldType < 0 || static_cast<int>(worldPrefixes.size()) <= worldType) {
         return false;
     }
-    *code = worldPrefixes[static_cast<size_t>(worldType)];
-    *code += std::to_string(seed);
-    *code += "-0-D3-";
-    *code += SettingsCache::BinaryToBase36(mixing);
+    *code = MixingCode::BuildCanonicalCoordinate(worldPrefixes[static_cast<size_t>(worldType)],
+                                                 seed,
+                                                 mixing);
     return true;
 }
 
@@ -963,7 +966,7 @@ void RunPreviewCoordCommand(const Batch::SidecarPreviewCoordRequest &request)
     EmitLine(Batch::SerializePreviewEvent(request.jobId,
                                           resolvedRequest,
                                           responsePreview,
-                                          &resolved.code));
+                                          &session.coord));
 }
 
 void RunPreviewGeyserDetailsCommand(const Batch::SidecarPreviewGeyserDetailsRequest &request)

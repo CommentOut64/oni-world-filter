@@ -618,7 +618,7 @@ Json::Value BuildNormalizedSearchRequestJson(const SearchAnalysis::NormalizedSea
     root["worldType"] = request.worldType;
     root["seedStart"] = request.seedStart;
     root["seedEnd"] = request.seedEnd;
-    root["mixing"] = request.mixing;
+    root["mixing"] = Json::UInt64(request.mixing);
 
     Json::Value requiredTraits(Json::arrayValue);
     for (const auto &traitId : request.requiredTraits) {
@@ -810,7 +810,10 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         if (!RequireInt(root, "seedEnd", &request.seedEnd, &result.error)) {
             return result;
         }
-        request.mixing = root.get("mixing", request.mixing).asInt();
+        if (root.isMember("mixing") &&
+            !RequireUInt64(root, "mixing", &request.mixing, &result.error)) {
+            return result;
+        }
         if (request.seedEnd < request.seedStart) {
             SetParseError(result, "seedEnd must be >= seedStart");
             return result;
@@ -956,7 +959,10 @@ SidecarParseResult ParseSidecarRequest(const std::string &jsonText)
         if (!RequireInt(root, "seedEnd", &request.seedEnd, &result.error)) {
             return result;
         }
-        request.mixing = root.get("mixing", request.mixing).asInt();
+        if (root.isMember("mixing") &&
+            !RequireUInt64(root, "mixing", &request.mixing, &result.error)) {
+            return result;
+        }
         if (!ParseCpuConfig(root, &request.cpu, &result)) {
             return result;
         }

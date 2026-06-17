@@ -14,6 +14,7 @@
 #include "Geyser/GeyserCatalog.hpp"
 #include "SearchAnalysis/SearchCatalog.hpp"
 #include "Setting/ContentActivation.hpp"
+#include "Setting/MixingCode.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "Setting/WorldTraitConflict.hpp"
 #include "Setting/WorldEffectiveState.hpp"
@@ -23,22 +24,18 @@ namespace SearchAnalysis {
 
 namespace {
 
-constexpr int kMixingMax = 48828124;
-// 11 个 mixing 槽位全部设为 level 1 (Enabled) 的编码值:
-// sum(1 * 5^i, i=0..10) = (5^11 - 1) / 4 = 12207031
-constexpr int kMixingProbeAllEnabled = 12207031;
-
-std::string BuildWorldCode(int worldType, int mixing)
+std::string BuildWorldCode(int worldType, uint64_t mixing)
 {
     const auto &prefixes = GetWorldPrefixes();
     if (worldType < 0 || worldType >= static_cast<int>(prefixes.size())) {
         return {};
     }
-    const int normalizedMixing = std::clamp(mixing, 0, kMixingMax);
-    std::string code = prefixes[static_cast<size_t>(worldType)];
-    code += "100000-0-D3-";
-    code += SettingsCache::BinaryToBase36(static_cast<uint32_t>(normalizedMixing));
-    return code;
+    if (mixing > MixingCode::GetSupportedMixingMax()) {
+        return {};
+    }
+    return MixingCode::BuildCanonicalCoordinate(prefixes[static_cast<size_t>(worldType)],
+                                                100000,
+                                                mixing);
 }
 
 uint64_t Fnv1a64(const std::string &text)
@@ -811,7 +808,7 @@ void BuildSpatialEnvelopes(SettingsCache &settings,
 
 WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
                                                  int worldType,
-                                                 int mixing,
+                                                 uint64_t mixing,
                                                  std::string *errorMessage)
 {
     return CompileWorldEnvelopeProfile(baseSettings,
@@ -823,7 +820,7 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
 
 WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettings,
                                                  int worldType,
-                                                 int mixing,
+                                                 uint64_t mixing,
                                                  const WorldEnvelopeCompileOptions &options,
                                                  std::string *errorMessage)
 {
@@ -833,7 +830,9 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
 
     if (profile.worldCode.empty()) {
         if (errorMessage != nullptr) {
-            *errorMessage = "worldType 超出有效范围";
+            *errorMessage = mixing > MixingCode::GetSupportedMixingMax()
+                                ? "mixing 超出当前支持范围"
+                                : "worldType 超出有效范围";
         }
         return profile;
     }
@@ -878,8 +877,11 @@ WorldEnvelopeProfile CompileWorldEnvelopeProfile(const SettingsCache &baseSettin
     // 用全启用 probe 值探测世界结构性禁用槽位（CER/PRE 约束），
     // 而非把用户未开启的槽位也标记为 disabled
     {
-        std::string probeCode = BuildWorldCode(worldType, kMixingProbeAllEnabled);
         SettingsCache probeSettings = baseSettings;
+        std::string probeCode =
+            BuildWorldCode(worldType,
+                           MixingCode::AllEnabledProbeValueForSlotCount(
+                               probeSettings.mixConfigs.size()));
         if (probeSettings.CoordinateChanged(probeCode, probeSettings)) {
             for (size_t slot = 0; slot < probeSettings.mixConfigs.size(); ++slot) {
                 if (probeSettings.mixConfigs[slot].level == MixingLevel::Disabled) {

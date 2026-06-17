@@ -149,7 +149,6 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
             const packageMode = getPackageMode(levels, group);
             const packageEnabled = isSlotEnabled(packageLevel);
             const packageDisabled = disabledMixingSlots?.has(group.packageSlot.slot) ?? false;
-            const packageCheckboxDisabled = packageDisabled && !packageEnabled;
             const packageDescription = formatMixingSlotDescription(group.packageSlot);
 
             return (
@@ -166,7 +165,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                       <Checkbox
                         className="mixing-package-toggle"
                         checked={packageEnabled}
-                        disabled={packageCheckboxDisabled}
+                        disabled={packageDisabled}
                         onChange={(event) => {
                           const nextLevels = applyPackageMode(
                             levels,
@@ -199,7 +198,6 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                         const childEnabled = isSlotEnabled(childLevel);
                         const slotDisabled = disabledMixingSlots?.has(child.slot) ?? false;
                         const childDisabled = slotDisabled || !packageEnabled;
-                        const childCheckboxDisabled = slotDisabled ? !childEnabled : !packageEnabled;
                         const childDescription = formatMixingSlotDescription(child);
                         const disabledReason =
                           slotDisabled
@@ -213,7 +211,7 @@ export default function MixingSelector({ mixingSlots, disabledMixingSlots }: Mix
                             <Checkbox
                               className="mixing-child-toggle"
                               checked={childEnabled}
-                              disabled={childCheckboxDisabled}
+                              disabled={childDisabled}
                               onChange={(event) => {
                                 commitLevels(
                                   applyChildMode(

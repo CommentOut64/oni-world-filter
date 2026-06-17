@@ -66,7 +66,7 @@ struct SidecarSearchRequest {
     int worldType = 0;
     int seedStart = 1;
     int seedEnd = 100000;
-    int mixing = 0;
+    uint64_t mixing = 0;
     SidecarConstraints constraints;
     SidecarCpuConfig cpu;
 };
@@ -119,7 +119,7 @@ struct SidecarAnalyzeSearchRequest {
     int worldType = 0;
     int seedStart = 1;
     int seedEnd = 100000;
-    int mixing = 0;
+    uint64_t mixing = 0;
     SidecarConstraints constraints;
     SidecarCpuConfig cpu;
 };

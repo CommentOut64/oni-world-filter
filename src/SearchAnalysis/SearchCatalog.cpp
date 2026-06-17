@@ -7,6 +7,7 @@
 #include "Geyser/GeyserCatalog.hpp"
 #include "SearchAnalysis/TraitCatalog.hpp"
 #include "Setting/DlcRegistry.hpp"
+#include "Setting/MixingCode.hpp"
 #include "Setting/SettingsCache.hpp"
 
 namespace SearchAnalysis {
@@ -93,7 +94,7 @@ void AddParameterSpec(std::vector<ParameterSpec> *specs,
     });
 }
 
-std::vector<ParameterSpec> BuildParameterSpecs()
+std::vector<ParameterSpec> BuildParameterSpecs(std::size_t mixingSlotCount)
 {
     std::vector<ParameterSpec> specs;
     specs.reserve(11);
@@ -107,10 +108,10 @@ std::vector<ParameterSpec> BuildParameterSpecs()
     AddParameterSpec(&specs,
                      "mixing",
                      "base5-encoded-int",
-                     "11 个 mixing slot 的 base-5 编码",
-                     "0..48828124",
+                     std::to_string(mixingSlotCount) + " 个 mixing slot 的 base-5 编码",
+                     "0.." + std::to_string(MixingCode::MaxValueForSlotCount(mixingSlotCount)),
                      true,
-                     "SettingsCache::ParseAndApplyMixingSettingsCode");
+                     "Setting/MixingCode.hpp + SettingsCache::ParseAndApplyMixingSettingsCode");
     AddParameterSpec(&specs,
                      "seedStart",
                      "int",
@@ -231,7 +232,7 @@ SearchCatalog BuildSearchCatalog(const SettingsCache &settings)
         catalog.mixingSlots.push_back(std::move(slot));
     }
 
-    catalog.parameterSpecs = BuildParameterSpecs();
+    catalog.parameterSpecs = BuildParameterSpecs(settings.mixConfigs.size());
     return catalog;
 }
 

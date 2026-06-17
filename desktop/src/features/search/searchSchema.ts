@@ -1,10 +1,11 @@
 import { z } from "zod";
 
+import { FALLBACK_MIXING_SLOTS } from "../../lib/searchCatalog.ts";
 import type { SearchDraft } from "../../state/searchStore";
 const nonNegativeInt = z.coerce.number().int().min(0);
 const cpuModeSchema = z.enum(["balanced", "turbo"]);
 type SearchCpuMode = z.infer<typeof cpuModeSchema>;
-export const MIXING_SLOT_COUNT = 11;
+export const MIXING_SLOT_COUNT = FALLBACK_MIXING_SLOTS.length;
 export const MIXING_LEVEL_MIN = 0;
 export const MIXING_LEVEL_MAX = 4;
 export const COUNT_MAX_SENTINEL = -1;
