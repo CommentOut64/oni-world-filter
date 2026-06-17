@@ -286,6 +286,9 @@ int RunAllTests()
     {
         const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 38, 0);
         Expect(profile.valid, "AQU-A profile should be valid", failures);
+        Expect(HasAllSlots(profile.disabledMixingSlots, {11, 12, 13, 14, 15, 16}),
+               "AQU-A profile should disable slots 11..16",
+               failures);
         Expect(Contains(profile.possibleGeyserTypes, "murky_brine"),
                "AQU-A profile should expose murky_brine in possible geyser types",
                failures);
@@ -294,6 +297,14 @@ int RunAllTests()
                failures);
         Expect(Contains(profile.possibleGeyserTypes, "underwater_vent"),
                "AQU-A profile should expose underwater_vent in possible geyser types",
+               failures);
+    }
+
+    {
+        const auto profile = SearchAnalysis::CompileWorldEnvelopeProfile(settings, 40, 0);
+        Expect(profile.valid, "AQU-C profile should be valid", failures);
+        Expect(HasAllSlots(profile.disabledMixingSlots, {11, 12, 13, 14, 15, 16}),
+               "AQU-C profile should disable slots 11..16",
                failures);
     }
 

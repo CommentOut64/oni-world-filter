@@ -103,6 +103,15 @@ int RunAllTests()
     }
 
     {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"search","jobId":"job-search-long-mixing","worldType":13,"seedStart":100000,"seedEnd":100001,"mixing":152841815626})");
+        Expect(result.Ok(), "search request with 64-bit mixing should parse", failures);
+        Expect(result.request.search.mixing == kLongMixing,
+               "search request should preserve 64-bit mixing",
+               failures);
+    }
+
+    {
         const auto path = FixturePath("preview-request.json");
         const auto jsonText = ReadText(path);
         Expect(!jsonText.empty(), "preview fixture should be readable", failures);
@@ -308,6 +317,15 @@ int RunAllTests()
     }
 
     {
+        const auto result = Batch::ParseSidecarRequest(
+            R"({"command":"analyze_search_request","jobId":"job-analyze-long-mixing","worldType":13,"seedStart":100000,"seedEnd":100001,"mixing":152841815626,"constraints":{"required":[],"forbidden":[],"distance":[],"count":[],"requiredTraits":[],"forbiddenTraits":[]}})");
+        Expect(result.Ok(), "analyze_search_request with 64-bit mixing should parse", failures);
+        Expect(result.request.analyze.mixing == kLongMixing,
+               "analyze_search_request should preserve 64-bit mixing",
+               failures);
+    }
+
+    {
         const auto result = Batch::ParseSidecarRequest(R"({"command":"unknown","jobId":"x"})");
         Expect(!result.Ok(), "unknown command should fail", failures);
         Expect(!result.error.empty(), "unknown command should report error", failures);
@@ -414,7 +432,7 @@ int RunAllTests()
         match.capture.traits = {1, 5};
         const int steam = Batch::GeyserIdToIndex("steam");
         Expect(steam >= 0, "steam geyser should exist", failures);
-        match.capture.geysers.push_back({steam, 60, 80});
+        match.capture.geysers.push_back({steam, 60, 80, 60, 80});
 
         Batch::SearchCompletedEvent completed;
         completed.processedSeeds = 100;
@@ -549,9 +567,9 @@ int RunAllTests()
             .id = "mixing",
             .valueType = "base5-encoded-int",
             .meaning = "mixing code",
-            .staticRange = "0..48828124",
+            .staticRange = "0..762939453124",
             .supportsDynamicRange = true,
-            .source = "SettingsCache::ParseAndApplyMixingSettingsCode",
+            .source = "Setting/MixingCode.hpp + SettingsCache::ParseAndApplyMixingSettingsCode",
         });
 
         SearchAnalysis::SearchAnalysisResult analysis;

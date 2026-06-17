@@ -1,5 +1,6 @@
 #include "SearchAnalysis/HardValidator.hpp"
 #include "SearchAnalysis/SearchConstraintNormalizer.hpp"
+#include "Setting/MixingCode.hpp"
 
 #include <iostream>
 
@@ -86,10 +87,11 @@ bool Expect(bool condition, const char *message, int &failures)
     return false;
 }
 
-int EncodeMixingFromLevels(const std::vector<int> &levels)
+uint64_t EncodeMixingFromLevels(const std::vector<int> &levels)
 {
-    int value = 0;
-    for (const int level : levels) {
+    uint64_t value = 0;
+    for (std::size_t slot = 0; slot < MixingCode::GetSupportedSlotCount(); ++slot) {
+        const int level = slot < levels.size() ? levels[slot] : 0;
         value = value * 5 + level;
     }
     return value;

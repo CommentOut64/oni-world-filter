@@ -126,6 +126,18 @@ test("classifyWorld and getCategoryForWorld map current world codes to UI catego
     grouped.classicCluster.some((item) => item.code === "V-PRES-C-"),
     false
   );
+  assert.equal(
+    grouped.baseAsteroid.some((item) => item.code === "AQU-A-"),
+    true
+  );
+  assert.equal(
+    grouped.classicCluster.some((item) => item.code === "V-AQU-C-"),
+    true
+  );
+  assert.equal(
+    grouped.moonletCluster.some((item) => item.code === "AQU-C-"),
+    true
+  );
 
   assert.equal(getCategoryForWorld(worlds, 32), "moonletCluster");
 });
@@ -179,7 +191,8 @@ test("mixing ui mode collapses level 3 and 4 into normal mode", () => {
 test("package mode and child mode updates preserve checkbox-first behavior", () => {
   const groups = groupMixingSlots(mixingSlots);
   const frosty = groups[0];
-  let levels = new Array(11).fill(0);
+  const slotCount = Math.max(...mixingSlots.map((item) => item.slot)) + 1;
+  let levels = new Array(slotCount).fill(0);
 
   levels = applyPackageMode(levels, frosty, "normal");
   assert.equal(levels[0], 1);

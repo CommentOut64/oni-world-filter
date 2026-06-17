@@ -59,15 +59,15 @@ test("geyser display names keep the legacy frontend spelling", () => {
     en: "InFectious Polluted Oxygen Vent",
   });
   assert.deepEqual(GEYSER_DISPLAY_NAMES.murky_brine, {
-    zh: "污浊盐水喷口",
-    en: "Polluted Brine Vent",
+      zh: "污染浓盐水喷口",
+      en: "Polluted Brine Vent",
   });
   assert.deepEqual(GEYSER_DISPLAY_NAMES.small_reef_geyser, {
     zh: "潮汐泉",
     en: "Tidal Spring",
   });
   assert.deepEqual(GEYSER_DISPLAY_NAMES.underwater_vent, {
-    zh: "热气裂隙",
-    en: "Thermal Gas Fissure",
+      zh: "热气裂缝",
+      en: "Thermal Gas Fissure",
   });
 });
