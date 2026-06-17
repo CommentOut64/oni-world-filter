@@ -12,6 +12,7 @@ interface PreviewDetailsProps {
   selectedRegion: { id: string; zoneType: number } | null;
   hoverGeyserIndex: number | null;
   selectedGeyserIndex: number | null;
+  geyserDetailsSuppressed?: boolean;
 }
 
 export default function PreviewDetails({
@@ -20,6 +21,7 @@ export default function PreviewDetails({
   selectedRegion,
   hoverGeyserIndex,
   selectedGeyserIndex,
+  geyserDetailsSuppressed = false,
 }: PreviewDetailsProps) {
   void React;
   const geysers = useSearchStore((state) => state.geysers);
@@ -39,7 +41,7 @@ export default function PreviewDetails({
   const focusRegionName =
     focusRegion === null ? null : formatPlayerBiomeNameByZoneType(focusRegion.zoneType);
   const focusGeyser =
-    focusIndex === null ? null : preview.summary.geysers[focusIndex] ?? null;
+    geyserDetailsSuppressed || focusIndex === null ? null : preview.summary.geysers[focusIndex] ?? null;
   const traitNames = preview.summary.traits.map((traitIndex) =>
     resolveTraitDisplayName(traitIndex, catalog)
   );
@@ -100,7 +102,9 @@ export default function PreviewDetails({
           {
             key: "geyser",
             label: "喷口",
-            children: focusGeyser ? (
+            children: geyserDetailsSuppressed ? (
+              "当前世界已隐藏喷口信息"
+            ) : focusGeyser ? (
               <span className="preview-detail-focus-value">
                 {formatGeyserNameFromSummary(focusGeyser, geysers)} ({focusGeyser.x}, {focusGeyser.y})
               </span>

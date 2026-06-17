@@ -6,6 +6,7 @@ interface PreviewToolbarProps {
   showBiomes: boolean;
   showGeysers: boolean;
   geyserCount: number;
+  geyserControlsDisabled?: boolean;
   isGeneratingReport: boolean;
   onToggleBoundaries: () => void;
   onToggleBiomes: () => void;
@@ -20,6 +21,7 @@ export default function PreviewToolbar({
   showBiomes,
   showGeysers,
   geyserCount,
+  geyserControlsDisabled = false,
   isGeneratingReport,
   onToggleBoundaries,
   onToggleBiomes,
@@ -31,8 +33,8 @@ export default function PreviewToolbar({
   void React;
   return (
     <section className="preview-toolbar">
-      <Tooltip title="打开当前地图中的喷口列表">
-        <Button htmlType="button" onClick={onOpenGeyserList}>
+      <Tooltip title={geyserControlsDisabled ? "当前世界的喷口数据不可信，列表已禁用" : "打开当前地图中的喷口列表"}>
+        <Button htmlType="button" onClick={onOpenGeyserList} disabled={geyserControlsDisabled}>
           喷口列表 ({geyserCount})
         </Button>
       </Tooltip>
@@ -46,7 +48,7 @@ export default function PreviewToolbar({
       </div>
       <div className="preview-toolbar-toggle">
         <Typography.Text>喷口</Typography.Text>
-        <Switch checked={showGeysers} onChange={onToggleGeysers} />
+        <Switch checked={showGeysers} onChange={onToggleGeysers} disabled={geyserControlsDisabled} />
       </div>
       <Tooltip title="回到适合当前地图的默认视图">
         <Button htmlType="button" onClick={onResetView}>

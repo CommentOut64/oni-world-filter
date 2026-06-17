@@ -49,6 +49,26 @@ export default function GeyserListOverlay({
     );
   }, [geysersData, geysers]);
 
+  if (geysersData.length === 0) {
+    return (
+      <Card
+        size="small"
+        className="geyser-overlay"
+        variant="outlined"
+        title="喷口列表 (0)"
+        extra={
+          <Button className="geyser-overlay-close" htmlType="button" size="small" onClick={onClose}>
+            关闭
+          </Button>
+        }
+      >
+        <Typography.Paragraph className="hint">
+          为防止错误喷口信息误导，当前世界不提供喷口列表。
+        </Typography.Paragraph>
+      </Card>
+    );
+  }
+
   return (
     <Card
       size="small"

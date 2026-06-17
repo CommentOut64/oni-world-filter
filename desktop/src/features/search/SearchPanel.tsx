@@ -32,6 +32,7 @@ import { validateNativeCoordInput } from "./nativeCoordValidation";
 import SearchActions from "./SearchActions";
 import SearchConstraintAlerts from "./SearchConstraintAlerts";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
+import { isBrokenAquaticWorldType } from "./aquaticWorldGuard";
 import { buildWorldConstraintAlertItems } from "./geyserConstraintPresentation.ts";
 import {
   getPrimaryTraitBlockingError,
@@ -48,6 +49,8 @@ import TraitConstraintEditor from "./TraitConstraintEditor";
 import { hasMatchingWorldProfileRequest, type WorldProfileRequestState } from "./worldProfileRequestState";
 import {
   COUNT_MAX_SENTINEL,
+  decodeMixingToLevels,
+  encodeMixingFromLevels,
   createSearchSchema,
   getDefaultAllowLowPerfForCpuMode,
   resolveCountAutoMax,
@@ -148,6 +151,10 @@ export default function SearchPanel({
     submitDraft: SearchDraft;
     analysis: SearchAnalysisPayload;
   } | null>(null);
+  const [pendingAquaticWorldConfirmation, setPendingAquaticWorldConfirmation] = useState<{
+    uiDraft: SearchDraft;
+    submitDraft: SearchDraft;
+  } | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
   const watchCpuMode = methods.watch("cpuMode");
@@ -204,6 +211,25 @@ export default function SearchPanel({
     nextWorldProfile: SearchAnalysisPayload["worldProfile"],
     requestState: WorldProfileRequestState
   ) => {
+    const currentMixing = methods.getValues("mixing");
+    const slotCount = Math.max(catalog?.mixingSlots?.length ?? 0, 1);
+    const levels = decodeMixingToLevels(
+      Number.isFinite(currentMixing) ? currentMixing : draft.mixing,
+      slotCount
+    );
+    let hasSanitizedMixing = false;
+    for (const slot of nextWorldProfile.disabledMixingSlots) {
+      if (slot >= 0 && slot < levels.length && levels[slot] !== 0) {
+        levels[slot] = 0;
+        hasSanitizedMixing = true;
+      }
+    }
+    if (hasSanitizedMixing) {
+      methods.setValue("mixing", encodeMixingFromLevels(levels), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
     setWorldProfile(nextWorldProfile);
     setWorldProfileRequestState(requestState);
     setDisabledGeyserKeys(new Set(nextWorldProfile.impossibleGeyserTypes));
@@ -277,6 +303,7 @@ export default function SearchPanel({
     const uiDraft = toSearchDraft(values);
     let nextDraft = uiDraft;
     setPendingWarningConfirmation(null);
+    setPendingAquaticWorldConfirmation(null);
     setIsSearchSubmitting(true);
     try {
       if (hasCountAutoMax(uiDraft)) {
@@ -360,6 +387,13 @@ export default function SearchPanel({
         setPendingWarningConfirmation({ uiDraft, submitDraft: nextDraft, analysis });
         return;
       }
+      if (isBrokenAquaticWorldType(worlds, nextDraft.worldType)) {
+        setPendingAquaticWorldConfirmation({
+          uiDraft,
+          submitDraft: nextDraft,
+        });
+        return;
+      }
     } catch (error) {
       useSearchStore.setState({ lastError: formatTauriError(error) });
       return;
@@ -382,6 +416,20 @@ export default function SearchPanel({
 
   const handleWarningAbandon = () => {
     setPendingWarningConfirmation(null);
+  };
+
+  const handleAquaticWorldContinue = () => {
+    if (!pendingAquaticWorldConfirmation) {
+      return;
+    }
+    const nextUiDraft = pendingAquaticWorldConfirmation.uiDraft;
+    const nextSubmitDraft = pendingAquaticWorldConfirmation.submitDraft;
+    setPendingAquaticWorldConfirmation(null);
+    void startSearchWithDraft(nextUiDraft, nextSubmitDraft);
+  };
+
+  const handleAquaticWorldAbandon = () => {
+    setPendingAquaticWorldConfirmation(null);
   };
 
   const handleCoordSubmit = async () => {
@@ -712,6 +760,26 @@ export default function SearchPanel({
               onContinue={handleWarningContinue}
               onAbandon={handleWarningAbandon}
           />
+          <SearchWarningConfirmModal
+              open={pendingAquaticWorldConfirmation !== null}
+              analysis={null}
+              geysers={geysers}
+              title="重要提示"
+              continueText="仍然搜索"
+              abandonText="返回修改"
+              onContinue={handleAquaticWorldContinue}
+              onAbandon={handleAquaticWorldAbandon}
+          >
+              <Typography.Paragraph>
+                  水生行星包的世界目前只有地图可信。
+              </Typography.Paragraph>
+              <Typography.Paragraph>
+                  由于暂时无法修复，为防止错误喷口信息误导，系统将隐藏喷口图标、喷口文字、喷口参数，并清空喷口列表。
+              </Typography.Paragraph>
+              <Typography.Paragraph>
+                  所有依赖喷口的筛选条件对水生行星包世界都不可靠；水生行星包的混搭不受影响。
+              </Typography.Paragraph>
+          </SearchWarningConfirmModal>
       </FormProvider>
   );
 }
