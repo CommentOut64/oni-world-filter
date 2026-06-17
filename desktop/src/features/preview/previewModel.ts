@@ -4,6 +4,7 @@ import type { GeyserOption, PreviewPayload } from "../../lib/contracts";
 export interface PreviewRegion {
   id: string;
   zoneType: number;
+  hasHole: boolean;
   points: number[];
   centroid: { x: number; y: number };
 }
@@ -127,6 +128,7 @@ export function toPreviewViewModel(
     regions.push({
       id,
       zoneType: polygon.zoneType,
+      hasHole: polygon.hasHole,
       points,
       centroid: center,
     });

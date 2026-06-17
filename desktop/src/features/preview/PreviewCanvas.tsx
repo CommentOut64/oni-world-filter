@@ -98,6 +98,12 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
   const [hasManualViewportInteraction, setHasManualViewportInteraction] = useState(false);
 
   const model = useMemo(() => (preview ? toPreviewViewModel(preview, geysers) : null), [geysers, preview]);
+  const orderedRegions = useMemo(() => {
+    if (!model) {
+      return [];
+    }
+    return [...model.regions].sort((left, right) => Number(right.hasHole) - Number(left.hasHole));
+  }, [model]);
   const previewPalette = useMemo(() => createPreviewPalette(themeMode), [themeMode]);
   const fittedViewport = useMemo(() => {
     if (!model) {
@@ -307,7 +313,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
         </Layer>
 
         <Layer>
-          {model.regions.map((region) => (
+          {orderedRegions.map((region) => (
             <Line
               key={region.id}
               points={region.points}
@@ -434,7 +440,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
                 <Line
                   points={region.points}
                   closed
-                  fill={previewPalette.regionSelected}
+                  fill={region.hasHole ? undefined : previewPalette.regionSelected}
                   stroke={previewPalette.regionStrokeSelected}
                   strokeWidth={2 / viewport.scale}
                 />
@@ -452,7 +458,7 @@ const PreviewCanvas = forwardRef<PreviewCanvasHandle, PreviewCanvasProps>(functi
                 <Line
                   points={region.points}
                   closed
-                  fill={previewPalette.regionHover}
+                  fill={region.hasHole ? undefined : previewPalette.regionHover}
                   stroke={previewPalette.regionStrokeHover}
                   strokeWidth={2 / viewport.scale}
                 />

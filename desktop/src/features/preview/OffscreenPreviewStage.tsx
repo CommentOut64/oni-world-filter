@@ -43,6 +43,10 @@ function OffscreenPreviewStage(props: OffscreenPreviewStageProps) {
   } = props;
   const stageRef = useRef<KonvaStage | null>(null);
   const model = useMemo(() => toPreviewViewModel(preview, geysers), [geysers, preview]);
+  const orderedRegions = useMemo(
+    () => [...model.regions].sort((left, right) => Number(right.hasHole) - Number(left.hasHole)),
+    [model.regions]
+  );
   const previewPalette = useMemo(() => createPreviewPalette(themeMode), [themeMode]);
   const reportVisualScale = useMemo(() => stageWidth / 560, [stageWidth]);
   const resolvedLabels = useMemo(
@@ -98,7 +102,7 @@ function OffscreenPreviewStage(props: OffscreenPreviewStageProps) {
       </Layer>
 
       <Layer listening={false}>
-        {model.regions.map((region) => (
+        {orderedRegions.map((region) => (
           <Line
             key={region.id}
             points={region.points}
