@@ -1,7 +1,11 @@
 # oni-world-filter
 
 > A Windows x64 desktop app for Oxygen Not Included world generation and seed filtering.
-
+> 
+> 因存在较难修复的技术问题，oni-world-filter 项目现已暂停开发，版本停止更新。
+> 目前社区内，@无聊_Boring 大佬制作了一款与本项目功能类似的选种工具。该项目依然保持活跃，且已全面支持水生行星包，建议有需要的玩家转用该工具以接替使用。
+> 相关交流与答疑，欢迎加入Q群：1005498512。
+> 
 [![中文 README](https://img.shields.io/badge/README-中文-blue.svg)](./README.zh-CN.md)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![C++](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white)
