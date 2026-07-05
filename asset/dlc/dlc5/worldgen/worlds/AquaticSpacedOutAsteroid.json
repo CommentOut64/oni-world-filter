@@ -1,10 +1,5 @@
 {
   "name": "STRINGS.WORLDS.AQUATICSPACEDOUT.NAME",
-  "description": "STRINGS.WORLDS.AQUATICSPACEDOUT.DESCRIPTION",
-  "nameTables": [
-    "AQUATIC"
-  ],
-  "asteroidIcon": "aquatic_asteroid_so_kanim",
   "worldTags": [
     "Aquatic"
   ],
@@ -31,7 +26,7 @@
       ],
       "forbiddenTraits": [
         "traits/MisalignedStart",
-        "traits/GeoDormant",
+        "traits/Geodormant",
         "traits/MagmaVents",
         "expansion1::traits/Volcanoes"
       ]
@@ -57,9 +52,6 @@
   "fixedTraits": [
     "sunlightLow",
     "cosmicRadiationVeryLow"
-  ],
-  "seasons": [
-    "SpacedOutStyleStartMeteorShowers"
   ],
   "defaultsOverrides": {
     "data": {

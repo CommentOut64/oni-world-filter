@@ -1,13 +1,11 @@
 {
-  "biomeNoise": "dlc5::noise/reefNoise",
-  "backwallNoise": "dlc5::noise/kelpForestNoise",
   "temperatureRange": "HumanWarm",
   "pdWeight": 1,
   "density": {
     "min": 10,
     "max": 20
   },
-  "avoidRadius": 20,
+  "avoidRadius": 20.0,
   "minChildCount": 6,
   "doAvoidPoints": false,
   "dontRelaxChildren": true,

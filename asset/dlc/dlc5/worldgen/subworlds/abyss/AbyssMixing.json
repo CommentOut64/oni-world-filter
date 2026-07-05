@@ -1,12 +1,10 @@
 {
-  "biomeNoise": "dlc5::noise/abyssNoise",
-  "backwallNoise": "noise/SandstoneStrange",
   "temperatureRange": "SomewhatHot",
   "density": {
     "min": 5,
     "max": 10
   },
-  "avoidRadius": 15,
+  "avoidRadius": 15.0,
   "doAvoidPoints": false,
   "dontRelaxChildren": true,
   "extraBiomeChildren": 3,

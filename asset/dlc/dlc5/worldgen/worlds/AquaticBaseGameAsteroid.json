@@ -1,10 +1,5 @@
 {
   "name": "STRINGS.WORLDS.AQUATICBASEGAME.NAME",
-  "description": "STRINGS.WORLDS.AQUATICBASEGAME.DESCRIPTION",
-  "nameTables": [
-    "AQUATIC"
-  ],
-  "asteroidIcon": "aquatic_asteroid_base_kanim",
   "worldTags": [
     "Aquatic"
   ],
@@ -63,9 +58,6 @@
       "minCount": 2,
       "maxCount": 4
     }
-  ],
-  "seasons": [
-    "MeteorShowers"
   ],
   "defaultsOverrides": {
     "data": {

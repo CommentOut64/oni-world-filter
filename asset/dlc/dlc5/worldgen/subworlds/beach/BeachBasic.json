@@ -1,13 +1,11 @@
 {
-  "biomeNoise": "dlc5::noise/beachNoise",
-  "backwallNoise": "dlc5::noise/reefNoise",
   "temperatureRange": "HumanWarm",
   "pdWeight": 2,
   "density": {
     "min": 7,
     "max": 14
   },
-  "avoidRadius": 20,
+  "avoidRadius": 20.0,
   "minChildCount": 12,
   "doAvoidPoints": false,
   "dontRelaxChildren": true,

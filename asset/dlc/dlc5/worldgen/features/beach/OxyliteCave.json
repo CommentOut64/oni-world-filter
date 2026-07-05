@@ -16,15 +16,15 @@
       "choices": [
         {
           "element": "Oxygen",
-          "weight": 10
+          "weight": 10.0
         },
         {
           "element": "OxyRock",
-          "weight": 1
+          "weight": 1.0
         },
         {
           "element": "Salt",
-          "weight": 2
+          "weight": 2.0
         }
       ]
     },
@@ -33,11 +33,11 @@
       "choices": [
         {
           "element": "OxyRock",
-          "weight": 1
+          "weight": 1.0
         },
         {
           "element": "SiltStone",
-          "weight": 2
+          "weight": 2.0
         }
       ]
     }

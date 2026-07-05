@@ -1,10 +1,5 @@
 {
   "name": "STRINGS.WORLDS.AQUATICCLASSIC.NAME",
-  "description": "STRINGS.WORLDS.AQUATICCLASSIC.DESCRIPTION",
-  "nameTables": [
-    "AQUATIC"
-  ],
-  "asteroidIcon": "aquatic_asteroid_classic_kanim",
   "worldTags": [
     "Aquatic"
   ],
@@ -69,9 +64,6 @@
     "sunlightMed",
     "cosmicRadiationVeryLow",
     "largeImpactorFragmentsAllowed"
-  ],
-  "seasons": [
-    "ClassicStyleStartMeteorShowers"
   ],
   "defaultsOverrides": {
     "data": {

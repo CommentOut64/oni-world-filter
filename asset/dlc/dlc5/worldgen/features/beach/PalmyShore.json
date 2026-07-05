@@ -19,7 +19,7 @@
       "choices": [
         {
           "element": "Oxygen",
-          "weight": 1
+          "weight": 1.0
         },
         {
           "element": "Water",

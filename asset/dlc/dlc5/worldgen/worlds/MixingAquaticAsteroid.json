@@ -1,10 +1,5 @@
 {
   "name": "STRINGS.WORLDS.AQUATICMIXING.NAME",
-  "description": "STRINGS.WORLDS.AQUATICMIXING.DESCRIPTION",
-  "nameTables": [
-    "AQUATIC"
-  ],
-  "asteroidIcon": "aquatic_asteroid_mixing_kanim",
   "worldTags": [
     "Mixing",
     "SmallWorld",

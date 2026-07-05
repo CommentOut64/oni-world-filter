@@ -1,6 +1,4 @@
 {
-  "biomeNoise": "noise/Generic",
-  "borderOverride": "prehistoricCrust",
   "borderOverridePriority": 6,
   "temperatureRange": "VeryCold",
   "singleChildCount": true,

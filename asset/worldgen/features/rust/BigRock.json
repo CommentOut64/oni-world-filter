@@ -3,7 +3,6 @@
     "AllowExceedNodeBorders"
   ],
   "shape": "Circle",
-  "borders": null,
   "blobSize": {
     "min": 2,
     "max": 3
