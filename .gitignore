@@ -2,6 +2,8 @@
 .vscode/
 .tools/
 out/
+/build/
+/tmp/
 
 # CMake (covers accidental in-source builds)
 CMakeUserPresets.json
