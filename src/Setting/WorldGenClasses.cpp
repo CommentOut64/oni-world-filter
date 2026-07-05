@@ -97,21 +97,6 @@ static MixingConfig *FindSubworldMixing(SubworldMixingRule &rule,
     return nullptr;
 }
 
-static void CleanupUnusedMixingProxyNames(World &world)
-{
-    for (auto *filter : world.unknownCellsAllowedSubworlds2) {
-        auto *mutableFilter = const_cast<AllowedCellsFilter *>(filter);
-        if (mutableFilter == nullptr) {
-            continue;
-        }
-        auto remove = std::remove_if(
-            mutableFilter->subworldNames.begin(),
-            mutableFilter->subworldNames.end(),
-            [](const std::string &name) { return name.starts_with('('); });
-        mutableFilter->subworldNames.erase(remove, mutableFilter->subworldNames.end());
-    }
-}
-
 void World::ApplayWorldMixing(const WorldMixing &mixing)
 {
     for (auto &subworld : mixing.additionalSubworldFiles) {
@@ -169,7 +154,6 @@ void World::ApplayMixings(std::vector<MixingConfig *> &mixings)
             mixings.erase(itr);
         }
     }
-    CleanupUnusedMixingProxyNames(*this);
 }
 
 void World::ApplayTraits(const WorldTrait &trait, const SettingsCache &settings)
@@ -220,17 +204,21 @@ void World::ClearMixingsAndTraits()
     globalFeatures2.clear();
     mixingSubworlds.clear();
     mixingSubworlds.reserve(10);
+    for (auto filter : unknownCellsAllowedSubworlds2) {
+        auto filter2 = const_cast<AllowedCellsFilter *>(filter);
+        filter2->Restore();
+    }
     unknownCellsAllowedSubworlds2.clear();
     worldTemplateRules2.clear();
-    for (auto &filter : unknownCellsAllowedSubworlds) {
-        filter.Restore();
-    }
+    subworldFiles2.reserve(subworldFiles.size());
     for (auto &subworld : subworldFiles) {
         subworldFiles2.push_back(&subworld);
     }
+    unknownCellsAllowedSubworlds2.reserve(unknownCellsAllowedSubworlds.size());
     for (auto &filter : unknownCellsAllowedSubworlds) {
         unknownCellsAllowedSubworlds2.push_back(&filter);
     }
+    worldTemplateRules2.reserve(worldTemplateRules.size());
     for (auto &rule : worldTemplateRules) {
         worldTemplateRules2.push_back(&rule);
     }

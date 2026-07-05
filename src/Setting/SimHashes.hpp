@@ -268,7 +268,8 @@ enum class ZoneType {
     KelpForest,
     Reef,
     Abyss,
-    Beach
+    Beach,
+    MaxZoneType
 };
 
 enum class LocationType {
@@ -366,10 +367,11 @@ enum class Range {
     Room,
     HumanWarm,
     HumanHot,
+    SomewhatHot,
     Hot,
     VeryHot,
     ExtremelyHot,
-    SomewhatHot
+    MaxRange
 };
 
 enum class Type {

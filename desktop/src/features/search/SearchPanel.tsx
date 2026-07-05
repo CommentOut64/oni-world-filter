@@ -774,7 +774,7 @@ export default function SearchPanel({
                   水生行星包的世界目前只有地图可信。
               </Typography.Paragraph>
               <Typography.Paragraph>
-                  由于暂时无法修复，为防止错误喷口信息误导，系统将隐藏喷口图标、喷口文字、喷口参数，并清空喷口列表。
+                  前端不再额外隐藏喷口预览，但这些世界的喷口结果仍可能不可靠，请结合实际情况自行判断。
               </Typography.Paragraph>
               <Typography.Paragraph>
                   所有依赖喷口的筛选条件对水生行星包世界都不可靠；水生行星包的混搭不受影响。

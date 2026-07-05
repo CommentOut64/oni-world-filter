@@ -6,63 +6,6 @@
 #include "Setting/ContentActivation.hpp"
 #include "Setting/SettingsCache.hpp"
 #include "Setting/WorldTraitConflict.hpp"
-#include "Utils/KRandom.hpp"
-#include "Utils/PointGenerator.hpp"
-
-namespace {
-
-bool MatchesWorldMixingTags(const World &world, const WorldMixing &mixing)
-{
-    if (!mixing.requiredTags.empty() &&
-        !std::ranges::all_of(mixing.requiredTags, [&world](const std::string &tag) {
-            return std::ranges::contains(world.worldTags, tag);
-        })) {
-        return false;
-    }
-    if (!mixing.forbiddenTags.empty() &&
-        std::ranges::any_of(mixing.forbiddenTags, [&world](const std::string &tag) {
-            return std::ranges::contains(world.worldTags, tag);
-        })) {
-        return false;
-    }
-    return true;
-}
-
-MixingConfig *FindWorldMixingForPlacement(const WorldPlacement &placement,
-                                          const SettingsCache &settings,
-                                          std::vector<MixingConfig *> &configs)
-{
-    std::vector<MixingConfig *> sorted = configs;
-    std::sort(sorted.begin(), sorted.end(), [](const MixingConfig *lhs, const MixingConfig *rhs) {
-        if (lhs == nullptr || rhs == nullptr) {
-            return lhs != nullptr;
-        }
-        if (rhs->minCount != lhs->minCount) {
-            return rhs->minCount < lhs->minCount;
-        }
-        return rhs->maxCount < lhs->maxCount;
-    });
-    for (auto *config : sorted) {
-        if (config == nullptr || config->maxCount <= 0) {
-            continue;
-        }
-        auto *setting = static_cast<WorldMixingSettings *>(config->setting);
-        if (setting == nullptr) {
-            continue;
-        }
-        const auto worldItr = settings.worlds.find(setting->world);
-        if (worldItr == settings.worlds.end()) {
-            continue;
-        }
-        if (!MatchesWorldMixingTags(worldItr->second, placement.worldMixing)) {
-            continue;
-        }
-        return config;
-    }
-    return nullptr;
-}
-
-} // namespace
 
 bool BuildResolvedWorldPlacements(SettingsCache &settings,
                                   std::vector<ResolvedWorldPlacement> *placements,
@@ -105,74 +48,6 @@ bool BuildResolvedWorldPlacements(SettingsCache &settings,
         placements->front().sourceWorld->locationType = LocationType::StartWorld;
     }
 
-    std::vector<MixingConfig *> worldMixingConfigs;
-    for (auto &config : settings.mixConfigs) {
-        if (config.level == MixingLevel::Disabled || config.type != 1) {
-            continue;
-        }
-        auto itr = settings.worldMixing.find(config.path);
-        if (itr == settings.worldMixing.end()) {
-            continue;
-        }
-        config.setting = &itr->second;
-        worldMixingConfigs.push_back(&config);
-    }
-    if (worldMixingConfigs.empty()) {
-        return true;
-    }
-
-    std::vector<int> candidateIndexes;
-    candidateIndexes.reserve(placements->size());
-    for (const auto &placement : *placements) {
-        if (placement.placement != nullptr && placement.placement->IsMixingPlacement()) {
-            candidateIndexes.push_back(placement.placementIndex);
-        }
-    }
-    if (candidateIndexes.empty()) {
-        return true;
-    }
-
-    KRandom random(settings.seed);
-    ShuffleSeeded(candidateIndexes, random);
-    for (const int placementIndex : candidateIndexes) {
-        if (worldMixingConfigs.empty()) {
-            break;
-        }
-        auto &resolved = (*placements)[static_cast<size_t>(placementIndex)];
-        if (resolved.placement == nullptr) {
-            continue;
-        }
-        ShuffleSeeded(worldMixingConfigs, random);
-        MixingConfig *config =
-            FindWorldMixingForPlacement(*resolved.placement, settings, worldMixingConfigs);
-        if (config == nullptr) {
-            continue;
-        }
-        auto *setting = static_cast<WorldMixingSettings *>(config->setting);
-        if (setting == nullptr) {
-            continue;
-        }
-        const auto worldItr = settings.worlds.find(setting->world);
-        if (worldItr == settings.worlds.end()) {
-            if (errorMessage != nullptr) {
-                *errorMessage = "world mixing target is missing";
-            }
-            return false;
-        }
-        worldItr->second.locationType = resolved.placement->locationType;
-        resolved.sourceWorld = &worldItr->second;
-        resolved.appliedWorldMixingSetting = setting;
-        resolved.worldAssetId = setting->world;
-
-        config->maxCount--;
-        config->minCount--;
-        if (config->maxCount <= 0) {
-            const auto itr = std::ranges::find(worldMixingConfigs, config);
-            if (itr != worldMixingConfigs.end()) {
-                worldMixingConfigs.erase(itr);
-            }
-        }
-    }
     return true;
 }
 

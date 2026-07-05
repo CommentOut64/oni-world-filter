@@ -83,13 +83,20 @@ private:
 
 public:
     bool LoadSettingsCache(const std::string_view &content);
+    bool CoordinateChanged(const std::string &text);
     bool CoordinateChanged(const std::string &text, SettingsCache &settings);
+    bool CoordinateChanged(int type, int seed, uint64_t mix);
+    bool InitializeWorlds(std::vector<World *> &chosenWorlds);
     bool IsSpaceOutEnabled() const { return (m_dlcState & 1) == 1; }
     ActiveContentSet BuildActiveContentSet() const;
     bool IsContentEnabled(const std::string &id) const;
     const NoiseTree *FindNoise(std::string_view resourcePath,
                                std::string_view ownerResourcePath = {}) const;
+    std::vector<const WorldTrait *> GetRandomTraits(const World &world, int seed) const;
     std::vector<const WorldTrait *> GetRandomTraits(const World &world) const;
+    void SetSeedWithTraits(const std::vector<World *> &worlds,
+                           int traitsFlag,
+                           KRandom &random);
     void DoSubworldMixing(std::vector<World *> worlds, bool resetWorldRuntime = true);
     SearchMutableStateSnapshot CaptureSearchMutableState() const;
     void RestoreSearchMutableState(const SearchMutableStateSnapshot &snapshot);
@@ -114,6 +121,8 @@ public:
     }
 
 private:
+    bool InitializeCluster(std::string_view coord);
+    void ParseAndApplyMixingSettingsCode(uint64_t num);
     void ParseAndApplyMixingSettingsCode(const std::string &code);
     void SanitizeMixingConfigsForCurrentCluster();
     void RepairTransientPointersAfterCopy();

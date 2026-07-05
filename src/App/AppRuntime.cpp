@@ -12,6 +12,7 @@
 #include <clipper.hpp>
 
 #include "App/SettingsAsset.hpp"
+#include "Geyser/GeyserCatalog.hpp"
 #include "config.h"
 
 #ifndef __EMSCRIPTEN__
@@ -72,6 +73,69 @@ std::string ReadEnvironmentVariable(const char *name)
     std::string result(value);
     free(value);
     return result;
+}
+
+std::string_view ResolveWorldgenGeyserCatalogKey(int worldgenType)
+{
+    static constexpr std::string_view kWorldgenTypes[] = {
+        "steam", "hot_steam", "hot_water", "slush_water", "filthy_water",
+        "slush_salt_water", "salt_water", "small_volcano", "big_volcano",
+        "liquid_co2", "hot_co2", "hot_hydrogen", "hot_po2", "slimy_po2",
+        "chlorine_gas", "methane", "molten_copper", "molten_iron",
+        "molten_gold", "molten_aluminum", "molten_cobalt", "oil_drip",
+        "liquid_sulfur", "chlorine_gas_cool", "molten_tungsten",
+        "molten_niobium", "murky_brine", "OilWell", "SmallReefGeyser",
+        "UnderwaterVent", "receiver", "sender", "teleporter", "cryopod",
+        "printpod",
+    };
+    if (worldgenType < 0 ||
+        worldgenType >= static_cast<int>(std::size(kWorldgenTypes))) {
+        return {};
+    }
+    switch (worldgenType) {
+    case 27:
+        return "oil_reservoir";
+    case 28:
+        return "small_reef_geyser";
+    case 29:
+        return "underwater_vent";
+    case 30:
+        return "warp_receiver";
+    case 31:
+        return "warp_sender";
+    case 32:
+        return "warp_portal";
+    case 33:
+        return "cryo_tank";
+    case 34:
+        return "printing_pod";
+    default:
+        return kWorldgenTypes[static_cast<size_t>(worldgenType)];
+    }
+}
+
+int ResolveCatalogGeyserType(int worldgenType)
+{
+    const auto key = ResolveWorldgenGeyserCatalogKey(worldgenType);
+    if (key.empty()) {
+        return worldgenType;
+    }
+    const int mapped = Geyser::FindIdByKey(key);
+    return mapped >= 0 ? mapped : worldgenType;
+}
+
+bool ShouldIncludeInAuthoritativeSummary(int worldgenType)
+{
+    switch (worldgenType) {
+    case 30: // warp receiver
+    case 31: // warp sender
+    case 32: // warp teleporter
+    case 33: // cryopod
+    case 34: // printpod
+        return false;
+    default:
+        return true;
+    }
 }
 
 } // namespace
@@ -285,40 +349,57 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlac
                                                    const std::vector<int> &placementIndexes,
                                                    int primaryPlacementIndex)
 {
-    std::vector<WorldEffectiveState> states;
     std::string errorMessage;
-    if (!InitializeWorldEffectiveStates(m_settings, placements, &states, &errorMessage)) {
-        LogE("InitializeWorldEffectiveStates failed: %s", errorMessage.c_str());
-        return false;
-    }
     std::vector<ClusterWorldOffset> worldOffsets;
     if (!ComputeClusterWorldOffsets(placements, &worldOffsets, &errorMessage)) {
         LogE("ComputeClusterWorldOffsets failed: %s", errorMessage.c_str());
         return false;
     }
-    auto effectiveWorlds = CollectWorldEffectivePointers(states);
+
+    std::vector<World *> activeWorlds;
+    if (!m_settings.InitializeWorlds(activeWorlds)) {
+        LogE("InitializeWorlds failed.");
+        return false;
+    }
+    if (activeWorlds.size() != placements.size()) {
+        LogE("active world count mismatch, placements=%zu worlds=%zu",
+             placements.size(),
+             activeWorlds.size());
+        return false;
+    }
+    for (size_t i = 0; i < placements.size(); ++i) {
+        auto *world = activeWorlds[i];
+        if (world == nullptr) {
+            LogE("world source at placement index %zu is null.", i);
+            return false;
+        }
+        world->ClearMixingsAndTraits();
+        placements[i].sourceWorld = world;
+    }
 
     if (traitsFlag != 0) {
-        SetSeedWithTraits(effectiveWorlds, traitsFlag);
+        m_settings.SetSeedWithTraits(activeWorlds, traitsFlag, m_random);
     }
 
     int seed = m_settings.seed;
-    for (auto &state : states) {
-        auto *world = &state.world;
+    std::vector<std::vector<const WorldTrait *>> randomTraitsByPlacement(placements.size());
+    for (size_t i = 0; i < placements.size(); ++i) {
+        const auto &placement = placements[i];
+        auto *world = activeWorlds[i];
         if (world->locationType == LocationType::Cluster) {
             continue;
         }
 
-        m_settings.seed = seed + state.placementIndex;
-        state.randomTraits = m_settings.GetRandomTraits(*world);
-        for (const auto *trait : state.randomTraits) {
+        auto &randomTraits = randomTraitsByPlacement[static_cast<size_t>(placement.placementIndex)];
+        randomTraits = m_settings.GetRandomTraits(*world, seed + static_cast<int>(i));
+        for (const auto *trait : randomTraits) {
             if (trait != nullptr) {
                 world->ApplayTraits(*trait, m_settings);
             }
         }
     }
     m_settings.seed = seed;
-    ApplySubworldMixingToWorldEffectiveStates(m_settings, states);
+    m_settings.DoSubworldMixing(activeWorlds, false);
 
     std::vector<int> normalizedPlacementIndexes;
     normalizedPlacementIndexes.reserve(placementIndexes.size());
@@ -334,19 +415,23 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlac
     }
 
     for (const int placementIndex : normalizedPlacementIndexes) {
-        auto *state = FindWorldEffectiveState(states, placementIndex);
-        if (state == nullptr) {
-            LogE("world effective state at placement index %d is null.", placementIndex);
+        if (placementIndex < 0 || placementIndex >= static_cast<int>(placements.size())) {
+            LogE("placement index %d is out of range during world generation.", placementIndex);
             return false;
         }
-        auto *world = &state->world;
+        auto &placement = placements[static_cast<size_t>(placementIndex)];
+        auto *world = placement.sourceWorld;
+        if (world == nullptr) {
+            LogE("world source at placement index %d is null.", placementIndex);
+            return false;
+        }
         if (world->locationType == LocationType::Cluster) {
             LogE("placement index %d points to cluster-only world.", placementIndex);
             return false;
         }
 
         m_settings.seed = seed + placementIndex;
-        WorldGen worldGen(*world, m_settings);
+        WorldGen worldGen(*world, m_settings, seed + placementIndex);
         std::vector<Site> sites;
         if (!worldGen.GenerateOverworld(sites)) {
             LogE("generate overworld failed.");
@@ -368,7 +453,13 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlac
             LogE("cluster world offset at placement index %d is missing.", placementIndex);
             return false;
         }
-        auto summary = BuildSummary(seed, *state, *worldOffset, sites, worldGen);
+        WorldEffectiveState summaryState;
+        summaryState.placementIndex = placementIndex;
+        summaryState.worldAssetId = placement.worldAssetId;
+        summaryState.randomTraits =
+            randomTraitsByPlacement[static_cast<size_t>(placementIndex)];
+        summaryState.world = *world;
+        auto summary = BuildSummary(seed, summaryState, *worldOffset, sites, worldGen);
         summary.isPrimary = primaryPlacementIndex >= 0
                                 ? placementIndex == primaryPlacementIndex
                                 : world->locationType == LocationType::StartWorld;
@@ -380,57 +471,13 @@ bool AppRuntime::GenerateWorldsForPlacementIndexes(std::vector<ResolvedWorldPlac
             m_sink->OnGeneratedWorldPreview(preview);
         }
     }
+    m_settings.seed = seed;
     return true;
 }
 
 void AppRuntime::SetSeedWithTraits(const std::vector<World *> &worlds, int traitsFlag)
 {
-    std::vector<const WorldTrait *> presets;
-    int index = 0;
-    for (auto &pair : m_settings.traits) {
-        if ((traitsFlag >> index & 1) == 1) {
-            presets.push_back(&pair.second);
-        }
-        ++index;
-    }
-    if (presets.empty()) {
-        m_settings.seed = m_random.Next();
-        return;
-    }
-
-    index = 0;
-    World *world = worlds[index];
-    for (size_t i = 0; i < worlds.size(); ++i) {
-        world = worlds[i];
-        if (world->locationType == LocationType::StartWorld) {
-            index = (int)i;
-            break;
-        }
-    }
-
-    size_t maxCount = 0;
-    int maxCountSeed = 0;
-    for (int i = 0; i < 1000; ++i) {
-        int seed = m_random.Next();
-        m_settings.seed = seed + index;
-        auto traits = m_settings.GetRandomTraits(*world);
-        m_settings.seed = seed;
-        size_t count = 0;
-        for (auto *preset : presets) {
-            if (std::ranges::contains(traits, preset)) {
-                ++count;
-            }
-        }
-        if (count == presets.size()) {
-            return;
-        } else if (maxCount < count) {
-            maxCount = count;
-            maxCountSeed = seed;
-        }
-    }
-
-    m_settings.seed = maxCountSeed;
-    LogI("can not find seed for preset traits");
+    m_settings.SetSeedWithTraits(worlds, traitsFlag, m_random);
 }
 
 GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
@@ -468,12 +515,16 @@ GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
     auto geysers = worldGen.GetGeysers(summary.geyserSeed);
     summary.geysers.reserve(geysers.size());
     for (auto &item : geysers) {
+        if (!ShouldIncludeInAuthoritativeSummary(item.z)) {
+            continue;
+        }
+        const int geyserType = ResolveCatalogGeyserType(item.z);
         summary.geysers.push_back({
-            item.z,
+            geyserType,
             item.x,
-            static_cast<int>(world->worldsize.y - item.y),
+            summary.worldSize.y - item.y,
             item.x,
-            item.y,
+            summary.worldSize.y - item.y,
         });
     }
 

@@ -13,8 +13,7 @@ struct GeyserSummary {
     int type{};
     int x{};
     int y{};
-    // `x/y` 是给预览链和文案展示使用的显示坐标；`worldX/worldY`
-    // 保留 worldgen 原始坐标，供喷口参数链按游戏语义复算。
+    // 对外统一导出权威坐标；保留 `worldX/worldY` 仅为兼容现有协议字段名。
     int worldX{};
     int worldY{};
 };

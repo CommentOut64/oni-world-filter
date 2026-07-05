@@ -726,7 +726,7 @@ void BuildSpatialEnvelopes(SettingsCache &settings,
     profile->spatialEnvelopes.clear();
     profile->envelopeStatsById.clear();
 
-    WorldGen worldGen(world, settings);
+    WorldGen worldGen(world, settings, settings.seed);
     std::vector<Site> generatedSites;
     if (!worldGen.GenerateOverworld(generatedSites)) {
         profile->spatialEnvelopes.push_back(SpatialEnvelope{

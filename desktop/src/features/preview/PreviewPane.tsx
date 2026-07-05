@@ -8,7 +8,6 @@ import { formatTauriError } from "../../lib/tauri.ts";
 import { usePreviewStore } from "../../state/previewStore";
 import { previewBaseKey } from "../../state/previewStoreState.ts";
 import { useSearchStore } from "../../state/searchStore";
-import { isBrokenAquaticWorldType } from "../search/aquaticWorldGuard";
 import { findCategoryForWorld } from "../search/worldParameterUi.ts";
 import { exportWorldReport } from "../report/exportWorldReport.ts";
 import PreviewCanvas, { type PreviewCanvasHandle } from "./PreviewCanvas";
@@ -69,9 +68,6 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
   const selectedWorldCategory = selectedMatch
     ? findCategoryForWorld(worlds, selectedMatch.worldType)
     : null;
-  const suppressBrokenAquaticGeysers = selectedMatch
-    ? isBrokenAquaticWorldType(worlds, selectedMatch.worldType)
-    : false;
   const isMoonletResult = selectedWorldCategory === "moonletCluster";
   const selectedMatchBaseKey = selectedMatch
     ? `${selectedMatch.worldType}:${selectedMatch.seed}:${selectedMatch.mixing}`
@@ -106,17 +102,6 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
     }
     setSelectedGeyserAnchor(null);
   }, [preview, selectedGeyserIndex]);
-
-  useEffect(() => {
-    if (!suppressBrokenAquaticGeysers) {
-      return;
-    }
-    setShowGeysers(false);
-    setHoverGeyserIndex(null);
-    setSelectedGeyserIndex(null);
-    setSelectedGeyserAnchor(null);
-    setShowGeyserList(false);
-  }, [suppressBrokenAquaticGeysers]);
 
   const handleGenerateReport = () => {
     if (!selectedMatch) {
@@ -216,9 +201,9 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
       <PreviewToolbar
         showBoundaries={showBoundaries}
         showBiomes={showBiomes}
-        showGeysers={suppressBrokenAquaticGeysers ? false : showGeysers}
-        geyserCount={suppressBrokenAquaticGeysers ? 0 : preview?.summary.geysers.length ?? 0}
-        geyserControlsDisabled={suppressBrokenAquaticGeysers}
+        showGeysers={showGeysers}
+        geyserCount={preview?.summary.geysers.length ?? 0}
+        geyserControlsDisabled={false}
         isGeneratingReport={isGeneratingReport}
         onToggleBoundaries={() => setShowBoundaries((current) => !current)}
         onToggleBiomes={() => setShowBiomes((current) => !current)}
@@ -234,10 +219,10 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
           sessionKey={previewSessionKey}
           preview={preview}
           geysers={geysers}
-          geyserPopoverEnabled={activeTarget === "primary" && !suppressBrokenAquaticGeysers}
+          geyserPopoverEnabled={activeTarget === "primary"}
           showBoundaries={showBoundaries}
           showBiomes={showBiomes}
-          showGeysers={suppressBrokenAquaticGeysers ? false : showGeysers}
+          showGeysers={showGeysers}
           selectedGeyserIndex={selectedGeyserIndex}
           onHoverRegionChange={setHoveredRegion}
           onSelectedRegionChange={setSelectedRegion}
@@ -249,9 +234,9 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
         <GeyserParameterPopover
           anchor={selectedGeyserAnchor}
           popupContainer={previewCanvasContainer}
-          geyser={suppressBrokenAquaticGeysers ? null : selectedGeyser}
-          geyserDetail={suppressBrokenAquaticGeysers ? null : selectedGeyserDetail}
-          geyserDetailsStatus={suppressBrokenAquaticGeysers ? "idle" : activeGeyserDetailsStatus}
+          geyser={selectedGeyser}
+          geyserDetail={selectedGeyserDetail}
+          geyserDetailsStatus={activeGeyserDetailsStatus}
           geyserDetailsError={activeGeyserDetailsError}
           onClose={() => {
             setSelectedGeyserIndex(null);
@@ -262,9 +247,9 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
         {showGeyserList && preview ? (
           <GeyserListOverlay
             activeTarget={activeTarget}
-            geysersData={suppressBrokenAquaticGeysers ? [] : preview.summary.geysers}
-            geyserDetails={suppressBrokenAquaticGeysers ? [] : activeGeyserDetails}
-            geyserDetailsStatus={suppressBrokenAquaticGeysers ? "idle" : activeGeyserDetailsStatus}
+            geysersData={preview.summary.geysers}
+            geyserDetails={activeGeyserDetails}
+            geyserDetailsStatus={activeGeyserDetailsStatus}
             popupContainer={previewCanvasContainer}
             onClose={() => setShowGeyserList(false)}
           />
@@ -276,7 +261,6 @@ export default function PreviewPane({ themeMode, onThemeModeChange }: PreviewPan
         selectedRegion={selectedRegion}
         hoverGeyserIndex={hoverGeyserIndex}
         selectedGeyserIndex={selectedGeyserIndex}
-        geyserDetailsSuppressed={suppressBrokenAquaticGeysers}
       />
     </section>
   );

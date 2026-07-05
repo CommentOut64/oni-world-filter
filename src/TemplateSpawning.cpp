@@ -12,20 +12,6 @@
 
 using TagSet = std::vector<std::string>;
 
-namespace {
-
-Vector2f ResolveTemplateRulePosition(const Site &site,
-                                     const TemplateSpawnRules &rule)
-{
-    const auto &centroid = site.polygon.Centroid();
-    return Vector2f{static_cast<float>(static_cast<int>(centroid.x) +
-                                       static_cast<int>(rule.overrideOffset.x)),
-                    static_cast<float>(static_cast<int>(centroid.y) +
-                                       static_cast<int>(rule.overrideOffset.y))};
-}
-
-} // namespace
-
 class TemplateSpawning
 {
 private:
@@ -197,8 +183,8 @@ static bool DoesCellMatchFilter(const Site &site,
         }
         return true;
     case TagCommand::DistanceFromTag: {
-        auto itr = site.minDistanceToTag.find(filter.tag);
-        if (itr != site.minDistanceToTag.end()) {
+        auto itr = site.parent->minDistanceToTag.find(filter.tag);
+        if (itr != site.parent->minDistanceToTag.end()) {
             if (itr->second >= filter.minDistance) {
                 return itr->second <= filter.maxDistance;
             }
@@ -252,7 +238,7 @@ bool TemplateSpawning::RemoveOverlappingPOI(
     const Site *site, const TemplateContainer &templt,
     const TemplateSpawnRules &rule) const
 {
-    auto position = ResolveTemplateRulePosition(*site, rule);
+    auto position = site->polygon.Centroid() + rule.overrideOffset;
     Rect templateBounds = templt.info.GetBounds(position, m_poiPadding);
     if (IsPOIOverlappingBounds(templateBounds)) {
         return true;
@@ -428,7 +414,8 @@ bool TemplateSpawning::ApplyTemplateRules(const TemplateSpawnRules &rule,
         } else {
             site = FindTargetForTemplate(templt, rule, guarantee);
             if (site != nullptr) {
-                position = ResolveTemplateRulePosition(*site, rule);
+                auto &centroid = site->polygon.Centroid();
+                position = centroid + rule.overrideOffset;
             }
         }
         if (site != nullptr) {

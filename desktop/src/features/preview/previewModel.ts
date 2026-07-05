@@ -117,6 +117,8 @@ export function toPreviewViewModel(
   const regions: PreviewRegion[] = [];
   const bounds: PreviewRegionBounds[] = [];
   const labels: PreviewLabelCandidate[] = [];
+  const worldHeight = preview.summary.worldSize.h;
+  const toDisplayY = (worldY: number): number => worldHeight - worldY;
 
   preview.polygons.forEach((polygon, index) => {
     if (!polygon.vertices.length) {
@@ -153,7 +155,7 @@ export function toPreviewViewModel(
       index,
       id: formatGeyserNameFromSummary(item, geyserOptions),
       x: item.x,
-      y: item.y,
+      y: toDisplayY(item.y),
       distanceToStart: Number(Math.sqrt(dx * dx + dy * dy).toFixed(1)),
     };
   });
@@ -161,7 +163,7 @@ export function toPreviewViewModel(
   labels.push({
     id: "start-marker-label",
     x: start.x,
-    y: start.y,
+    y: toDisplayY(start.y),
     text: "起点",
     kind: "start",
   });
@@ -182,7 +184,7 @@ export function toPreviewViewModel(
     geysers,
     startMarker: {
       x: start.x,
-      y: start.y,
+      y: toDisplayY(start.y),
       text: "起点",
     },
     worldBounds: {

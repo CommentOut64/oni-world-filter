@@ -31,6 +31,25 @@ std::shared_ptr<const SettingsCache> g_sharedSettingsCache;
 
 } // namespace
 
+namespace Setting
+{
+template<>
+bool deserialize(const Json::Value &json, std::map<Range, Temperature> &obj)
+{
+    for (auto itr = json.begin(); itr != json.end(); ++itr) {
+        Range key;
+        Temperature value;
+        if (!Deserializer<Range>::deserialize(itr.name(), key) ||
+            !Deserializer<Temperature>::deserialize(*itr, value)) {
+            LogE("object std::map<Range, Temperature> parse failed.");
+            return false;
+        }
+        obj[key] = value;
+    }
+    return true;
+}
+} // namespace Setting
+
 SettingsCache::SettingsCache(const SettingsCache &other)
 {
     *this = other;
@@ -100,8 +119,6 @@ void SettingsCache::RepairTransientPointersAfterCopy()
             }
         }
     }
-    SanitizeMixingConfigsForCurrentCluster();
-
     for (auto &pair : worlds) {
         pair.second.ClearMixingsAndTraits();
     }
@@ -251,14 +268,7 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
             continue;
         }
         if (strstr(stat.m_filename, "worldgen/temperatures.json") != nullptr) {
-            ComposableDictionary<Temperature> temperatureDict;
-            LoadJsonFile(zip, i, temperatureDict);
-            for (auto &pair : temperatureDict.add) {
-                Range range;
-                if (Setting::deserialize<Range>(pair.first, range)) {
-                    temperatures.emplace(range, pair.second);
-                }
-            }
+            LoadJsonFile(zip, i, temperatures);
             continue;
         }
         if (strstr(stat.m_filename, "worldgen/borders.json") != nullptr) {
@@ -347,7 +357,6 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
             std::string key = GenerateKey(stat.m_filename);
             TemplateContainer &templt = templates[key];
             LoadJsonFile(zip, i, templt);
-            templt.RefreshInfo();
             templt.name = key;
             continue;
         }
@@ -356,6 +365,7 @@ bool SettingsCache::LoadSettingsCache(const std::string_view &content)
     mz_zip_end(&zip);
     for (auto &pair : Asubworlds) {
         auto &list = orderedSubworlds[pair.first];
+        list.reserve(pair.second.size());
         for (auto &name : pair.second) {
             auto itr = subworlds.find(name);
             if (itr != subworlds.end()) {
@@ -468,53 +478,112 @@ std::string SettingsCache::BinaryToBase36(uint64_t input)
 bool SettingsCache::CoordinateChanged(const std::string &text,
                                       SettingsCache &settings)
 {
+    (void)settings;
+    return CoordinateChanged(text);
+}
+
+bool SettingsCache::CoordinateChanged(const std::string &text)
+{
     std::vector<std::string> codes = ParseSettingCoordinate(text);
     if (codes.size() < 4 || codes.size() > 6) {
         return false;
     }
     seed = std::stoi(codes[2]);
+    ParseAndApplyMixingSettingsCode(codes[5]);
+    return InitializeCluster(codes[1]);
+}
+
+bool SettingsCache::CoordinateChanged(int type, int seedValue, uint64_t mix)
+{
+    const char *clusterPrefix[] = {
+        "SNDST-A",   "OCAN-A",   "S-FRZ",     "LUSH-A",    "FRST-A",
+        "VOLCA",     "BAD-A",    "HTFST-A",   "OASIS-A",   "CER-A",
+        "CERS-A",    "PRE-A",    "PRES-A",    "AQU-A",     "V-SNDST-C",
+        "V-OCAN-C",  "V-SWMP-C", "V-SFRZ-C",  "V-LUSH-C",  "V-FRST-C",
+        "V-VOLCA-C", "V-BAD-C",  "V-HTFST-C", "V-OASIS-C", "V-CER-C",
+        "V-CERS-C",  "V-PRE-C",  "V-PRES-C",  "V-AQU-C",   "SNDST-C",
+        "AQU-C",     "PRE-C",    "CER-C",     "FRST-C",    "SWMP-C",
+        "M-SWMP-C",  "M-BAD-C",  "M-FRZ-C",   "M-FLIP-C",  "M-RAD-C",
+        "M-CERS-C"};
+    if (type < 0 || type >= static_cast<int>(std::size(clusterPrefix))) {
+        return false;
+    }
+
+    seed = seedValue;
+    ParseAndApplyMixingSettingsCode(mix);
+    return InitializeCluster(clusterPrefix[type]);
+}
+
+bool SettingsCache::InitializeCluster(std::string_view coord)
+{
     cluster = nullptr;
-    for (auto &pair : settings.clusters) {
-        if (pair.second.coordinatePrefix == codes[1]) {
+    for (auto &pair : clusters) {
+        if (pair.second.coordinatePrefix == coord) {
             cluster = &pair.second;
             break;
         }
     }
     if (cluster == nullptr) {
-        LogE("cluster %s was wrong.", codes[1].c_str());
+        LogE("cluster %.*s was wrong.", static_cast<int>(coord.size()), coord.data());
         return false;
     }
+
     m_dlcState = 0;
     for (auto &id : cluster->requiredDlcIds) {
         if (const auto *dlc = DlcRegistry::FindById(id); dlc != nullptr) {
             m_dlcState |= static_cast<int>(dlc->stateBit);
         }
     }
-    ParseAndApplyMixingSettingsCode(codes[5]);
-    if (codes[1].contains("CER")) {
-        mixConfigs[0].level = mixConfigs[1].level = mixConfigs[2].level =
-            mixConfigs[3].level = mixConfigs[4].level = MixingLevel::Disabled;
-    } else if (codes[1].contains("PRE")) {
-        mixConfigs[6].level = mixConfigs[7].level = mixConfigs[8].level =
-            mixConfigs[9].level = mixConfigs[10].level = MixingLevel::Disabled;
-    } else if (codes[1].contains("AQU")) {
-        mixConfigs[11].level = mixConfigs[12].level = mixConfigs[13].level =
-            mixConfigs[14].level = mixConfigs[15].level = mixConfigs[16].level =
-                MixingLevel::Disabled;
+
+    MinMax mixIndex;
+    if (coord.find("CER") != std::string_view::npos) {
+        mixIndex = {0, 5};
+    } else if (coord.find("PRE") != std::string_view::npos) {
+        mixIndex = {6, 11};
+    } else if (coord.find("AQU") != std::string_view::npos) {
+        mixIndex = {11, 17};
     }
-    SanitizeMixingConfigsForCurrentCluster();
+    for (int i = mixIndex.min; i < mixIndex.max; ++i) {
+        mixConfigs[i].level = MixingLevel::Disabled;
+    }
     return true;
+}
+
+bool SettingsCache::InitializeWorlds(std::vector<World *> &chosenWorlds)
+{
+    chosenWorlds.clear();
+    if (cluster == nullptr) {
+        return false;
+    }
+    chosenWorlds.reserve(cluster->worldPlacements.size());
+    for (auto &worldPlacement : cluster->worldPlacements) {
+        auto itr = worlds.find(worldPlacement.world);
+        if (itr == worlds.end()) {
+            LogE("world %s was wrong.", worldPlacement.world.c_str());
+            return false;
+        }
+        itr->second.locationType = worldPlacement.locationType;
+        chosenWorlds.push_back(&itr->second);
+    }
+    if (chosenWorlds.size() == 1) {
+        chosenWorlds[0]->locationType = LocationType::StartWorld;
+    }
+    return true;
+}
+
+void SettingsCache::ParseAndApplyMixingSettingsCode(uint64_t num)
+{
+    for (auto itr = mixConfigs.rbegin(); itr != mixConfigs.rend(); ++itr) {
+        itr->level = (MixingLevel)(num % 5);
+        itr->minCount = itr->level == MixingLevel::GuranteeMixing ? 1 : 0;
+        itr->maxCount = 3;
+        num /= 5;
+    }
 }
 
 void SettingsCache::ParseAndApplyMixingSettingsCode(const std::string &code)
 {
-    auto num = Base36ToBinary(code);
-    for (auto itr = mixConfigs.rbegin(); itr != mixConfigs.rend(); ++itr) {
-        itr->level = (MixingLevel)(num % 5);
-        itr->minCount = itr->level == MixingLevel::GuranteeMixing ? 1 : 0;
-        itr->maxCount = itr->type == 1 ? 1 : 3;
-        num /= 5;
-    }
+    ParseAndApplyMixingSettingsCode(Base36ToBinary(code));
 }
 
 ActiveContentSet SettingsCache::BuildActiveContentSet() const
@@ -566,14 +635,15 @@ void SettingsCache::SanitizeMixingConfigsForCurrentCluster()
 }
 
 std::vector<const WorldTrait *>
-SettingsCache::GetRandomTraits(const World &world) const
+SettingsCache::GetRandomTraits(const World &world, int seedValue) const
 {
-    if (seed == 0 || world.disableWorldTraits ||
+    if (seedValue == 0 || world.disableWorldTraits ||
         world.worldTraitRules.empty()) {
         return {};
     }
-    KRandom kRandom(seed);
+    KRandom kRandom(seedValue);
     std::vector<const WorldTrait *> total;
+    total.reserve(traits.size());
     for (auto &pair : traits) {
         if (pair.first[0] == 't') {
             if (IsSpaceOutEnabled() && pair.second.ForbiddenSpaceOut()) {
@@ -587,25 +657,18 @@ SettingsCache::GetRandomTraits(const World &world) const
             total.push_back(&pair.second);
         }
     }
-    const auto fixedConflictState = BuildFixedTraitConflictState(traits, world.fixedTraits);
     std::vector<const WorldTrait *> result;
-    std::vector<std::string> names(world.fixedTraits.begin(), world.fixedTraits.end());
-    std::set<std::string> except = fixedConflictState.blockedExclusiveTags;
+    std::set<std::string> except;
+    std::vector<const WorldTrait *> filtered;
+    filtered.reserve(total.size());
     for (auto &rule : world.worldTraitRules) {
         for (auto &specificTrait : rule.specificTraits) {
-            const auto itr = FindTraitById(traits, specificTrait);
-            if (itr != traits.end() &&
-                !TraitConflictsWithFixedTraits(itr->second, fixedConflictState)) {
-                names.emplace_back(specificTrait);
-                for (auto trait : total) {
-                    if (TraitIdEquals(specificTrait, trait->filePath)) {
-                        result.emplace_back(trait);
-                        break;
-                    }
-                }
+            const auto itr = traits.find(specificTrait);
+            if (itr != traits.end()) {
+                result.push_back(&itr->second);
             }
         }
-        std::vector<const WorldTrait *> subtotal;
+        filtered.clear();
         for (auto &trait : total) {
             if (!rule.requiredTags.empty() &&
                 !std::ranges::all_of(
@@ -621,24 +684,26 @@ SettingsCache::GetRandomTraits(const World &world) const
                     })) {
                 continue;
             }
-            if (TraitIdListContains(rule.forbiddenTraits, trait->filePath)) {
-                continue;
-            }
-            if (TraitConflictsWithFixedTraits(*trait, fixedConflictState)) {
+            if (std::ranges::contains(rule.forbiddenTraits, trait->filePath)) {
                 continue;
             }
             if (trait->IsValid(world)) {
-                subtotal.push_back(trait);
+                filtered.push_back(trait);
             }
         }
         int num = kRandom.Next(rule.min, std::max(rule.min, rule.max + 1));
-        int count = (int)names.size();
-        while ((int)names.size() < count + num && subtotal.size() > 0) {
-            int index = kRandom.Next((int)subtotal.size());
-            auto &worldTrait = subtotal[index];
+        int count = (int)result.size();
+        while ((int)result.size() < count + num && filtered.size() > 0) {
+            int index = kRandom.Next((int)filtered.size());
+            auto *worldTrait = filtered[index];
+            filtered.erase(filtered.begin() + index);
             bool flag = false;
             for (auto &exclusiveId : worldTrait->exclusiveWith) {
-                if (TraitIdListContains(names, exclusiveId)) {
+                if (std::ranges::contains(
+                        result, exclusiveId,
+                        [](const WorldTrait *trait) -> const std::string & {
+                            return trait->filePath;
+                        })) {
                     flag = true;
                     break;
                 }
@@ -650,7 +715,6 @@ SettingsCache::GetRandomTraits(const World &world) const
                 }
             }
             if (!flag) {
-                names.emplace_back(worldTrait->filePath);
                 result.emplace_back(worldTrait);
                 for (auto &exclusiveWithTag2 : worldTrait->exclusiveWithTags) {
                     except.emplace(exclusiveWithTag2);
@@ -658,20 +722,77 @@ SettingsCache::GetRandomTraits(const World &world) const
                 auto itr = std::remove(total.begin(), total.end(), worldTrait);
                 total.erase(itr, total.end());
             }
-            subtotal.erase(subtotal.begin() + index);
         }
-        if ((int)names.size() != count + num) {
+        if ((int)result.size() != count + num) {
             LogI("TraitRule on %s tried to generate %d but only generated %d",
-                 world.name.c_str(), num, (int)names.size() - count);
+                 world.name.c_str(), num, (int)result.size() - count);
         }
     }
     return result;
 }
 
+std::vector<const WorldTrait *>
+SettingsCache::GetRandomTraits(const World &world) const
+{
+    return GetRandomTraits(world, seed);
+}
+
+void SettingsCache::SetSeedWithTraits(const std::vector<World *> &activeWorlds,
+                                      int traitsFlag,
+                                      KRandom &random)
+{
+    constexpr int MaxTryTimes = 1000;
+    std::vector<const WorldTrait *> presets;
+    int index = 0;
+    for (auto &pair : traits) {
+        if ((traitsFlag >> index & 1) == 1) {
+            presets.push_back(&pair.second);
+        }
+        ++index;
+    }
+    if (presets.empty()) {
+        seed = random.Next();
+        return;
+    }
+
+    index = 0;
+    World *world = activeWorlds[index];
+    for (size_t i = 0; i < activeWorlds.size(); ++i) {
+        world = activeWorlds[i];
+        if (world->locationType == LocationType::StartWorld) {
+            index = static_cast<int>(i);
+            break;
+        }
+    }
+
+    size_t maxCount = 0;
+    int maxCountSeed = 0;
+    for (int i = 0; i < MaxTryTimes; ++i) {
+        int trySeed = random.Next();
+        auto worldTraits = GetRandomTraits(*world, trySeed + index);
+        size_t count = 0;
+        for (auto *preset : presets) {
+            if (std::ranges::contains(worldTraits, preset)) {
+                ++count;
+            }
+        }
+        if (count == presets.size()) {
+            seed = trySeed;
+            return;
+        }
+        if (maxCount < count) {
+            maxCount = count;
+            maxCountSeed = trySeed;
+        }
+    }
+    seed = maxCountSeed;
+    LogI("can not find seed for preset traits");
+}
 
 void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids, bool resetWorldRuntime)
 {
     std::vector<MixingConfig *> filtered;
+    filtered.reserve(mixConfigs.size());
     for (auto &config : mixConfigs) {
         if (config.level == MixingLevel::Disabled || config.type != 2) {
             continue;
@@ -680,7 +801,15 @@ void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids, bool resetW
         if (itr == subworldMixing.end()) {
             continue;
         }
-        if (!HasAnyClusterTag(cluster, itr->second.forbiddenClusterTags)) {
+        bool forbidden = false;
+        for (auto &tag : itr->second.forbiddenClusterTags) {
+            if (cluster != nullptr &&
+                std::ranges::find(cluster->clusterTags, tag) != cluster->clusterTags.end()) {
+                forbidden = true;
+                break;
+            }
+        }
+        if (!forbidden) {
             config.setting = &(itr->second);
             filtered.push_back(&config);
         }

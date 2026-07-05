@@ -127,8 +127,8 @@ void FillGenericParameterDetail(const CatalogEntry &entry,
     }
 
     (void)worldHeight;
-    KRandom random(geyserSeed + (summary.worldX + worldOffsetX) +
-                   (summary.worldY + worldOffsetY));
+    KRandom random(geyserSeed + (summary.x + worldOffsetX) +
+                   (summary.y + worldOffsetY));
 
     const float rateRoll = random.NextSingle();
     const float iterationLengthRoll = random.NextSingle();
