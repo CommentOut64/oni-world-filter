@@ -102,6 +102,7 @@ bool WorldRuntimeHasMixingProxyNames(const World &world)
         }
         for (const auto &subworldName : filter->subworldNames) {
             if (!subworldName.empty() && subworldName.front() == '(') {
+                std::cerr << "[TRACE] unresolved proxy subworld: " << subworldName << std::endl;
                 return true;
             }
         }

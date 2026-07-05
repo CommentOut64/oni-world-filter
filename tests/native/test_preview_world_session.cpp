@@ -310,7 +310,33 @@ bool BuildRawGeyserSummariesForTarget(int worldType,
     rawGeysers->clear();
     rawGeysers->reserve(generatedGeysers.size());
     for (const auto &geyser : generatedGeysers) {
-        rawGeysers->push_back({geyser.z, geyser.x, geyser.y, geyser.x, geyser.y});
+        if (geyser.z == 33 || geyser.z == 34) {
+            continue;
+        }
+        int mappedType = geyser.z;
+        switch (geyser.z) {
+        case 27:
+            mappedType = Batch::GeyserIdToIndex("oil_reservoir");
+            break;
+        case 28:
+            mappedType = Batch::GeyserIdToIndex("small_reef_geyser");
+            break;
+        case 29:
+            mappedType = Batch::GeyserIdToIndex("underwater_vent");
+            break;
+        case 30:
+            mappedType = Batch::GeyserIdToIndex("warp_receiver");
+            break;
+        case 31:
+            mappedType = Batch::GeyserIdToIndex("warp_sender");
+            break;
+        case 32:
+            mappedType = Batch::GeyserIdToIndex("warp_portal");
+            break;
+        default:
+            break;
+        }
+        rawGeysers->push_back({mappedType, geyser.x, geyser.y, geyser.x, geyser.y});
     }
     *worldSize = selectedState->world.worldsize;
     settings.seed = baseSeed;

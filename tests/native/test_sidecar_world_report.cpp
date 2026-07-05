@@ -265,24 +265,30 @@ int RunAllTests()
         const std::string d3Coord = "AQU-C-2124866103-0-D3-SAH2Q7Y1";
         const std::string d9Coord = "AQU-C-2124866103-0-D9-SAH2Q7Y1";
         const std::string expectedGeysers =
-            "small_reef_geyser,33,98,175,98,99\n"
-            "small_reef_geyser,33,114,104,114,170\n"
-            "small_reef_geyser,33,20,163,20,111\n"
-            "murky_brine,32,137,47,137,227\n"
-            "salt_water,6,128,83,128,191\n"
-            "small_reef_geyser,33,25,112,25,162\n"
-            "small_reef_geyser,33,76,181,76,93\n"
-            "small_reef_geyser,33,126,120,126,154\n"
-            "small_reef_geyser,33,125,189,125,85\n"
-            "small_reef_geyser,33,37,153,37,121\n"
-            "small_reef_geyser,33,104,158,104,116\n"
-            "small_reef_geyser,33,37,169,37,105\n"
-            "small_reef_geyser,33,40,181,40,93\n"
-            "small_reef_geyser,33,44,141,44,133\n"
-            "small_reef_geyser,33,34,112,34,162\n"
-            "liquid_co2,9,35,50,35,224\n"
-            "hot_po2,12,67,213,67,61\n"
-            "methane,15,115,166,115,108";
+            "small_reef_geyser,33,98,175,98,175\n"
+            "small_reef_geyser,33,114,104,114,104\n"
+            "small_reef_geyser,33,20,163,20,163\n"
+            "underwater_vent,34,83,16,83,16\n"
+            "underwater_vent,34,72,18,72,18\n"
+            "underwater_vent,34,68,47,68,47\n"
+            "murky_brine,32,137,47,137,47\n"
+            "salt_water,6,128,83,128,83\n"
+            "small_reef_geyser,33,25,112,25,112\n"
+            "small_reef_geyser,33,76,181,76,181\n"
+            "small_reef_geyser,33,126,120,126,120\n"
+            "small_reef_geyser,33,125,189,125,189\n"
+            "small_reef_geyser,33,37,153,37,153\n"
+            "small_reef_geyser,33,104,158,104,158\n"
+            "small_reef_geyser,33,37,169,37,169\n"
+            "small_reef_geyser,33,40,181,40,181\n"
+            "small_reef_geyser,33,44,141,44,141\n"
+            "small_reef_geyser,33,34,112,34,112\n"
+            "warp_portal,30,85,71,85,71\n"
+            "warp_sender,28,110,140,110,140\n"
+            "warp_receiver,29,141,161,141,161\n"
+            "liquid_co2,9,35,50,35,50\n"
+            "hot_po2,12,67,213,67,213\n"
+            "methane,15,115,166,115,166";
 
         const Json::Value d3Root = RunPreviewCoordAndParse(d3Coord, &failures);
         const Json::Value d9Root = RunPreviewCoordAndParse(d9Coord, &failures);

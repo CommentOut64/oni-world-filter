@@ -293,6 +293,24 @@ target_link_libraries(test_dlc5_mixing_registration PRIVATE Threads::Threads)
 endif()
 add_test(NAME test_dlc5_mixing_registration COMMAND test_dlc5_mixing_registration)
 
+add_executable(test_dlc5_batch_search
+    "../tests/native/test_main.cpp"
+    "../tests/native/test_dlc5_batch_search.cpp"
+    ${ONI_BASE_SOURCES}
+)
+target_include_directories(test_dlc5_batch_search
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/clipper"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/jsoncpp"
+    PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty/miniz"
+)
+target_link_libraries(test_dlc5_batch_search PRIVATE clipper jsoncpp miniz)
+if(TARGET Threads::Threads)
+target_link_libraries(test_dlc5_batch_search PRIVATE Threads::Threads)
+endif()
+add_test(NAME test_dlc5_batch_search COMMAND test_dlc5_batch_search)
+
 add_executable(test_app_runtime_worker_reset
     "../tests/native/test_main.cpp"
     "../tests/native/test_app_runtime_worker_reset.cpp"
