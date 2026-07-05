@@ -32,7 +32,6 @@ import { validateNativeCoordInput } from "./nativeCoordValidation";
 import SearchActions from "./SearchActions";
 import SearchConstraintAlerts from "./SearchConstraintAlerts";
 import SearchWarningConfirmModal from "./SearchWarningConfirmModal";
-import { isBrokenAquaticWorldType } from "./aquaticWorldGuard";
 import { buildWorldConstraintAlertItems } from "./geyserConstraintPresentation.ts";
 import {
   getPrimaryTraitBlockingError,
@@ -150,10 +149,6 @@ export default function SearchPanel({
     uiDraft: SearchDraft;
     submitDraft: SearchDraft;
     analysis: SearchAnalysisPayload;
-  } | null>(null);
-  const [pendingAquaticWorldConfirmation, setPendingAquaticWorldConfirmation] = useState<{
-    uiDraft: SearchDraft;
-    submitDraft: SearchDraft;
   } | null>(null);
   const watchWorldType = methods.watch("worldType");
   const watchMixing = methods.watch("mixing");
@@ -303,7 +298,6 @@ export default function SearchPanel({
     const uiDraft = toSearchDraft(values);
     let nextDraft = uiDraft;
     setPendingWarningConfirmation(null);
-    setPendingAquaticWorldConfirmation(null);
     setIsSearchSubmitting(true);
     try {
       if (hasCountAutoMax(uiDraft)) {
@@ -387,13 +381,6 @@ export default function SearchPanel({
         setPendingWarningConfirmation({ uiDraft, submitDraft: nextDraft, analysis });
         return;
       }
-      if (isBrokenAquaticWorldType(worlds, nextDraft.worldType)) {
-        setPendingAquaticWorldConfirmation({
-          uiDraft,
-          submitDraft: nextDraft,
-        });
-        return;
-      }
     } catch (error) {
       useSearchStore.setState({ lastError: formatTauriError(error) });
       return;
@@ -416,20 +403,6 @@ export default function SearchPanel({
 
   const handleWarningAbandon = () => {
     setPendingWarningConfirmation(null);
-  };
-
-  const handleAquaticWorldContinue = () => {
-    if (!pendingAquaticWorldConfirmation) {
-      return;
-    }
-    const nextUiDraft = pendingAquaticWorldConfirmation.uiDraft;
-    const nextSubmitDraft = pendingAquaticWorldConfirmation.submitDraft;
-    setPendingAquaticWorldConfirmation(null);
-    void startSearchWithDraft(nextUiDraft, nextSubmitDraft);
-  };
-
-  const handleAquaticWorldAbandon = () => {
-    setPendingAquaticWorldConfirmation(null);
   };
 
   const handleCoordSubmit = async () => {
@@ -760,26 +733,6 @@ export default function SearchPanel({
               onContinue={handleWarningContinue}
               onAbandon={handleWarningAbandon}
           />
-          <SearchWarningConfirmModal
-              open={pendingAquaticWorldConfirmation !== null}
-              analysis={null}
-              geysers={geysers}
-              title="重要提示"
-              continueText="仍然搜索"
-              abandonText="返回修改"
-              onContinue={handleAquaticWorldContinue}
-              onAbandon={handleAquaticWorldAbandon}
-          >
-              <Typography.Paragraph>
-                  水生行星包的世界目前只有地图可信。
-              </Typography.Paragraph>
-              <Typography.Paragraph>
-                  前端不再额外隐藏喷口预览，但这些世界的喷口结果仍可能不可靠，请结合实际情况自行判断。
-              </Typography.Paragraph>
-              <Typography.Paragraph>
-                  所有依赖喷口的筛选条件对水生行星包世界都不可靠；水生行星包的混搭不受影响。
-              </Typography.Paragraph>
-          </SearchWarningConfirmModal>
       </FormProvider>
   );
 }

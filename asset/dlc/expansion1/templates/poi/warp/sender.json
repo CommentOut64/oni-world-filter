@@ -15,6 +15,11 @@
       "id": "PropLight",
       "location_x": -2,
       "location_y": 3
+    },
+    {
+      "id": "WarpConduitSender",
+      "location_x": -3,
+      "location_y": -2
     }
   ]
 }

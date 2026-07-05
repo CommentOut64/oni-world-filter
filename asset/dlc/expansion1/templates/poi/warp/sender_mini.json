@@ -9,5 +9,12 @@
       "X": -5,
       "Y": -3
     }
-  }
+  },
+  "otherEntities": [
+    {
+      "id": "WarpConduitSender",
+      "location_x": -1,
+      "location_y": -2
+    }
+  ]
 }

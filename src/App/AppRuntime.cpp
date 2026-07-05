@@ -127,9 +127,6 @@ int ResolveCatalogGeyserType(int worldgenType)
 bool ShouldIncludeInAuthoritativeSummary(int worldgenType)
 {
     switch (worldgenType) {
-    case 30: // warp receiver
-    case 31: // warp sender
-    case 32: // warp teleporter
     case 33: // cryopod
     case 34: // printpod
         return false;
@@ -229,7 +226,7 @@ bool AppRuntime::ResetSearchSeed(const std::string &code)
         return false;
     }
     m_searchSeedPrepared = true;
-    m_searchWarpWorld = code.find("M-") == 0;
+    m_searchWarpWorld = ShouldGenerateWarpWorldForCode(code);
     return true;
 }
 
@@ -258,10 +255,14 @@ bool AppRuntime::Generate(const std::string &code, int traitsFlag)
         LogE("parse seed code %s failed.", code.c_str());
         return false;
     }
-    // DLC5 经典/太空风格主世界同样存在唯一 warp 副世界，预览链需要把它纳入。
-    const bool shouldPreviewWarpWorld =
-        code.find("M-") == 0 || m_settings.IsContentEnabled("DLC5_ID");
+    const bool shouldPreviewWarpWorld = ShouldGenerateWarpWorldForCode(code);
     return GenerateCurrentState(traitsFlag, shouldPreviewWarpWorld);
+}
+
+bool AppRuntime::ShouldGenerateWarpWorldForCode(const std::string &code)
+{
+    // DLC5 经典/太空风格主世界同样存在唯一 warp 副世界，批量链路必须与预览链路保持一致。
+    return code.find("M-") == 0 || m_settings.IsContentEnabled("DLC5_ID");
 }
 
 bool AppRuntime::GenerateSelectedPlacements(const std::string &code,

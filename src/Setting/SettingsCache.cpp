@@ -641,6 +641,8 @@ SettingsCache::GetRandomTraits(const World &world, int seedValue) const
         world.worldTraitRules.empty()) {
         return {};
     }
+    const auto fixedTraitConflictState =
+        BuildFixedTraitConflictState(traits, world.fixedTraits);
     KRandom kRandom(seedValue);
     std::vector<const WorldTrait *> total;
     total.reserve(traits.size());
@@ -687,7 +689,8 @@ SettingsCache::GetRandomTraits(const World &world, int seedValue) const
             if (std::ranges::contains(rule.forbiddenTraits, trait->filePath)) {
                 continue;
             }
-            if (trait->IsValid(world)) {
+            if (!TraitConflictsWithFixedTraits(*trait, fixedTraitConflictState) &&
+                trait->IsValid(world)) {
                 filtered.push_back(trait);
             }
         }
@@ -827,6 +830,7 @@ void SettingsCache::DoSubworldMixing(std::vector<World *> asteroids, bool resetW
             world->ClearMixingsAndTraits();
         }
         world->ApplayMixings(filtered);
+        world->PruneUnresolvedSubworldMixingPlaceholders();
     }
 }
 

@@ -56,6 +56,7 @@ public:
 private:
     AppRuntime() = default;
 
+    bool ShouldGenerateWarpWorldForCode(const std::string &code);
     bool BuildWorldList(std::vector<ResolvedWorldPlacement> &placements);
     bool GenerateCurrentState(int traitsFlag, bool genWarpWorld);
     static int FindPrimaryPlacementIndex(const std::vector<ResolvedWorldPlacement> &placements);

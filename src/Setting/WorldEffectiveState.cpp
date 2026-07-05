@@ -7,6 +7,37 @@
 #include "Setting/SettingsCache.hpp"
 #include "Setting/WorldTraitConflict.hpp"
 
+namespace {
+
+const WorldMixingSettings *ResolveAppliedWorldMixingSetting(const SettingsCache &settings,
+                                                            const WorldPlacement &placement,
+                                                            const ActiveContentSet &activeContent)
+{
+    if (!placement.IsMixingPlacement()) {
+        return nullptr;
+    }
+    for (const auto &config : settings.mixConfigs) {
+        if (config.type != 1 || config.level == MixingLevel::Disabled) {
+            continue;
+        }
+        const auto settingItr = settings.worldMixing.find(config.path);
+        if (settingItr == settings.worldMixing.end()) {
+            continue;
+        }
+        const auto &setting = settingItr->second;
+        if (setting.world != placement.world) {
+            continue;
+        }
+        if (!IsMixingConfigAllowed(config, settings.cluster, activeContent, &setting, nullptr)) {
+            continue;
+        }
+        return &setting;
+    }
+    return nullptr;
+}
+
+} // namespace
+
 bool BuildResolvedWorldPlacements(SettingsCache &settings,
                                   std::vector<ResolvedWorldPlacement> *placements,
                                   std::string *errorMessage)
@@ -26,6 +57,7 @@ bool BuildResolvedWorldPlacements(SettingsCache &settings,
     }
 
     placements->reserve(settings.cluster->worldPlacements.size());
+    const ActiveContentSet activeContent = settings.BuildActiveContentSet();
     for (size_t index = 0; index < settings.cluster->worldPlacements.size(); ++index) {
         auto &placement = settings.cluster->worldPlacements[index];
         const auto worldItr = settings.worlds.find(placement.world);
@@ -40,6 +72,8 @@ bool BuildResolvedWorldPlacements(SettingsCache &settings,
             .placementIndex = static_cast<int>(index),
             .placement = &placement,
             .sourceWorld = &worldItr->second,
+            .appliedWorldMixingSetting =
+                ResolveAppliedWorldMixingSetting(settings, placement, activeContent),
             .worldAssetId = placement.world,
         });
     }

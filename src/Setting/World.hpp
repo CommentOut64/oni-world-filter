@@ -113,5 +113,6 @@ struct World {
     void ApplayWorldMixing(const WorldMixing &mixing);
     void ApplayMixings(std::vector<MixingConfig *> &mixings);
     void ApplayTraits(const WorldTrait &traits, const SettingsCache &settings);
+    void PruneUnresolvedSubworldMixingPlaceholders();
     void ClearMixingsAndTraits();
 };

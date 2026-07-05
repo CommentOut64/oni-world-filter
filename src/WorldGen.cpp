@@ -708,11 +708,50 @@ std::vector<Vector3i> WorldGen::GetGeysers(int globalWorldSeed) const
             }
             result.emplace_back(pos.x, pos.y, index);
         } else if (name.starts_with("expansion1::poi/warp/receiver")) {
-            result.emplace_back(pos.x, pos.y, configs["receiver"]);
+            bool found = false;
+            for (const auto &entity : ExpandTemplateEntities(templt)) {
+                if (entity.entityId != "WarpConduitReceiver") {
+                    continue;
+                }
+                result.emplace_back(entity.position.x,
+                                    (int)m_world.worldsize.y - entity.position.y,
+                                    configs["receiver"]);
+                found = true;
+                break;
+            }
+            if (!found) {
+                result.emplace_back(pos.x, pos.y, configs["receiver"]);
+            }
         } else if (name.starts_with("expansion1::poi/warp/sender")) {
-            result.emplace_back(pos.x, pos.y, configs["sender"]);
+            bool found = false;
+            for (const auto &entity : ExpandTemplateEntities(templt)) {
+                if (entity.entityId != "WarpConduitSender") {
+                    continue;
+                }
+                result.emplace_back(entity.position.x,
+                                    (int)m_world.worldsize.y - entity.position.y,
+                                    configs["sender"]);
+                found = true;
+                break;
+            }
+            if (!found) {
+                result.emplace_back(pos.x, pos.y, configs["sender"]);
+            }
         } else if (name.starts_with("expansion1::poi/warp/teleporter")) {
-            result.emplace_back(pos.x, pos.y, configs["teleporter"]);
+            bool found = false;
+            for (const auto &entity : ExpandTemplateEntities(templt)) {
+                if (entity.entityId != "WarpPortal") {
+                    continue;
+                }
+                result.emplace_back(entity.position.x,
+                                    (int)m_world.worldsize.y - entity.position.y,
+                                    configs["teleporter"]);
+                found = true;
+                break;
+            }
+            if (!found) {
+                result.emplace_back(pos.x, pos.y, configs["teleporter"]);
+            }
         } else if (name.starts_with("expansion1::poi/traits/cryopod")) {
             result.emplace_back(pos.x, pos.y, configs["cryopod"]);
         } else if (!templt.container->otherEntities.empty()) {

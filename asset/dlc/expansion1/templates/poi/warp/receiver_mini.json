@@ -20,6 +20,11 @@
       "id": "PropGravitasLabTable",
       "location_x": -3,
       "location_y": -1
+    },
+    {
+      "id": "WarpConduitReceiver",
+      "location_x": 1,
+      "location_y": -1
     }
   ]
 }

@@ -196,6 +196,24 @@ void World::ApplayTraits(const WorldTrait &trait, const SettingsCache &settings)
     }
 }
 
+void World::PruneUnresolvedSubworldMixingPlaceholders()
+{
+    for (auto filter : unknownCellsAllowedSubworlds2) {
+        if (filter == nullptr) {
+            continue;
+        }
+        auto *runtimeFilter = const_cast<AllowedCellsFilter *>(filter);
+        runtimeFilter->Backup();
+        auto remove = std::remove_if(runtimeFilter->subworldNames.begin(),
+                                     runtimeFilter->subworldNames.end(),
+                                     [](const std::string &subworldName) {
+                                         return !subworldName.empty() &&
+                                                subworldName.front() == '(';
+                                     });
+        runtimeFilter->subworldNames.erase(remove, runtimeFilter->subworldNames.end());
+    }
+}
+
 void World::ClearMixingsAndTraits()
 {
     startingPositionHorizontal2 = startingBasePositionHorizontal;
