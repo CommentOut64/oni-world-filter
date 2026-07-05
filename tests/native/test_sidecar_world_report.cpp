@@ -265,30 +265,24 @@ int RunAllTests()
         const std::string d3Coord = "AQU-C-2124866103-0-D3-SAH2Q7Y1";
         const std::string d9Coord = "AQU-C-2124866103-0-D9-SAH2Q7Y1";
         const std::string expectedGeysers =
-            "small_reef_geyser,33,95,190,95,84\n"
-            "small_reef_geyser,33,28,166,28,108\n"
-            "small_reef_geyser,33,108,109,108,165\n"
-            "underwater_vent,34,70,29,70,245\n"
-            "underwater_vent,34,80,18,80,256\n"
-            "underwater_vent,34,119,36,119,238\n"
-            "murky_brine,32,114,47,114,227\n"
-            "salt_water,6,22,216,22,58\n"
-            "small_reef_geyser,33,15,153,15,121\n"
-            "small_reef_geyser,33,78,193,78,81\n"
-            "small_reef_geyser,33,82,174,82,100\n"
-            "small_reef_geyser,33,18,101,18,173\n"
-            "small_reef_geyser,33,125,104,125,170\n"
-            "small_reef_geyser,33,24,155,24,119\n"
-            "small_reef_geyser,33,91,174,91,100\n"
-            "small_reef_geyser,33,51,150,51,124\n"
-            "small_reef_geyser,33,49,110,49,164\n"
-            "small_reef_geyser,33,114,191,114,83\n"
-            "warp_sender,28,107,84,107,190\n"
-            "warp_portal,30,79,69,79,205\n"
-            "warp_receiver,29,101,215,101,59\n"
-            "hot_hydrogen,11,117,128,117,146\n"
-            "methane,15,143,33,143,241\n"
-            "liquid_co2,9,140,117,140,157";
+            "small_reef_geyser,33,98,175,98,99\n"
+            "small_reef_geyser,33,114,104,114,170\n"
+            "small_reef_geyser,33,20,163,20,111\n"
+            "murky_brine,32,137,47,137,227\n"
+            "salt_water,6,128,83,128,191\n"
+            "small_reef_geyser,33,25,112,25,162\n"
+            "small_reef_geyser,33,76,181,76,93\n"
+            "small_reef_geyser,33,126,120,126,154\n"
+            "small_reef_geyser,33,125,189,125,85\n"
+            "small_reef_geyser,33,37,153,37,121\n"
+            "small_reef_geyser,33,104,158,104,116\n"
+            "small_reef_geyser,33,37,169,37,105\n"
+            "small_reef_geyser,33,40,181,40,93\n"
+            "small_reef_geyser,33,44,141,44,133\n"
+            "small_reef_geyser,33,34,112,34,162\n"
+            "liquid_co2,9,35,50,35,224\n"
+            "hot_po2,12,67,213,67,61\n"
+            "methane,15,115,166,115,108";
 
         const Json::Value d3Root = RunPreviewCoordAndParse(d3Coord, &failures);
         const Json::Value d9Root = RunPreviewCoordAndParse(d9Coord, &failures);

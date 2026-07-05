@@ -41,3 +41,11 @@ test("PreviewPane manages report generation lifecycle, success toast and error p
   assert.match(PREVIEW_PANE_SOURCE, /finally \{\s*setIsGeneratingReport\(false\);\s*\}/);
   assert.match(PREVIEW_PANE_SOURCE, /isGeneratingReport=\{isGeneratingReport\}/);
 });
+
+test("PreviewPane no longer suppresses aquatic world geyser preview in the frontend", () => {
+  assert.doesNotMatch(PREVIEW_PANE_SOURCE, /isBrokenAquaticWorldType/);
+  assert.doesNotMatch(PREVIEW_PANE_SOURCE, /suppressBrokenAquaticGeysers/);
+  assert.match(PREVIEW_PANE_SOURCE, /showGeysers=\{showGeysers\}/);
+  assert.match(PREVIEW_PANE_SOURCE, /geyserCount=\{preview\?\.summary\.geysers\.length \?\? 0\}/);
+  assert.match(PREVIEW_PANE_SOURCE, /geyserControlsDisabled=\{false\}/);
+});
