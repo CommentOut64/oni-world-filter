@@ -54,7 +54,8 @@ public:
 
     bool GenerateOverworld(std::vector<Site> &sites);
 
-    std::vector<Vector3i> GetGeysers(int seed) const;
+    std::vector<Vector3i> GetGeysers(int seed,
+                                     const std::vector<Site> *generatedSites = nullptr) const;
     void DumpDebugWorldState(const std::vector<Site> &sites,
                              const std::string &path) const;
 #if 0

@@ -97,6 +97,11 @@ void TemplateSpawning::SpawnStartingTemplate()
         return;
     }
     m_poiBounds.push_back(templateBounds);
+    // 仅 warp world 起始基地目前承载权威设施（例如 WarpPortal），
+    // 需要进入后续 summary 提取链路；普通起始基地仍保持现有行为。
+    if (container.name.contains("::bases/warpworld")) {
+        m_templates.emplace_back(position, &container);
+    }
 }
 
 static void UpdateNodeTags(Site &site, const std::string &name, bool remove)

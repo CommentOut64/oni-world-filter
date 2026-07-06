@@ -513,7 +513,7 @@ GeneratedWorldSummary AppRuntime::BuildSummary(int seed,
         }
     }
 
-    auto geysers = worldGen.GetGeysers(summary.geyserSeed);
+    auto geysers = worldGen.GetGeysers(summary.geyserSeed, &sites);
     summary.geysers.reserve(geysers.size());
     for (auto &item : geysers) {
         if (!ShouldIncludeInAuthoritativeSummary(item.z)) {
