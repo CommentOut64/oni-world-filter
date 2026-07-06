@@ -1,0 +1,8 @@
+{
+  "name": "worldgen-diff-batch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.mjs"
+  }
+}
